@@ -66,8 +66,8 @@ fun TrackMenuSheet(
                         .clip(androidx.compose.foundation.shape.RoundedCornerShape(6.dp))
                         .background(MaterialTheme.colorScheme.surfaceContainerHigh),
                 ) {
-                    coil3.compose.AsyncImage(
-                        model = cover,
+                    ArtworkImage(
+                        url = cover,
                         contentDescription = null,
                         contentScale = androidx.compose.ui.layout.ContentScale.Crop,
                         modifier = Modifier.fillMaxWidth().height(56.dp),

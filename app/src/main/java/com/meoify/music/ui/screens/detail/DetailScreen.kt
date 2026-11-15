@@ -68,7 +68,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import coil3.compose.AsyncImage
 import com.meoify.music.MeoifyApplication
 import com.meoify.music.data.model.DetailPage
 import com.meoify.music.data.model.MediaKind
@@ -77,6 +76,7 @@ import com.meoify.music.data.model.UiState
 import com.meoify.music.playback.PlayerUiState
 import com.meoify.music.ui.components.ArtistCard
 import com.meoify.music.ui.components.MediaCard
+import com.meoify.music.ui.components.ArtworkImage
 import com.meoify.music.ui.components.SectionHeader
 import com.meoify.music.ui.components.TrackRow
 import com.meoify.music.ui.components.rememberTrackCover
@@ -342,8 +342,8 @@ private fun DetailContent(
                                 )
                             }
                         } else {
-                            AsyncImage(
-                                model = com.meoify.music.data.remote.Artwork.highRes(page.thumbnailUrl),
+                            ArtworkImage(
+                                url = page.thumbnailUrl,
                                 contentDescription = null,
                                 contentScale = ContentScale.Crop,
                                 modifier = Modifier.fillMaxSize(),
@@ -605,8 +605,8 @@ private fun TrackCard(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(modifier = Modifier.size(46.dp)) {
-                AsyncImage(
-                    model = cover,
+                ArtworkImage(
+                    url = cover,
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier

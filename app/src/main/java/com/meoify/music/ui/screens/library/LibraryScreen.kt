@@ -58,12 +58,13 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import coil3.compose.AsyncImage
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.meoify.music.MeoifyApplication
 import com.meoify.music.data.model.LocalPlaylist
 import com.meoify.music.data.model.MediaCard as MediaCardModel
 import com.meoify.music.data.model.MediaKind
 import com.meoify.music.data.model.Track
+import com.meoify.music.ui.components.ArtworkImage
 import com.meoify.music.ui.components.MediaCard
 import com.meoify.music.ui.components.SectionHeader
 import com.meoify.music.ui.components.ShimmerBox
@@ -85,13 +86,16 @@ fun LibraryScreen(
     val actions = LocalAppActions.current
     val context = LocalContext.current
     val app = context.applicationContext as MeoifyApplication
+    val settings by app.container.settings.settings.collectAsStateWithLifecycle()
     val ytPlaylists = LocalYtPlaylists.current
     val ytLoading = LocalYtLoading.current
     val signedIn = LocalSignedIn.current
 
     var filterName by rememberSaveable { mutableStateOf(LibraryFilter.Playlists.name) }
     val filter = LibraryFilter.valueOf(filterName)
-    var gridView by rememberSaveable { mutableStateOf(false) }
+    // The layout lives in settings so it survives opening a playlist and
+    // coming back to the Library tab.
+    val gridView = settings.libraryGridView
     var menuTarget by remember { mutableStateOf<PlaylistTarget?>(null) }
     var renameTarget by remember { mutableStateOf<PlaylistTarget?>(null) }
     var deleteTarget by remember { mutableStateOf<PlaylistTarget?>(null) }
@@ -121,7 +125,7 @@ fun LibraryScreen(
                     modifier = Modifier.weight(1f),
                 )
                 if (filter == LibraryFilter.Playlists) {
-                    IconButton(onClick = { gridView = !gridView }) {
+                    IconButton(onClick = { app.container.settings.setLibraryGridView(!gridView) }) {
                         Icon(
                             imageVector = if (gridView) Icons.Filled.ViewList else Icons.Filled.GridView,
                             contentDescription = if (gridView) "Show as list" else "Show as grid",
@@ -529,8 +533,8 @@ private fun PlaylistRow(
                     .background(MaterialTheme.colorScheme.surfaceContainerHigh),
             ) {
                 if (!playlist.artworkUrl.isNullOrBlank()) {
-                    AsyncImage(
-                        model = com.meoify.music.data.remote.Artwork.highRes(playlist.artworkUrl),
+                    ArtworkImage(
+                        url = playlist.artworkUrl,
                         contentDescription = null,
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize(),
@@ -603,8 +607,8 @@ private fun YtPlaylistRow(
                     .background(MaterialTheme.colorScheme.surfaceContainerHigh),
             ) {
                 if (!card.thumbnailUrl.isNullOrBlank()) {
-                    AsyncImage(
-                        model = com.meoify.music.data.remote.Artwork.highRes(card.thumbnailUrl),
+                    ArtworkImage(
+                        url = card.thumbnailUrl,
                         contentDescription = null,
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize(),

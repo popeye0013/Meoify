@@ -18,6 +18,26 @@ object Artwork {
     fun isVideoStill(url: String?): Boolean =
         url != null && (url.contains("ytimg.com") || url.contains("img.youtube.com"))
 
+    private val YT_VIDEO_ID = Regex("/vi/([^/]+)/")
+
+    /**
+     * URLs for [url], best quality first.
+     *
+     * Album and artist covers only have one source, but video stills can be
+     * served at several sizes. The largest version (`maxresdefault`) does not
+     * exist for every upload, so the always-present `hqdefault` follows it and
+     * the image simply falls back when the big one is missing.
+     */
+    fun candidates(url: String?): List<String> {
+        val high = highRes(url) ?: return emptyList()
+        if (!isVideoStill(high)) return listOf(high)
+        val videoId = YT_VIDEO_ID.find(high)?.groupValues?.getOrNull(1) ?: return listOf(high)
+        return listOf(
+            "https://i.ytimg.com/vi/$videoId/maxresdefault.jpg",
+            "https://i.ytimg.com/vi/$videoId/hqdefault.jpg",
+        )
+    }
+
     /** The highest quality version of a cover or still URL. */
     fun highRes(url: String?): String? {
         if (url.isNullOrBlank()) return null

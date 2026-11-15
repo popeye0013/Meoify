@@ -128,6 +128,7 @@ data class AppSettings(
     val accountName: String? = null,
     val localProfileName: String? = null,
     val localAvatarPath: String? = null,
+    val libraryGridView: Boolean = false,
     val onboardingCompleted: Boolean = false,
 )
 

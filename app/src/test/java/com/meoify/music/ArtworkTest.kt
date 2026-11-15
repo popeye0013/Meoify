@@ -44,6 +44,22 @@ class ArtworkTest {
     }
 
     @Test
+    fun videoStillsOfferALargerFrameFirst() {
+        assertEquals(
+            listOf(
+                "https://i.ytimg.com/vi/abc/maxresdefault.jpg",
+                "https://i.ytimg.com/vi/abc/hqdefault.jpg",
+            ),
+            Artwork.candidates("https://i.ytimg.com/vi/abc/hqdefault.jpg"),
+        )
+        assertEquals(
+            listOf("https://lh3.googleusercontent.com/abc=w1200-h1200-l90-rj"),
+            Artwork.candidates("https://lh3.googleusercontent.com/abc=w60-h60-l90-rj"),
+        )
+        assertTrue(Artwork.candidates(null).isEmpty())
+    }
+
+    @Test
     fun blankUrlsStayNull() {
         assertEquals(null, Artwork.highRes(null))
         assertEquals(null, Artwork.highRes(""))

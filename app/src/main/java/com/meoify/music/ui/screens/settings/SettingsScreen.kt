@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -33,6 +34,7 @@ import androidx.compose.material.icons.filled.ArrowOutward
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Badge
 import androidx.compose.material.icons.filled.Backup
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.ColorLens
 import androidx.compose.material.icons.filled.ContentCopy
@@ -70,11 +72,14 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
@@ -119,12 +124,21 @@ fun SettingsScreen(
     val settings by app.container.settings.settings.collectAsStateWithLifecycle()
     val actions = LocalAppActions.current
     val library = LocalLibrary.current
+    val ytLibrary by app.container.ytLibrary.state.collectAsStateWithLifecycle()
+    val signedIn = settings.ytCookies != null
     val profileViewModel: ProfileViewModel = viewModel(
         factory = ProfileViewModelFactory(app.container.repository),
     )
     val account by profileViewModel.account.collectAsStateWithLifecycle()
     val profileLoading by profileViewModel.loading.collectAsStateWithLifecycle()
     val historyStatus by app.container.historySync.status.collectAsStateWithLifecycle()
+
+    // In Settings the search icon searches the settings themselves, not the
+    // music catalogue.
+    var searchOpen by rememberSaveable { mutableStateOf(false) }
+    var searchQuery by rememberSaveable { mutableStateOf("") }
+    val searchFocus = remember { FocusRequester() }
+    val searchListState = rememberLazyListState()
 
     val scope = rememberCoroutineScope()
     val backupManager = remember(app) {
@@ -139,7 +153,7 @@ fun SettingsScreen(
     val versionName = remember {
         runCatching {
             context.packageManager.getPackageInfo(context.packageName, 0).versionName
-        }.getOrNull().orEmpty().ifBlank { "1.7.1" }
+        }.getOrNull().orEmpty().ifBlank { "1.7.2" }
     }
 
     val avatarPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
@@ -190,6 +204,46 @@ fun SettingsScreen(
         if (settings.ytCookies != null) profileViewModel.refresh(force = true)
     }
 
+    LaunchedEffect(searchOpen) {
+        if (searchOpen) {
+            kotlinx.coroutines.delay(80)
+            runCatching { searchFocus.requestFocus() }
+        } else {
+            searchQuery = ""
+        }
+    }
+    LaunchedEffect(searchQuery) {
+        runCatching { searchListState.scrollToItem(0) }
+    }
+
+    fun matches(vararg keys: String): Boolean {
+        val query = searchQuery.trim()
+        if (query.isBlank()) return true
+        return keys.any { it.contains(query, ignoreCase = true) }
+    }
+
+    val accountKeys = arrayOf(
+        "Account", "profile", "avatar", "email", "name", "sign in", "sign out",
+        "YouTube Music", "local", "liked", "playlists", "played", "stats",
+    )
+    val appearanceKeys = arrayOf(
+        "Appearance", "theme", "dark", "light", "system", "dynamic color",
+        "colours", "colors", "wallpaper", "pure black", "OLED",
+    )
+    val playbackKeys = arrayOf(
+        "Playback", "audio", "quality", "high", "normal", "saver", "data",
+        "kbps", "history", "sync",
+    )
+    val libraryKeys = arrayOf("Library", "clear", "recent", "searches", "listening", "history")
+    val backupKeys = arrayOf("Backup", "restore", "export", "import", "json", "file")
+    val supportKeys = arrayOf("Support", "donate", "UPI", "Google Pay", "contribution", "money")
+    val developerKeys = arrayOf("Developer", "telegram", "contact", "github", "source")
+    val aboutKeys = arrayOf("About", "version", "update", "release", "app", "Meoify")
+    val anyMatch = listOf(
+        accountKeys, appearanceKeys, playbackKeys, libraryKeys,
+        backupKeys, supportKeys, developerKeys, aboutKeys,
+    ).any { matches(*it) }
+
     Scaffold(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
@@ -215,26 +269,47 @@ fun SettingsScreen(
                         )
                     }
                 }
-                Text(
-                    text = "Settings",
-                    style = MaterialTheme.typography.headlineLarge,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = MaterialTheme.colorScheme.onBackground,
-                    maxLines = 1,
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(horizontal = 14.dp),
-                )
+                if (searchOpen) {
+                    OutlinedTextField(
+                        value = searchQuery,
+                        onValueChange = { searchQuery = it },
+                        placeholder = { Text("Search settings") },
+                        singleLine = true,
+                        shape = CircleShape,
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(horizontal = 12.dp)
+                            .focusRequester(searchFocus),
+                    )
+                } else {
+                    Text(
+                        text = "Settings",
+                        style = MaterialTheme.typography.headlineLarge,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = MaterialTheme.colorScheme.onBackground,
+                        maxLines = 1,
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(horizontal = 14.dp),
+                    )
+                }
                 Surface(
-                    onClick = { actions.search("") },
+                    onClick = {
+                        if (searchOpen) {
+                            searchOpen = false
+                            searchQuery = ""
+                        } else {
+                            searchOpen = true
+                        }
+                    },
                     shape = CircleShape,
                     color = MaterialTheme.colorScheme.surfaceContainerHigh,
                     modifier = Modifier.size(44.dp),
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Icon(
-                            Icons.Filled.Search,
-                            contentDescription = "Search",
+                            imageVector = if (searchOpen) Icons.Filled.Close else Icons.Filled.Search,
+                            contentDescription = if (searchOpen) "Close settings search" else "Search settings",
                             tint = MaterialTheme.colorScheme.onSurface,
                             modifier = Modifier.size(22.dp),
                         )
@@ -244,6 +319,7 @@ fun SettingsScreen(
         },
     ) { padding ->
         LazyColumn(
+            state = searchListState,
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding),
@@ -255,6 +331,36 @@ fun SettingsScreen(
             ),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
+            if (!anyMatch) {
+                item {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 40.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        Icon(
+                            Icons.Filled.Search,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(36.dp),
+                        )
+                        Spacer(Modifier.height(12.dp))
+                        Text(
+                            text = "No settings match \"${searchQuery.trim()}\"",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            text = "Try theme, audio quality, backup or updates.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
+            if (matches(*accountKeys)) {
             item { SectionLabel("Account") }
             item {
                 val displayName = account?.displayName
@@ -276,9 +382,21 @@ fun SettingsScreen(
                         ?: settings.localProfileName?.trim()?.take(1)?.uppercase(),
                     signedIn = settings.ytCookies != null,
                     loading = profileLoading,
-                    liked = library.liked.size,
-                    playlists = library.playlists.size,
-                    played = library.recent.size,
+                    liked = if (signedIn && ytLibrary.ready) {
+                        ytLibrary.likedCount
+                    } else {
+                        library.liked.size
+                    },
+                    playlists = if (signedIn) {
+                        ytLibrary.playlists.size
+                    } else {
+                        library.playlists.size
+                    },
+                    played = if (signedIn && ytLibrary.ready) {
+                        ytLibrary.playedCount
+                    } else {
+                        library.recent.size
+                    },
                     onLiked = { actions.openLiked() },
                     onPlaylists = { actions.openLibrary() },
                     onPlayed = { actions.openLibrary() },
@@ -295,7 +413,9 @@ fun SettingsScreen(
                     },
                 )
             }
+            }
 
+            if (matches(*appearanceKeys)) {
             item { SectionLabel("Appearance") }
             item {
                 SettingsCard {
@@ -344,7 +464,9 @@ fun SettingsScreen(
                     )
                 }
             }
+            }
 
+            if (matches(*playbackKeys)) {
             item { SectionLabel("Playback") }
             item {
                 SettingsCard {
@@ -406,7 +528,9 @@ fun SettingsScreen(
                     )
                 }
             }
+            }
 
+            if (matches(*libraryKeys)) {
             item { SectionLabel("Library") }
             item {
                 SettingsCard {
@@ -422,7 +546,9 @@ fun SettingsScreen(
                     )
                 }
             }
+            }
 
+            if (matches(*backupKeys)) {
             item { SectionLabel("Backup & restore") }
             item {
                 SettingsCard {
@@ -440,7 +566,9 @@ fun SettingsScreen(
                     )
                 }
             }
+            }
 
+            if (matches(*supportKeys)) {
             item { SectionLabel("Support") }
             item {
                 DonateCard(
@@ -460,14 +588,18 @@ fun SettingsScreen(
                     },
                 )
             }
+            }
 
+            if (matches(*developerKeys)) {
             item { SectionLabel("Developer") }
             item {
                 DeveloperCard(
                     onOpen = { url -> context.openUrl(url) },
                 )
             }
+            }
 
+            if (matches(*aboutKeys)) {
             item { SectionLabel("About") }
             item {
                 SettingsCard {
@@ -560,6 +692,7 @@ fun SettingsScreen(
                         onClick = { context.openUrl(DeveloperInfo.REPO_URL) },
                     )
                 }
+            }
             }
         }
     }

@@ -37,6 +37,7 @@ class SettingsStore(private val context: Context) {
         val accountName = stringPreferencesKey("yt_account")
         val localProfileName = stringPreferencesKey("local_profile_name")
         val localAvatarPath = stringPreferencesKey("local_avatar_path")
+        val libraryGrid = booleanPreferencesKey("library_grid")
     }
 
     val settings: StateFlow<AppSettings> = context.settingsStore.data
@@ -55,6 +56,7 @@ class SettingsStore(private val context: Context) {
                 accountName = prefs[Keys.accountName],
                 localProfileName = prefs[Keys.localProfileName],
                 localAvatarPath = prefs[Keys.localAvatarPath],
+                libraryGridView = prefs[Keys.libraryGrid] ?: false,
             )
         }
         .stateIn(scope, SharingStarted.Eagerly, AppSettings())
@@ -113,6 +115,11 @@ class SettingsStore(private val context: Context) {
         context.settingsStore.edit {
             if (path == null) it.remove(Keys.localAvatarPath) else it[Keys.localAvatarPath] = path
         }
+    }
+
+    /** Remembers whether the Library playlists are shown as a grid. */
+    fun setLibraryGridView(enabled: Boolean) = scope.launch {
+        context.settingsStore.edit { it[Keys.libraryGrid] = enabled }
     }
 
     suspend fun current(): AppSettings = settings.first()

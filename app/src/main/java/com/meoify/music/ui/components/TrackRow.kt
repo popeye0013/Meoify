@@ -28,7 +28,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import coil3.compose.AsyncImage
 import com.meoify.music.data.model.Track
 import com.meoify.music.ui.theme.ArtworkColorCache
 import com.meoify.music.util.formatDuration
@@ -105,8 +104,8 @@ fun TrackRow(
         }
         if (showArtwork) {
             Box(modifier = Modifier.size(48.dp)) {
-                AsyncImage(
-                    model = cover,
+                ArtworkImage(
+                    url = cover,
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier

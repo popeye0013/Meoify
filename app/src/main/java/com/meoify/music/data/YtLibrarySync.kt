@@ -32,6 +32,8 @@ class YtLibrarySync(
         val signedIn: Boolean = false,
         val loading: Boolean = false,
         val playlists: List<MediaCard> = emptyList(),
+        val likedCount: Int = 0,
+        val playedCount: Int = 0,
         val error: String? = null,
         val ready: Boolean = false,
     )
@@ -73,12 +75,15 @@ class YtLibrarySync(
         var error: String? = null
         var playlists: List<MediaCard> = current.playlists
         var liked: List<Track>? = null
+        var playedCount = current.playedCount
         try {
             coroutineScope {
                 val likedJob = async { repository.likedSongs() }
+                val playedJob = async { repository.playedCount() }
                 playlists = repository.libraryPlaylists()
                     .filterNot { it.id == "LM" || it.id == "SE" }
                 liked = likedJob.await()
+                playedCount = playedJob.await()
             }
         } catch (t: Throwable) {
             error = t.message ?: "Couldn't sync your YouTube Music library."
@@ -90,6 +95,8 @@ class YtLibrarySync(
             signedIn = true,
             loading = false,
             playlists = playlists,
+            likedCount = liked?.size ?: current.likedCount,
+            playedCount = playedCount,
             error = error,
             ready = true,
         )
@@ -102,15 +109,28 @@ class YtLibrarySync(
         // Update the mirror first so the heart responds instantly, then write
         // through to YouTube Music and roll back if the request fails.
         val current = library.current().liked
+        val wasLiked = current.any { it.id == track.id }
         val updated = if (liked) {
-            if (current.any { it.id == track.id }) current else listOf(track) + current
+            if (wasLiked) current else listOf(track) + current
         } else {
             current.filterNot { it.id == track.id }
         }
         library.setLiked(updated)
+        if (wasLiked != liked) {
+            _state.value = _state.value.copy(
+                likedCount = (_state.value.likedCount + if (liked) 1 else -1).coerceAtLeast(0),
+            )
+        }
 
         val ok = repository.setSongLiked(track.id, liked)
-        if (!ok) library.setLiked(current)
+        if (!ok) {
+            library.setLiked(current)
+            if (wasLiked != liked) {
+                _state.value = _state.value.copy(
+                    likedCount = (_state.value.likedCount + if (liked) -1 else 1).coerceAtLeast(0),
+                )
+            }
+        }
         return ok
     }
 

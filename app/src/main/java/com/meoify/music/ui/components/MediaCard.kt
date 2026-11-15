@@ -31,7 +31,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import coil3.compose.AsyncImage
 import com.meoify.music.data.model.MediaCard
 import com.meoify.music.data.model.MediaKind
 import com.meoify.music.ui.theme.ArtworkColorCache
@@ -57,8 +56,8 @@ fun MediaCard(
                 .background(MaterialTheme.colorScheme.surfaceContainerHigh),
         ) {
             if (!card.thumbnailUrl.isNullOrBlank()) {
-                AsyncImage(
-                    model = com.meoify.music.data.remote.Artwork.highRes(card.thumbnailUrl),
+                ArtworkImage(
+                    url = card.thumbnailUrl,
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize(),
@@ -134,8 +133,8 @@ fun ArtistCard(
                 .background(MaterialTheme.colorScheme.surfaceContainerHigh),
         ) {
             if (!card.thumbnailUrl.isNullOrBlank()) {
-                AsyncImage(
-                    model = com.meoify.music.data.remote.Artwork.highRes(card.thumbnailUrl),
+                ArtworkImage(
+                    url = card.thumbnailUrl,
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize(),

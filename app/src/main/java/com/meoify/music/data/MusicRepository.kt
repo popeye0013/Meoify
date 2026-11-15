@@ -252,6 +252,29 @@ class MusicRepository(private val settings: com.meoify.music.data.local.Settings
     val signedIn: Boolean get() = cookiesPresent
 
     /**
+     * How many songs the account has played recently. YouTube Music exposes
+     * this as the History page; we only need the number for the profile card.
+     */
+    suspend fun playedCount(limit: Int = 500): Int {
+        if (!cookiesPresent) return 0
+        return runCatching {
+            val root = innerTube.browse("FEmusic_history")
+            val tracks = YTMusicParser.parseTracks(root).toMutableList()
+            var token = YTMusicParser.nextContinuation(root)
+            var rounds = 0
+            while (token != null && tracks.size < limit && rounds < 5) {
+                val next = innerTube.browseContinuation(token)
+                val more = YTMusicParser.parseTracks(next)
+                if (more.isEmpty()) break
+                tracks += more
+                token = YTMusicParser.nextContinuation(next)
+                rounds++
+            }
+            tracks.distinctBy { it.id }.size
+        }.getOrDefault(0)
+    }
+
+    /**
      * Songs in the account's Liked music playlist, newest first. Returns null
      * when the request failed so callers can avoid overwriting a good mirror
      * with an empty list.

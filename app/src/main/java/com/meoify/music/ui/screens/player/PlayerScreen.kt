@@ -110,12 +110,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import coil3.compose.AsyncImage
 import com.meoify.music.data.model.AudioQuality
 import com.meoify.music.data.model.Track
 import com.meoify.music.data.remote.TrackLyrics
 import com.meoify.music.playback.PlayerUiState
 import com.meoify.music.ui.components.TrackRow
+import com.meoify.music.ui.components.ArtworkImage
 import com.meoify.music.ui.components.rememberTrackCover
 import com.meoify.music.ui.navigation.AppActions
 import com.meoify.music.ui.navigation.LocalAppActions
@@ -746,8 +746,8 @@ private fun MotionCanvas(
             .background(Color.White.copy(alpha = 0.07f)),
     ) {
         if (!url.isNullOrBlank()) {
-            AsyncImage(
-                model = url,
+            ArtworkImage(
+                url = url,
                 contentDescription = "Album artwork",
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize(),

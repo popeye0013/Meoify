@@ -51,7 +51,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import coil3.compose.AsyncImage
 import com.meoify.music.MeoifyApplication
 import com.meoify.music.data.model.MediaCard as MediaCardModel
 import com.meoify.music.data.model.MediaKind
@@ -62,6 +61,7 @@ import com.meoify.music.ui.components.MediaCard
 import com.meoify.music.ui.components.SectionHeader
 import com.meoify.music.ui.components.ProfileAvatar
 import com.meoify.music.ui.components.ShimmerBox
+import com.meoify.music.ui.components.ArtworkImage
 import com.meoify.music.ui.components.TrackRow
 import com.meoify.music.ui.components.rememberTrackCover
 import com.meoify.music.ui.navigation.LocalAppActions
@@ -379,8 +379,8 @@ private fun FeaturedCard(card: MediaCardModel, onClick: () -> Unit) {
             .clickable(onClick = onClick)
             .background(MaterialTheme.colorScheme.surfaceContainerHigh),
     ) {
-        AsyncImage(
-            model = com.meoify.music.data.remote.Artwork.highRes(card.thumbnailUrl),
+        ArtworkImage(
+            url = card.thumbnailUrl,
             contentDescription = null,
             contentScale = ContentScale.Crop,
             modifier = Modifier.fillMaxSize(),
@@ -461,8 +461,8 @@ private fun QuickAccessGrid(tracks: List<Track>, onPlay: (Track) -> Unit) {
                             .height(62.dp),
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            AsyncImage(
-                                model = cover,
+                            ArtworkImage(
+                                url = cover,
                                 contentDescription = null,
                                 contentScale = ContentScale.Crop,
                                 modifier = Modifier
