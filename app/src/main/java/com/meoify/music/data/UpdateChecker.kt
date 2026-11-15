@@ -11,10 +11,24 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.util.concurrent.TimeUnit
 
-/** Looks up the newest published Meoify release on GitHub. */
+/**
+ * Looks up the newest published Meoify release.
+ *
+ * The Meoify repository is private, so an anonymous call to the GitHub API
+ * cannot see its releases (it answers 404). A tiny public manifest is kept in
+ * the profile repository and is read first; the GitHub API is still tried as a
+ * fallback so the check keeps working if the repository is ever made public.
+ */
 object UpdateChecker {
 
-    data class Release(val version: String, val url: String)
+    data class Release(
+        val version: String,
+        val url: String,
+        val apkUrl: String? = null,
+    )
+
+    private const val MANIFEST_URL =
+        "https://raw.githubusercontent.com/${DeveloperInfo.HANDLE}/${DeveloperInfo.HANDLE}/main/meoify-latest.json"
 
     private val client = OkHttpClient.Builder()
         .connectTimeout(12, TimeUnit.SECONDS)
@@ -24,24 +38,56 @@ object UpdateChecker {
     private val json = Json { ignoreUnknownKeys = true }
 
     suspend fun latest(): Release? = withContext(Dispatchers.IO) {
-        runCatching {
-            val request = Request.Builder()
-                .url("https://api.github.com/repos/${DeveloperInfo.HANDLE}/Meoify/releases/latest")
-                .header("Accept", "application/vnd.github+json")
-                .header("User-Agent", "Meoify-Android")
-                .build()
-            client.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) return@withContext null
-                val root = json.parseToJsonElement(response.body?.string().orEmpty()).jsonObject
-                val tag = root["tag_name"]?.jsonPrimitive?.contentOrNull.orEmpty().trim()
-                if (tag.isBlank()) return@withContext null
-                Release(
-                    version = tag.removePrefix("v").removePrefix("V"),
-                    url = root["html_url"]?.jsonPrimitive?.contentOrNull ?: DeveloperInfo.REPO_URL,
-                )
-            }
-        }.getOrNull()
+        fromManifest() ?: fromGitHubApi()
     }
+
+    private fun fromManifest(): Release? = runCatching {
+        val request = Request.Builder()
+            .url(MANIFEST_URL)
+            .header("User-Agent", "Meoify-Android")
+            .build()
+        client.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) return@runCatching null
+            val root = json.parseToJsonElement(response.body?.string().orEmpty()).jsonObject
+            val version = root["version"]
+                ?.jsonPrimitive
+                ?.contentOrNull
+                .orEmpty()
+                .trim()
+                .removePrefix("v")
+                .removePrefix("V")
+            if (version.isBlank()) return@runCatching null
+            Release(
+                version = version,
+                url = root["release_url"]?.jsonPrimitive?.contentOrNull ?: DeveloperInfo.REPO_URL,
+                apkUrl = root["apk_url"]?.jsonPrimitive?.contentOrNull,
+            )
+        }
+    }.getOrNull()
+
+    private fun fromGitHubApi(): Release? = runCatching {
+        val request = Request.Builder()
+            .url("https://api.github.com/repos/${DeveloperInfo.HANDLE}/Meoify/releases/latest")
+            .header("Accept", "application/vnd.github+json")
+            .header("User-Agent", "Meoify-Android")
+            .build()
+        client.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) return@runCatching null
+            val root = json.parseToJsonElement(response.body?.string().orEmpty()).jsonObject
+            val tag = root["tag_name"]?.jsonPrimitive?.contentOrNull.orEmpty().trim()
+            if (tag.isBlank()) return@runCatching null
+            val assets = root["assets"]
+                ?.let { it as? kotlinx.serialization.json.JsonArray }
+                ?.mapNotNull { asset ->
+                    asset.jsonObject["browser_download_url"]?.jsonPrimitive?.contentOrNull
+                }
+            Release(
+                version = tag.removePrefix("v").removePrefix("V"),
+                url = root["html_url"]?.jsonPrimitive?.contentOrNull ?: DeveloperInfo.REPO_URL,
+                apkUrl = assets?.firstOrNull { it.endsWith(".apk", ignoreCase = true) },
+            )
+        }
+    }.getOrNull()
 
     /** True when [candidate] is a newer dotted version than [current]. */
     fun isNewer(candidate: String, current: String): Boolean {

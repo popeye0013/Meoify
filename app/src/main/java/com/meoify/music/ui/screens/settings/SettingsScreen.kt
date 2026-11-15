@@ -138,7 +138,7 @@ fun SettingsScreen(
     val versionName = remember {
         runCatching {
             context.packageManager.getPackageInfo(context.packageName, 0).versionName
-        }.getOrNull().orEmpty().ifBlank { "1.5.5" }
+        }.getOrNull().orEmpty().ifBlank { "1.5.6" }
     }
 
     val avatarPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
@@ -606,13 +606,16 @@ fun SettingsScreen(
             icon = { Icon(Icons.Filled.Refresh, contentDescription = null) },
             title = { Text("Update available") },
             text = {
-                Text("Meoify ${pendingUpdate.version} is available. You are on $versionName.")
+                Text(
+                    "Meoify ${pendingUpdate.version} is available. " +
+                        "You are on $versionName. Download the APK straight from GitHub.",
+                )
             },
             confirmButton = {
                 TextButton(
                     onClick = {
                         updateRelease = null
-                        context.openUrl(pendingUpdate.url)
+                        context.openUrl(pendingUpdate.apkUrl ?: pendingUpdate.url)
                     },
                 ) { Text("Download") }
             },
