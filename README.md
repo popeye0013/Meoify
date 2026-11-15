@@ -4,6 +4,14 @@ A native, unofficial YouTube Music client for Android with a Material 3 Expressi
 
 Inspired by the layout and feature set of [LastWave](https://github.com/Clash-Projects/LastWave-native), focused on a clean phone-sized experience and a small, hackable codebase.
 
+## Download
+
+Grab the latest APK from the [Releases page](https://github.com/popeye0013/Meoify/releases/latest). The release build installs like any other app and upgrades in place over older builds.
+
+| Version | Package | Min Android |
+|---|---|---|
+| 1.2.0 | `com.meoify.music` | 8.0 (API 26) |
+
 ## Features
 
 - **Home feed** — personalised greeting, quick picks, made-for-you mixes, trending songs, new releases, top artists and charts, with pull to refresh.
