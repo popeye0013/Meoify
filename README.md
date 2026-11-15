@@ -10,20 +10,23 @@ Grab the latest APK from the [Releases page](https://github.com/popeye0013/Meoif
 
 | Version | Package | Min Android |
 |---|---|---|
-| 1.4.0 | `com.meoify.music` | 8.0 (API 26) |
+| 1.5.0 | `com.meoify.music` | 8.0 (API 26) |
 
 ## Features
 
 - **Home feed** — personalised greeting, quick picks, made-for-you mixes, trending songs, new releases, top artists and charts, with pull to refresh.
-- **Search** — songs, albums, artists and playlists, live suggestions, recent searches and genre browsing.
+- **Search** — a back circle and pill search field with voice input, always-visible Tracks / Albums / Artists / Playlists filters, live suggestions, recent searches and an "Explore genres & moods" grid of genre pills.
 - **Library** — liked songs, local playlists (create / rename / delete) with list or grid layout, saved albums and recently played tracks.
 - **Your YouTube Music playlists** — when signed in, the Library tab lists the playlists saved to your own YouTube Music account and opens them in the player.
-- **Player** — rounded animated album canvas with a gradient blend, tap for full-screen edge-to-edge artwork, thin seek bar with a large tinted thumb, circular close/overflow header buttons, heart and lyrics circles, an Audio pill that switches quality, a wide accent play/pause pill, and bottom shuffle / mute + video / repeat controls, plus synced lyrics with a rotating artwork backdrop, queue management and a mini player.
+- **Player** — rounded animated album canvas with a gradient blend, tap for full-screen edge-to-edge artwork, thin seek bar with a large tinted thumb, circular close/overflow header buttons, heart and lyrics circles, an Audio pill that switches quality, a wide accent play/pause pill, and bottom shuffle / mute + video / repeat controls, plus queue management and a mini player.
+- **Lyrics screen** — full-screen `LYRICS` header with track title, sleep-timer and overflow circles, a `WORD SYNC` pill, a large glowing active line that scrolls itself, fullscreen and share circles, a wavy seek bar with a large thumb, and previous / play / next circles flanked by the elapsed and remaining times.
+- **YouTube Music history sync** — songs you actually listen to in Meoify are reported to your signed-in YouTube Music account history, including lossless streams and downloaded files, using the same per-play tracking ping YouTube's own web player sends. A listen counts after 30 seconds or half the track (4 minutes maximum); pauses, buffering and seeks don't count.
+- **Album & playlist pages** — circular back button, oversized rounded artwork with soft shadow, centred title and "source • N tracks" meta, Play and Shuffle pills, a wide "Save to library" button and rounded track cards with artwork, artist • album, duration and a menu.
 - **Navigation** — floating pill navigation bar that expands the active tab into a labelled pill.
 - **Synced lyrics** — LRC lyrics from LRCLIB with auto-scroll and tap-to-seek, plus a plain-text fallback.
 - **Playback** — ExoPlayer/Media3 background playback with lockscreen and notification controls.
 - **Accounts** — optional YouTube Music web sign-in for a personalised home feed.
-- **Profile & settings** — your avatar in the home header opens a single page with your YouTube Music account, name/email, library stats, sign in/out and every setting in one place.
+- **Profile & settings** — your avatar in the home header opens a single page with your YouTube Music account, name/email, library stats, search in the top bar, coloured section headings, rounded cards with icon tiles and chevrons, sign in/out and every setting in one place.
 - **Local profile** — people who don't want to sign in can set a name and profile picture that is used across the home header and settings page.
 - **Backup & restore** — export your local playlists and local profile to a human-readable `.json` file and restore them later, with a confirmation before a restore replaces anything.
 - **Developer card** — the settings screen credits the developer with a live GitHub avatar and links to Telegram and GitHub.

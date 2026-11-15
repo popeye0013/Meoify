@@ -190,6 +190,22 @@ class MusicRepository(private val settings: com.meoify.music.data.local.Settings
         }.getOrNull()
     }
 
+    /** True when the app currently holds YouTube Music cookies. */
+    val signedIn: Boolean get() = cookiesPresent
+
+    /**
+     * Per-play YouTube tracking URL for the signed-in account, or null when
+     * not signed in. Used only to register listens in YouTube Music history.
+     */
+    suspend fun historyTrackingUrl(videoId: String): String? {
+        if (!cookiesPresent) return null
+        return runCatching { innerTube.historyTrackingUrl(videoId) }.getOrNull()
+    }
+
+    /** Sends the history ping. Returns the HTTP status, or 0 on an invalid URL. */
+    suspend fun submitHistoryPlayback(trackingBaseUrl: String, cpn: String): Int =
+        runCatching { innerTube.submitHistoryPlayback(trackingBaseUrl, cpn) }.getOrDefault(0)
+
     private val lyricsCache = mutableMapOf<String, String>()
 
     private companion object {

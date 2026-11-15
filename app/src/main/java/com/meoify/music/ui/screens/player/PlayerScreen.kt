@@ -64,6 +64,7 @@ import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.filled.VideoLibrary
+import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.filled.VolumeOff
 import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.CircularProgressIndicator
@@ -120,6 +121,7 @@ import com.meoify.music.ui.navigation.LocalPlayerState
 import com.meoify.music.ui.theme.ArtworkColorCache
 import com.meoify.music.util.formatDuration
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.math.PI
 import kotlin.math.sin
@@ -244,12 +246,20 @@ fun PlayerScreen(onClose: () -> Unit) {
                         lyrics = lyrics,
                         loading = lyricsLoading,
                         positionMs = state.positionMs,
+                        durationMs = state.durationMs,
                         isPlaying = state.isPlaying,
+                        trackTitle = track?.title.orEmpty(),
                         artworkUrl = track?.thumbnailUrl,
                         accent = accent,
                         animate = canvasAnimated && state.isPlaying,
                         onBack = { showLyrics = false },
                         onSeek = actions.seekTo,
+                        onTogglePlay = actions.togglePlayPause,
+                        onPause = { if (state.isPlaying) actions.togglePlayPause() },
+                        onNext = actions.skipNext,
+                        onPrevious = actions.skipPrevious,
+                        onFullScreen = { fullArtwork = true },
+                        onShare = ::shareTrack,
                     )
                 } else {
                     PlayerMainContent(
@@ -1051,12 +1061,20 @@ private fun LyricsView(
     lyrics: TrackLyrics?,
     loading: Boolean,
     positionMs: Long,
+    durationMs: Long,
     isPlaying: Boolean,
+    trackTitle: String,
     artworkUrl: String?,
     accent: Color,
     animate: Boolean,
     onBack: () -> Unit,
     onSeek: (Long) -> Unit,
+    onTogglePlay: () -> Unit,
+    onPause: () -> Unit,
+    onNext: () -> Unit,
+    onPrevious: () -> Unit,
+    onFullScreen: () -> Unit,
+    onShare: () -> Unit,
 ) {
     val listState = rememberLazyListState()
     val currentIndex = lyrics?.lines?.indexOfLast { it.timeMs <= positionMs } ?: -1
@@ -1078,6 +1096,24 @@ private fun LyricsView(
         label = "lyricsAngle",
     )
 
+    var timerMenuOpen by remember { mutableStateOf(false) }
+    var moreMenuOpen by remember { mutableStateOf(false) }
+    var sleepMinutes by remember { mutableStateOf<Int?>(null) }
+    var sleepJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
+
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    fun armSleepTimer(minutes: Int) {
+        sleepJob?.cancel()
+        sleepMinutes = minutes
+        sleepJob = scope.launch {
+            kotlinx.coroutines.delay(minutes * 60_000L)
+            onPause()
+            sleepMinutes = null
+        }
+    }
+
+    val progress = if (durationMs > 0) (positionMs.toFloat() / durationMs).coerceIn(0f, 1f) else 0f
+
     Box(modifier = Modifier.fillMaxSize()) {
         if (!artworkUrl.isNullOrBlank()) {
             AsyncImage(
@@ -1096,100 +1132,486 @@ private fun LyricsView(
                         if (android.os.Build.VERSION.SDK_INT >= 31) Modifier.blur(50.dp) else Modifier,
                     ),
             )
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.verticalGradient(
-                            listOf(
-                                accent.copy(alpha = 0.22f),
-                                Color.Black.copy(alpha = 0.72f),
-                                Color.Black.copy(alpha = 0.9f),
-                            ),
+        }
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        listOf(
+                            accent.copy(alpha = 0.26f),
+                            Color.Black.copy(alpha = 0.78f),
+                            Color.Black.copy(alpha = 0.95f),
                         ),
                     ),
-            )
-        }
+                ),
+        )
 
-        Column(modifier = Modifier.fillMaxSize().padding(horizontal = 18.dp)) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .statusBarsPadding()
+                .navigationBarsPadding()
+                .padding(horizontal = 20.dp),
         ) {
-            IconButton(onClick = onBack) {
-                Icon(Icons.Filled.KeyboardArrowDown, contentDescription = "Back to player", tint = Color.White)
-            }
-            Text(
-                text = "Lyrics",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-                color = Color.White,
-                modifier = Modifier.weight(1f),
-            )
-        }
-
-        when {
-            loading -> {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = Color.White)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Surface(
+                    onClick = onBack,
+                    shape = CircleShape,
+                    color = Color.White.copy(alpha = 0.12f),
+                    modifier = Modifier.size(44.dp),
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            Icons.Filled.KeyboardArrowDown,
+                            contentDescription = "Back to player",
+                            tint = Color.White,
+                            modifier = Modifier.size(22.dp),
+                        )
+                    }
                 }
-            }
 
-            lyrics == null || lyrics.isEmpty -> {
-                Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
+                Spacer(Modifier.width(12.dp))
+
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "Lyrics aren't available for this track.",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = Color.White.copy(alpha = 0.72f),
-                        textAlign = TextAlign.Center,
+                        text = "LYRICS",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = Color.White.copy(alpha = 0.55f),
+                        letterSpacing = 1.6.sp,
+                    )
+                    Text(
+                        text = trackTitle.ifBlank { "Now playing" },
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
-            }
 
-            lyrics.synced && lyrics.lines.isNotEmpty() -> {
-                LazyColumn(
-                    state = listState,
-                    contentPadding = PaddingValues(vertical = 80.dp, horizontal = 4.dp),
-                    modifier = Modifier.fillMaxSize(),
-                ) {
-                    items(lyrics.lines.size) { index ->
-                        val line = lyrics.lines[index]
-                        val active = index == currentIndex
-                        Text(
-                            text = line.text,
-                            style = if (active) {
-                                MaterialTheme.typography.headlineSmall
-                            } else {
-                                MaterialTheme.typography.titleMedium
+                Box {
+                    CircleAction(
+                        icon = Icons.Filled.Timer,
+                        contentDescription = "Sleep timer",
+                        tint = if (sleepMinutes != null) MaterialTheme.colorScheme.primary else Color.White,
+                        size = 42.dp,
+                        background = Color.White.copy(alpha = 0.12f),
+                        onClick = { timerMenuOpen = true },
+                    )
+                    DropdownMenu(expanded = timerMenuOpen, onDismissRequest = { timerMenuOpen = false }) {
+                        val options = listOf(5, 15, 30, 60)
+                        options.forEach { minutes ->
+                            DropdownMenuItem(
+                                text = { Text("Pause after $minutes min") },
+                                leadingIcon = {
+                                    if (sleepMinutes == minutes) {
+                                        Icon(Icons.Filled.Check, contentDescription = null)
+                                    }
+                                },
+                                onClick = {
+                                    timerMenuOpen = false
+                                    armSleepTimer(minutes)
+                                },
+                            )
+                        }
+                        if (sleepMinutes != null) {
+                            DropdownMenuItem(
+                                text = { Text("Cancel sleep timer") },
+                                leadingIcon = { Icon(Icons.Filled.Close, contentDescription = null) },
+                                onClick = {
+                                    timerMenuOpen = false
+                                    sleepJob?.cancel()
+                                    sleepJob = null
+                                    sleepMinutes = null
+                                },
+                            )
+                        }
+                    }
+                }
+
+                Spacer(Modifier.width(8.dp))
+
+                Box {
+                    CircleAction(
+                        icon = Icons.Filled.MoreVert,
+                        contentDescription = "More options",
+                        tint = Color.White,
+                        size = 42.dp,
+                        background = Color.White.copy(alpha = 0.12f),
+                        onClick = { moreMenuOpen = true },
+                    )
+                    DropdownMenu(expanded = moreMenuOpen, onDismissRequest = { moreMenuOpen = false }) {
+                        DropdownMenuItem(
+                            text = { Text("Share lyrics") },
+                            leadingIcon = { Icon(Icons.Filled.Share, contentDescription = null) },
+                            onClick = {
+                                moreMenuOpen = false
+                                onShare()
                             },
-                            fontWeight = if (active) FontWeight.ExtraBold else FontWeight.Medium,
-                            color = if (active) Color.White else Color.White.copy(alpha = 0.42f),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { onSeek(line.timeMs) }
-                                .padding(vertical = 9.dp),
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Full screen") },
+                            leadingIcon = { Icon(Icons.Filled.Fullscreen, contentDescription = null) },
+                            onClick = {
+                                moreMenuOpen = false
+                                onFullScreen()
+                            },
                         )
                     }
                 }
             }
 
-            else -> {
-                LazyColumn(
-                    contentPadding = PaddingValues(top = 12.dp, bottom = 80.dp),
-                    modifier = Modifier.fillMaxSize(),
+            Spacer(Modifier.height(16.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center,
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(50),
+                    color = Color.White.copy(alpha = 0.12f),
                 ) {
-                    item {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(
+                            Icons.Filled.GraphicEq,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(14.dp),
+                        )
+                        Spacer(Modifier.width(7.dp))
                         Text(
-                            text = lyrics.plain.orEmpty(),
-                            style = MaterialTheme.typography.titleMedium,
-                            color = Color.White.copy(alpha = 0.9f),
-                            lineHeight = MaterialTheme.typography.titleMedium.lineHeight * 1.45f,
+                            text = if (lyrics?.synced == true) "WORD SYNC" else "LYRICS",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = Color.White.copy(alpha = 0.85f),
+                            letterSpacing = 1.2.sp,
                         )
                     }
                 }
             }
+
+            Spacer(Modifier.height(10.dp))
+
+            Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                when {
+                    loading -> {
+                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            CircularProgressIndicator(color = Color.White)
+                        }
+                    }
+
+                    lyrics == null || lyrics.isEmpty -> {
+                        Box(
+                            Modifier.fillMaxSize().padding(24.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(
+                                text = "Lyrics aren't available for this track.",
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = Color.White.copy(alpha = 0.72f),
+                                textAlign = TextAlign.Center,
+                            )
+                        }
+                    }
+
+                    lyrics.synced && lyrics.lines.isNotEmpty() -> {
+                        LazyColumn(
+                            state = listState,
+                            contentPadding = PaddingValues(top = 60.dp, bottom = 60.dp, start = 2.dp, end = 2.dp),
+                            modifier = Modifier.fillMaxSize(),
+                        ) {
+                            items(lyrics.lines.size) { index ->
+                                val line = lyrics.lines[index]
+                                val active = index == currentIndex
+                                Text(
+                                    text = line.text.ifBlank { "♪" },
+                                    style = if (active) {
+                                        MaterialTheme.typography.headlineMedium
+                                    } else {
+                                        MaterialTheme.typography.titleLarge
+                                    },
+                                    fontWeight = if (active) FontWeight.ExtraBold else FontWeight.SemiBold,
+                                    color = if (active) Color.White else Color.White.copy(alpha = 0.38f),
+                                    lineHeight = if (active) 38.sp else 30.sp,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable { onSeek(line.timeMs) }
+                                        .graphicsLayer {
+                                            alpha = if (active) 1f else 0.9f
+                                        }
+                                        .then(
+                                            if (active) {
+                                                Modifier.lyricsGlow(accent)
+                                            } else {
+                                                Modifier
+                                            },
+                                        )
+                                        .padding(vertical = 8.dp),
+                                )
+                            }
+                        }
+                    }
+
+                    else -> {
+                        LazyColumn(
+                            contentPadding = PaddingValues(top = 20.dp, bottom = 40.dp),
+                            modifier = Modifier.fillMaxSize(),
+                        ) {
+                            item {
+                                Text(
+                                    text = lyrics.plain.orEmpty(),
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = Color.White.copy(alpha = 0.9f),
+                                    lineHeight = MaterialTheme.typography.titleMedium.lineHeight * 1.5f,
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (sleepMinutes != null) {
+                    Text(
+                        text = "Sleep in ${sleepMinutes}m",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.weight(1f),
+                    )
+                } else {
+                    Spacer(Modifier.weight(1f))
+                }
+                CircleAction(
+                    icon = Icons.Filled.Fullscreen,
+                    contentDescription = "Full screen artwork",
+                    tint = Color.White,
+                    size = 38.dp,
+                    background = Color.White.copy(alpha = 0.12f),
+                    onClick = onFullScreen,
+                )
+                Spacer(Modifier.width(8.dp))
+                CircleAction(
+                    icon = Icons.Filled.Share,
+                    contentDescription = "Share song",
+                    tint = Color.White,
+                    size = 38.dp,
+                    background = Color.White.copy(alpha = 0.12f),
+                    onClick = onShare,
+                )
+            }
+
+            Spacer(Modifier.height(6.dp))
+
+            LyricsSeekBar(
+                progress = progress,
+                accent = accent,
+                durationMs = durationMs,
+                onSeek = onSeek,
+            )
+
+            Spacer(Modifier.height(2.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = formatDuration(positionMs),
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color.White.copy(alpha = 0.7f),
+                    modifier = Modifier.width(52.dp),
+                )
+
+                Row(
+                    modifier = Modifier.weight(1f),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    CircleAction(
+                        icon = Icons.Filled.SkipPrevious,
+                        contentDescription = "Previous",
+                        tint = Color.White,
+                        size = 48.dp,
+                        background = Color.White.copy(alpha = 0.10f),
+                        onClick = onPrevious,
+                    )
+                    Spacer(Modifier.width(14.dp))
+                    Surface(
+                        onClick = onTogglePlay,
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(64.dp),
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                                contentDescription = if (isPlaying) "Pause" else "Play",
+                                tint = MaterialTheme.colorScheme.onPrimary,
+                                modifier = Modifier.size(30.dp),
+                            )
+                        }
+                    }
+                    Spacer(Modifier.width(14.dp))
+                    CircleAction(
+                        icon = Icons.Filled.SkipNext,
+                        contentDescription = "Next",
+                        tint = Color.White,
+                        size = 48.dp,
+                        background = Color.White.copy(alpha = 0.10f),
+                        onClick = onNext,
+                    )
+                }
+
+                Text(
+                    text = if (durationMs > 0) "-${formatDuration((durationMs - positionMs).coerceAtLeast(0L))}" else "--:--",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color.White.copy(alpha = 0.7f),
+                    textAlign = TextAlign.End,
+                    modifier = Modifier.width(52.dp),
+                )
+            }
+
+            Spacer(Modifier.height(8.dp))
         }
+    }
+}
+
+/** Soft crimson halo behind the active lyric line. */
+private fun Modifier.lyricsGlow(accent: Color): Modifier = this
+    .shadow(
+        elevation = 18.dp,
+        shape = RoundedCornerShape(4.dp),
+        clip = false,
+        ambientColor = accent.copy(alpha = 0.7f),
+        spotColor = accent.copy(alpha = 0.9f),
+    )
+
+@Composable
+private fun LyricsSeekBar(
+    progress: Float,
+    accent: Color,
+    durationMs: Long,
+    onSeek: (Long) -> Unit,
+) {
+    var dragging by remember { mutableStateOf(false) }
+    var dragProgress by remember { mutableStateOf(0f) }
+    val shown = (if (dragging) dragProgress else progress).coerceIn(0f, 1f)
+    val wavePhase = rememberInfiniteTransition(label = "lyricsWave")
+    val phase by wavePhase.animateFloat(
+        initialValue = 0f,
+        targetValue = (2 * PI).toFloat(),
+        animationSpec = infiniteRepeatable(
+            animation = tween(2_600, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart,
+        ),
+        label = "lyricsWavePhase",
+    )
+
+    Canvas(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(46.dp)
+            .pointerInput(Unit) {
+                detectTapGestures { offset ->
+                    onSeek(((offset.x / size.width).coerceIn(0f, 1f) * durationMs).toLong())
+                }
+            }
+            .pointerInput(Unit) {
+                detectHorizontalDragGestures(
+                    onDragStart = { offset ->
+                        dragging = true
+                        dragProgress = (offset.x / size.width).coerceIn(0f, 1f)
+                    },
+                    onHorizontalDrag = { change, _ ->
+                        dragProgress = (change.position.x / size.width).coerceIn(0f, 1f)
+                    },
+                    onDragEnd = {
+                        dragging = false
+                        onSeek((dragProgress * durationMs).toLong())
+                    },
+                    onDragCancel = {
+                        dragging = false
+                        onSeek((dragProgress * durationMs).toLong())
+                    },
+                )
+            },
+    ) {
+        val centerY = size.height / 2f
+        val progressX = size.width * shown
+        val amplitude = 3.4.dp.toPx()
+        val wavelength = size.width / 7.5f
+
+        drawLine(
+            color = Color.White.copy(alpha = 0.20f),
+            start = Offset(0f, centerY),
+            end = Offset(size.width, centerY),
+            strokeWidth = 5.dp.toPx(),
+            cap = StrokeCap.Round,
+        )
+
+        if (progressX > 0f) {
+            clipRect(right = progressX) {
+                val path = Path()
+                path.moveTo(0f, centerY)
+                var x = 0f
+                while (x <= size.width) {
+                    val y = centerY + sin((x / wavelength) * 2f * PI + phase).toFloat() * amplitude
+                    path.lineTo(x, y)
+                    x += 3f
+                }
+                drawPath(
+                    path = path,
+                    color = Color.White.copy(alpha = 0.95f),
+                    style = Stroke(width = 5.dp.toPx(), cap = StrokeCap.Round),
+                )
+            }
+            drawPath(
+                path = Path().apply {
+                    moveTo(0f, centerY)
+                    var x = 0f
+                    while (x <= progressX) {
+                        val y = centerY + sin((x / wavelength) * 2f * PI + phase).toFloat() * amplitude
+                        lineTo(x, y)
+                        x += 3f
+                    }
+                },
+                color = accent.copy(alpha = 0.55f),
+                style = Stroke(width = 9.dp.toPx(), cap = StrokeCap.Round),
+            )
         }
+
+        drawCircle(
+            color = accent.copy(alpha = 0.28f),
+            radius = 16.dp.toPx(),
+            center = Offset(progressX, centerY),
+        )
+        drawCircle(
+            color = Color.White,
+            radius = 9.dp.toPx(),
+            center = Offset(progressX, centerY),
+        )
+        drawCircle(
+            color = accent,
+            radius = 5.dp.toPx(),
+            center = Offset(progressX, centerY),
+        )
     }
 }
 

@@ -126,6 +126,7 @@ data class AppSettings(
     val blurPlayerBackground: Boolean = true,
     val animatedCanvas: Boolean = true,
     val canvasOverCellular: Boolean = false,
+    val historySync: Boolean = true,
     val ytCookies: String? = null,
     val accountName: String? = null,
     val localProfileName: String? = null,

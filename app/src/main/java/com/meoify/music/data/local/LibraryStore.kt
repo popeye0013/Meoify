@@ -110,6 +110,24 @@ class LibraryStore(private val context: Context) {
         return id
     }
 
+    /** Creates a playlist with tracks in one edit (used by "Save to library"). */
+    fun savePlaylist(name: String, tracks: List<Track>): String {
+        val id = "local_${System.currentTimeMillis()}_${(100..999).random()}"
+        scope.launch {
+            context.libraryStore.edit { prefs ->
+                val playlists = decodePlaylists(prefs[Keys.playlists])
+                val playlist = LocalPlaylist(
+                    id = id,
+                    name = name.trim().ifBlank { "Saved playlist" },
+                    tracks = tracks,
+                    createdAt = System.currentTimeMillis(),
+                )
+                prefs[Keys.playlists] = json.encodeToString(listOf(playlist) + playlists)
+            }
+        }
+        return id
+    }
+
     fun deletePlaylist(id: String) = scope.launch {
         context.libraryStore.edit { prefs ->
             val playlists = decodePlaylists(prefs[Keys.playlists]).filterNot { it.id == id }

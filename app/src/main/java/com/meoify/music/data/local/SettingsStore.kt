@@ -34,6 +34,7 @@ class SettingsStore(private val context: Context) {
         val blur = booleanPreferencesKey("blur_player")
         val animatedCanvas = booleanPreferencesKey("animated_canvas")
         val canvasOverCellular = booleanPreferencesKey("canvas_over_cellular")
+        val historySync = booleanPreferencesKey("history_sync")
         val onboarding = booleanPreferencesKey("onboarding_completed")
         val ytCookies = stringPreferencesKey("yt_cookies")
         val accountName = stringPreferencesKey("yt_account")
@@ -54,6 +55,7 @@ class SettingsStore(private val context: Context) {
                 blurPlayerBackground = prefs[Keys.blur] ?: true,
                 animatedCanvas = prefs[Keys.animatedCanvas] ?: true,
                 canvasOverCellular = prefs[Keys.canvasOverCellular] ?: false,
+                historySync = prefs[Keys.historySync] ?: true,
                 onboardingCompleted = prefs[Keys.onboarding] ?: false,
                 ytCookies = prefs[Keys.ytCookies],
                 accountName = prefs[Keys.accountName],
@@ -89,6 +91,10 @@ class SettingsStore(private val context: Context) {
 
     fun setCanvasOverCellular(enabled: Boolean) = scope.launch {
         context.settingsStore.edit { it[Keys.canvasOverCellular] = enabled }
+    }
+
+    fun setHistorySync(enabled: Boolean) = scope.launch {
+        context.settingsStore.edit { it[Keys.historySync] = enabled }
     }
 
     fun setYtCookies(cookies: String?) = scope.launch {

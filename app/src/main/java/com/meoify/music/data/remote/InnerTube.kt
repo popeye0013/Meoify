@@ -5,9 +5,12 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonObject
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -95,6 +98,68 @@ class InnerTube(private val client: OkHttpClient) {
     suspend fun accountMenu(): JsonObject {
         return post("account/account_menu", buildJsonObject { })
     }
+
+    /**
+     * Asks the authenticated player for the per-play tracking URL used to
+     * register a listen in YouTube Music history. Anonymous responses return a
+     * URL whose ping is accepted but never recorded, so this returns null when
+     * no cookies are present.
+     */
+    suspend fun historyTrackingUrl(videoId: String): String? {
+        if (cookies.isNullOrBlank()) return null
+        val root = post(
+            "player",
+            buildJsonObject {
+                put("videoId", videoId)
+                put("contentCheckOk", true)
+                put("racyCheckOk", true)
+            },
+        )
+        return root["playbackTracking"]
+            ?.jsonObject
+            ?.get("videostatsPlaybackUrl")
+            ?.jsonObject
+            ?.get("baseUrl")
+            ?.jsonPrimitive
+            ?.contentOrNull
+            ?.takeIf { it.startsWith("https://") }
+    }
+
+    /**
+     * Registers one listen in the signed-in account's YouTube Music history by
+     * GET-ing the tracking URL, exactly as ytmusicapi's `add_history_item` does.
+     * Returns the HTTP status; 2xx means YouTube accepted the ping.
+     */
+    suspend fun submitHistoryPlayback(trackingBaseUrl: String, cpn: String): Int =
+        withContext(Dispatchers.IO) {
+            val base = trackingBaseUrl.toHttpUrlOrNull() ?: return@withContext 0
+            if (!base.isHttps || (base.host != "youtube.com" && !base.host.endsWith(".youtube.com"))) {
+                return@withContext 0
+            }
+            val url = base.newBuilder()
+                .setQueryParameter("ver", "2")
+                .setQueryParameter("c", "WEB_REMIX")
+                .setQueryParameter("cpn", cpn)
+                .build()
+            val request = Request.Builder()
+                .url(url)
+                .get()
+                .header("User-Agent", USER_AGENT)
+                .header("Origin", "https://music.youtube.com")
+                .header("X-Origin", "https://music.youtube.com")
+                .header("Referer", "https://music.youtube.com/")
+                .header("X-Youtube-Client-Name", "67")
+                .header("X-Youtube-Client-Version", CLIENT_VERSION)
+                .apply { authHeader()?.let { header("Authorization", it) } }
+                .apply { if (cookies != null) header("X-Goog-AuthUser", "0") }
+                .header("Cookie", cookies?.takeIf { it.isNotBlank() } ?: "SOCS=CAI")
+                .build()
+            try {
+                client.newCall(request).execute().use { it.code }
+            } catch (e: IOException) {
+                throw MusicApiException("Couldn't reach YouTube Music history.", e)
+            }
+        }
 
     private suspend fun post(endpoint: String, payload: JsonObject): JsonObject = withContext(Dispatchers.IO) {
         val body = buildJsonObject {

@@ -42,6 +42,7 @@ data class AppActions(
     val addToPlaylist: (String, Track) -> Unit,
     val removeFromPlaylist: (String, String) -> Unit,
     val createPlaylist: (String) -> String,
+    val savePlaylist: (String, List<Track>) -> Unit,
     val deletePlaylist: (String) -> Unit,
     val renamePlaylist: (String, String) -> Unit,
     val clearRecentSearches: () -> Unit,

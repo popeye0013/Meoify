@@ -195,6 +195,7 @@ fun MeoifyScaffold(
                     target == "tab:${Tab.Search.name}" -> SearchScreen(
                         pendingSearch = pendingSearch,
                         onConsumedPending = onConsumedPending,
+                        onBack = { onTabChange(Tab.Home) },
                     )
 
                     target == "tab:${Tab.Library.name}" -> LibraryScreen(

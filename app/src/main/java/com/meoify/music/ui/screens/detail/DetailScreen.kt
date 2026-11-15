@@ -27,12 +27,15 @@ import androidx.compose.material.icons.filled.Album
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.LibraryAdd
 import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.MoreHoriz
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Shuffle
+import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -44,6 +47,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -55,6 +59,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -67,6 +72,7 @@ import coil3.compose.AsyncImage
 import com.meoify.music.MeoifyApplication
 import com.meoify.music.data.model.DetailPage
 import com.meoify.music.data.model.MediaKind
+import com.meoify.music.data.model.Track
 import com.meoify.music.data.model.UiState
 import com.meoify.music.playback.PlayerUiState
 import com.meoify.music.ui.components.ArtistCard
@@ -80,6 +86,7 @@ import com.meoify.music.ui.navigation.LocalPlayerState
 import com.meoify.music.ui.theme.ArtworkColorCache
 import com.meoify.music.ui.viewmodel.DetailViewModel
 import com.meoify.music.ui.viewmodel.DetailViewModelFactory
+import com.meoify.music.util.formatDuration
 
 @Composable
 fun DetailScreen(destination: Destination, onBack: () -> Unit) {
@@ -172,11 +179,6 @@ private fun DetailContent(
     var accent by remember(page.id) { mutableStateOf(ArtworkColorCache.fallbackColor(page.title)) }
     LaunchedEffect(page.id) { accent = ArtworkColorCache.extract(page.thumbnailUrl, page.title) }
     val pair = ArtworkColorCache.gradientPair(page.id)
-    val headerGradient = if (page.thumbnailUrl.isNullOrBlank()) {
-        Brush.linearGradient(listOf(pair.first, pair.second))
-    } else {
-        Brush.verticalGradient(listOf(accent.copy(alpha = 0.95f), ArtworkColorCache.darken(accent, 0.35f)))
-    }
 
     val currentTrackId = playerState.track?.id
     val isCurrentPage = currentTrackId != null && page.tracks.any { it.id == currentTrackId }
@@ -187,136 +189,196 @@ private fun DetailContent(
     var showDelete by remember { mutableStateOf(false) }
     var renameValue by remember(page.title) { mutableStateOf(page.title) }
     val localPlaylistId = (destination as? Destination.LocalPlaylist)?.id
+    val canSave = page.tracks.isNotEmpty() &&
+        localPlaylistId == null &&
+        page.id != "liked" &&
+        page.kind != MediaKind.ARTIST
+
+    val kindLabel = when (page.kind) {
+        MediaKind.ALBUM -> "Album"
+        MediaKind.PLAYLIST -> "Playlist"
+        MediaKind.ARTIST -> "Artist"
+        else -> page.kind.name.lowercase().replaceFirstChar { it.uppercase() }
+    }
+    val meta = listOfNotNull(
+        page.subtitle?.takeIf { it.isNotBlank() },
+        if (page.tracks.isNotEmpty()) "${page.tracks.size} tracks" else null,
+    ).joinToString(" • ")
 
     LazyColumn(modifier = Modifier.fillMaxSize()) {
         item {
-            Box(
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(min = 300.dp)
-                    .background(headerGradient),
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(
+                                accent.copy(alpha = 0.30f),
+                                MaterialTheme.colorScheme.background,
+                            ),
+                        ),
+                    )
+                    .padding(bottom = 4.dp),
             ) {
-                Column(
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(16.dp),
+                        .padding(start = 12.dp, end = 6.dp, top = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
+                    Surface(
+                        onClick = onBack,
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.75f),
+                        modifier = Modifier.size(44.dp),
                     ) {
-                        IconButton(onClick = onBack) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
-                        }
-                        Spacer(Modifier.weight(1f))
-                        Box {
-                            IconButton(onClick = { menuOpen = true }) {
-                                Icon(Icons.Filled.MoreHoriz, contentDescription = "More options", tint = Color.White)
-                            }
-                            DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                                DropdownMenuItem(
-                                    text = { Text("Shuffle play") },
-                                    leadingIcon = { Icon(Icons.Filled.Shuffle, contentDescription = null) },
-                                    onClick = {
-                                        menuOpen = false
-                                        actions.playShuffled(page.tracks, page.title)
-                                    },
-                                )
-                                if (localPlaylistId != null) {
-                                    DropdownMenuItem(
-                                        text = { Text("Rename playlist") },
-                                        leadingIcon = { Icon(Icons.Filled.Edit, contentDescription = null) },
-                                        onClick = {
-                                            menuOpen = false
-                                            renameValue = page.title
-                                            showRename = true
-                                        },
-                                    )
-                                    DropdownMenuItem(
-                                        text = { Text("Delete playlist") },
-                                        leadingIcon = { Icon(Icons.Filled.Delete, contentDescription = null) },
-                                        onClick = {
-                                            menuOpen = false
-                                            showDelete = true
-                                        },
-                                    )
-                                }
-                            }
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "Back",
+                                tint = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.size(22.dp),
+                            )
                         }
                     }
-
-                    Spacer(Modifier.height(20.dp))
-
-                    Row(verticalAlignment = Alignment.Bottom) {
-                        Box(
-                            modifier = Modifier
-                                .size(156.dp)
-                                .clip(RoundedCornerShape(18.dp))
-                                .background(MaterialTheme.colorScheme.surfaceContainerHigh),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            if (page.thumbnailUrl.isNullOrBlank()) {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .background(Brush.linearGradient(listOf(pair.first, pair.second))),
-                                    contentAlignment = Alignment.Center,
-                                ) {
-                                    Icon(
-                                        imageVector = when {
-                                            page.id == "liked" -> Icons.Filled.Favorite
-                                            page.kind == MediaKind.ARTIST -> Icons.Filled.Person
-                                            page.kind == MediaKind.ALBUM -> Icons.Filled.Album
-                                            else -> Icons.Filled.LibraryMusic
-                                        },
-                                        contentDescription = null,
-                                        tint = Color.White.copy(alpha = 0.92f),
-                                        modifier = Modifier.size(64.dp),
-                                    )
-                                }
-                            } else {
-                                AsyncImage(
-                                    model = page.thumbnailUrl,
-                                    contentDescription = null,
-                                    contentScale = ContentScale.Crop,
-                                    modifier = Modifier.fillMaxSize(),
-                                )
-                            }
-                        }
-                        Spacer(Modifier.width(16.dp))
-                        Column(modifier = Modifier.weight(1f)) {
+                    Spacer(Modifier.width(14.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = kindLabel,
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                        Text(
+                            text = page.title,
+                            style = MaterialTheme.typography.headlineMedium,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = MaterialTheme.colorScheme.onBackground,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        if (!page.subtitle.isNullOrBlank()) {
                             Text(
-                                text = when (page.kind) {
-                                    MediaKind.ALBUM -> "ALBUM"
-                                    MediaKind.PLAYLIST -> "PLAYLIST"
-                                    MediaKind.ARTIST -> "ARTIST"
-                                    else -> page.kind.name
-                                },
-                                style = MaterialTheme.typography.labelMedium,
-                                color = Color.White.copy(alpha = 0.8f),
-                                fontWeight = FontWeight.Bold,
-                            )
-                            Text(
-                                text = page.title,
-                                style = MaterialTheme.typography.headlineMedium,
-                                fontWeight = FontWeight.ExtraBold,
-                                color = Color.White,
-                                maxLines = 3,
+                                text = page.subtitle,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                             )
-                            if (!page.subtitle.isNullOrBlank()) {
-                                Text(
-                                    text = page.subtitle,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = Color.White.copy(alpha = 0.85f),
-                                    maxLines = 2,
-                                    overflow = TextOverflow.Ellipsis,
+                        }
+                    }
+                    Box {
+                        IconButton(onClick = { menuOpen = true }) {
+                            Icon(
+                                Icons.Filled.MoreHoriz,
+                                contentDescription = "More options",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                            DropdownMenuItem(
+                                text = { Text("Shuffle play") },
+                                leadingIcon = { Icon(Icons.Filled.Shuffle, contentDescription = null) },
+                                onClick = {
+                                    menuOpen = false
+                                    actions.playShuffled(page.tracks, page.title)
+                                },
+                            )
+                            if (localPlaylistId != null) {
+                                DropdownMenuItem(
+                                    text = { Text("Rename playlist") },
+                                    leadingIcon = { Icon(Icons.Filled.Edit, contentDescription = null) },
+                                    onClick = {
+                                        menuOpen = false
+                                        renameValue = page.title
+                                        showRename = true
+                                    },
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Delete playlist") },
+                                    leadingIcon = { Icon(Icons.Filled.Delete, contentDescription = null) },
+                                    onClick = {
+                                        menuOpen = false
+                                        showDelete = true
+                                    },
                                 )
                             }
                         }
                     }
-                    Spacer(Modifier.height(18.dp))
                 }
+
+                Spacer(Modifier.height(14.dp))
+
+                Box(
+                    modifier = Modifier.fillMaxWidth(),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(232.dp)
+                            .shadow(20.dp, RoundedCornerShape(30.dp), clip = false)
+                            .clip(RoundedCornerShape(30.dp))
+                            .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        if (page.thumbnailUrl.isNullOrBlank()) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(Brush.linearGradient(listOf(pair.first, pair.second))),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Icon(
+                                    imageVector = when {
+                                        page.id == "liked" -> Icons.Filled.Favorite
+                                        page.kind == MediaKind.ARTIST -> Icons.Filled.Person
+                                        page.kind == MediaKind.ALBUM -> Icons.Filled.Album
+                                        else -> Icons.Filled.LibraryMusic
+                                    },
+                                    contentDescription = null,
+                                    tint = Color.White.copy(alpha = 0.92f),
+                                    modifier = Modifier.size(86.dp),
+                                )
+                            }
+                        } else {
+                            AsyncImage(
+                                model = page.thumbnailUrl,
+                                contentDescription = null,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize(),
+                            )
+                        }
+                    }
+                }
+
+                Spacer(Modifier.height(16.dp))
+                Text(
+                    text = page.title,
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = MaterialTheme.colorScheme.onBackground,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 28.dp),
+                )
+                if (meta.isNotBlank()) {
+                    Spacer(Modifier.height(3.dp))
+                    Text(
+                        text = meta,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 28.dp),
+                    )
+                }
+                Spacer(Modifier.height(18.dp))
             }
         }
 
@@ -324,7 +386,7 @@ private fun DetailContent(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 14.dp),
+                    .padding(horizontal = 16.dp, vertical = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
@@ -337,12 +399,14 @@ private fun DetailContent(
                         }
                     },
                     enabled = page.tracks.isNotEmpty(),
-                    shape = RoundedCornerShape(24.dp),
+                    shape = RoundedCornerShape(50),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.primary,
                         contentColor = MaterialTheme.colorScheme.onPrimary,
                     ),
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(52.dp),
                 ) {
                     Icon(
                         imageVector = if (isPlayingPage) Icons.Filled.Pause else Icons.Filled.PlayArrow,
@@ -354,11 +418,34 @@ private fun DetailContent(
                 FilledTonalButton(
                     onClick = { actions.playShuffled(page.tracks, page.title) },
                     enabled = page.tracks.isNotEmpty(),
-                    shape = RoundedCornerShape(24.dp),
+                    shape = RoundedCornerShape(50),
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(52.dp),
                 ) {
                     Icon(Icons.Filled.Shuffle, contentDescription = null, modifier = Modifier.size(20.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text("Shuffle")
+                    Text("Shuffle", fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+
+        if (canSave) {
+            item {
+                FilledTonalButton(
+                    onClick = {
+                        actions.savePlaylist(page.title, page.tracks)
+                        actions.showSnackbar("Saved “${page.title}” to your library")
+                    },
+                    shape = RoundedCornerShape(50),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 6.dp)
+                        .height(50.dp),
+                ) {
+                    Icon(Icons.Filled.LibraryAdd, contentDescription = null, modifier = Modifier.size(19.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Save to library", fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -371,7 +458,7 @@ private fun DetailContent(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 4,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp),
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp),
                 )
             }
         }
@@ -398,12 +485,11 @@ private fun DetailContent(
         }
 
         if (page.tracks.isNotEmpty()) {
-            item { SectionHeader(title = "Songs") }
+            item { SectionHeader(title = "Tracks") }
             items(page.tracks, key = { it.id }) { track ->
                 val idx = page.tracks.indexOf(track)
-                TrackRow(
+                TrackCard(
                     track = track,
-                    index = if (page.kind == MediaKind.ALBUM) idx else null,
                     isCurrent = currentTrackId == track.id,
                     onClick = { actions.playTracks(page.tracks, idx, page.title) },
                     onMoreClick = { actions.openTrackMenu(track) },
@@ -441,7 +527,7 @@ private fun DetailContent(
             if (section.tracks.isNotEmpty()) {
                 items(section.tracks, key = { it.id }) { track ->
                     val idx = section.tracks.indexOf(track)
-                    TrackRow(
+                    TrackCard(
                         track = track,
                         isCurrent = currentTrackId == track.id,
                         onClick = { actions.playTracks(section.tracks, idx, section.title) },
@@ -494,5 +580,93 @@ private fun DetailContent(
             },
             dismissButton = { TextButton(onClick = { showDelete = false }) { Text("Cancel") } },
         )
+    }
+}
+
+@Composable
+private fun TrackCard(
+    track: Track,
+    isCurrent: Boolean,
+    onClick: () -> Unit,
+    onMoreClick: () -> Unit,
+) {
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(18.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 3.dp),
+    ) {
+        Row(
+            modifier = Modifier.padding(start = 10.dp, end = 4.dp, top = 8.dp, bottom = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(modifier = Modifier.size(46.dp)) {
+                AsyncImage(
+                    model = track.thumbnailUrl,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .size(46.dp)
+                        .clip(RoundedCornerShape(9.dp))
+                        .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+                )
+                if (isCurrent) {
+                    Box(
+                        modifier = Modifier
+                            .size(46.dp)
+                            .clip(RoundedCornerShape(9.dp))
+                            .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.42f)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            Icons.Filled.GraphicEq,
+                            contentDescription = "Now playing",
+                            tint = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                }
+            }
+            Spacer(Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = track.title,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    color = if (isCurrent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                val subtitle = listOfNotNull(
+                    track.artist.takeIf { it.isNotBlank() },
+                    track.album?.takeIf { it.isNotBlank() },
+                ).joinToString(" • ")
+                if (subtitle.isNotBlank()) {
+                    Text(
+                        text = subtitle,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+            if (track.durationMs > 0) {
+                Text(
+                    text = formatDuration(track.durationMs),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 8.dp),
+                )
+            }
+            IconButton(onClick = onMoreClick, modifier = Modifier.size(38.dp)) {
+                Icon(
+                    Icons.Filled.MoreVert,
+                    contentDescription = "More options for ${track.title}",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
     }
 }

@@ -10,6 +10,7 @@ import com.meoify.music.data.MusicRepository
 import com.meoify.music.data.local.LibraryStore
 import com.meoify.music.data.local.SettingsStore
 import com.meoify.music.data.remote.StreamResolver
+import com.meoify.music.playback.HistorySync
 import com.meoify.music.playback.PlayerConnection
 
 class AppContainer(context: Context) {
@@ -19,6 +20,7 @@ class AppContainer(context: Context) {
     val repository = MusicRepository(settings)
     val streamResolver = StreamResolver(appContext, settings)
     val player = PlayerConnection(appContext, streamResolver, library)
+    val historySync = HistorySync(player, repository, settings)
 }
 
 class MeoifyApplication : Application(), SingletonImageLoader.Factory {

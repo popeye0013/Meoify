@@ -187,6 +187,11 @@ fun SettingsScreen(
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 },
+                actions = {
+                    IconButton(onClick = { actions.search("") }) {
+                        Icon(Icons.Filled.Search, contentDescription = "Search")
+                    }
+                },
             )
         },
     ) { padding ->
@@ -414,6 +419,18 @@ fun SettingsScreen(
                         enabled = settings.animatedCanvas,
                         onCheckedChange = { app.container.settings.setCanvasOverCellular(it) },
                     )
+                    ToggleRow(
+                        icon = Icons.Filled.History,
+                        title = "Sync to YouTube Music history",
+                        subtitle = if (settings.ytCookies != null) {
+                            "Songs you listen to appear in your account history, whatever the source"
+                        } else {
+                            "Sign in to YouTube Music to mirror your listening"
+                        },
+                        checked = settings.historySync,
+                        enabled = settings.ytCookies != null,
+                        onCheckedChange = { app.container.settings.setHistorySync(it) },
+                    )
                 }
             }
 
@@ -484,7 +501,7 @@ fun SettingsScreen(
                                 fontWeight = FontWeight.ExtraBold,
                             )
                             Text(
-                                text = "Version 1.4.0",
+                                text = "Version 1.5.0",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -1034,7 +1051,8 @@ private fun SectionLabel(text: String) {
         text = text,
         style = MaterialTheme.typography.titleMedium,
         fontWeight = FontWeight.ExtraBold,
-        modifier = Modifier.padding(start = 4.dp, top = 8.dp),
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.padding(start = 6.dp, top = 10.dp, bottom = 2.dp),
     )
 }
 
@@ -1045,7 +1063,7 @@ private fun SettingsCard(content: @Composable ColumnScope.() -> Unit) {
         color = MaterialTheme.colorScheme.surfaceContainerLow,
         modifier = Modifier.fillMaxWidth(),
     ) {
-        Column(modifier = Modifier.padding(18.dp)) { content() }
+        Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) { content() }
     }
 }
 
@@ -1062,18 +1080,22 @@ private fun ToggleRow(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(enabled = enabled) { onCheckedChange(!checked) }
-            .padding(vertical = 10.dp),
+            .padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(
-            icon,
-            contentDescription = null,
-            tint = if (enabled) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
-            modifier = Modifier.size(20.dp),
-        )
-        Spacer(Modifier.width(10.dp))
+        SettingsIconTile(icon = icon, enabled = enabled)
+        Spacer(Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
-            Text(text = title, style = MaterialTheme.typography.bodyLarge)
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.SemiBold,
+                color = if (enabled) {
+                    MaterialTheme.colorScheme.onSurface
+                } else {
+                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                },
+            )
             Text(
                 text = subtitle,
                 style = MaterialTheme.typography.bodySmall,
@@ -1081,6 +1103,34 @@ private fun ToggleRow(
             )
         }
         Switch(checked = checked, onCheckedChange = onCheckedChange, enabled = enabled)
+    }
+}
+
+@Composable
+private fun SettingsIconTile(icon: ImageVector, enabled: Boolean = true) {
+    Box(
+        modifier = Modifier
+            .size(40.dp)
+            .clip(RoundedCornerShape(13.dp))
+            .background(
+                if (enabled) {
+                    MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f)
+                } else {
+                    MaterialTheme.colorScheme.surfaceContainerHigh
+                },
+            ),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = if (enabled) {
+                MaterialTheme.colorScheme.primary
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+            },
+            modifier = Modifier.size(21.dp),
+        )
     }
 }
 
@@ -1095,18 +1145,17 @@ private fun ActionRow(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
-            .padding(vertical = 14.dp),
+            .padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(
-            icon,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(20.dp),
-        )
+        SettingsIconTile(icon = icon)
         Spacer(Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
-            Text(text = title, style = MaterialTheme.typography.bodyLarge)
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.SemiBold,
+            )
             if (subtitle != null) {
                 Text(
                     text = subtitle,
@@ -1115,5 +1164,11 @@ private fun ActionRow(
                 )
             }
         }
+        Icon(
+            Icons.AutoMirrored.Filled.KeyboardArrowRight,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(20.dp),
+        )
     }
 }

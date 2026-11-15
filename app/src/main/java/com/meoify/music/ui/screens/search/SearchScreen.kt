@@ -1,10 +1,18 @@
 package com.meoify.music.ui.screens.search
 
+import android.app.Activity
+import android.content.Intent
+import android.speech.RecognizerIntent
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -15,22 +23,20 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.GridItemSpan
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -45,7 +51,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -58,18 +63,19 @@ import com.meoify.music.MeoifyApplication
 import com.meoify.music.data.model.SearchResults
 import com.meoify.music.data.model.UiState
 import com.meoify.music.data.remote.YTMusicParser.SearchFilter
+import com.meoify.music.ui.components.ArtistCard
 import com.meoify.music.ui.components.MediaCard
 import com.meoify.music.ui.components.ShimmerBox
 import com.meoify.music.ui.components.TrackRow
 import com.meoify.music.ui.navigation.LocalAppActions
 import com.meoify.music.ui.navigation.LocalLibrary
-import com.meoify.music.ui.theme.GenrePalette
 import com.meoify.music.ui.viewmodel.SearchViewModel
 
 @Composable
 fun SearchScreen(
     pendingSearch: String?,
     onConsumedPending: () -> Unit,
+    onBack: () -> Unit = {},
 ) {
     val app = LocalContext.current.applicationContext as MeoifyApplication
     val container = app.container
@@ -85,6 +91,27 @@ fun SearchScreen(
     val library = LocalLibrary.current
     val actions = LocalAppActions.current
 
+    val voiceSearch = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult(),
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            val spoken = result.data
+                ?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
+                ?.firstOrNull()
+                ?.trim()
+            if (!spoken.isNullOrBlank()) viewModel.runSearch(spoken)
+        }
+    }
+
+    fun startVoiceSearch() {
+        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            putExtra(RecognizerIntent.EXTRA_PROMPT, "Search YouTube Music")
+        }
+        val launched = runCatching { voiceSearch.launch(intent) }.isSuccess
+        if (!launched) actions.showSnackbar("Voice search isn't available on this device")
+    }
+
     LaunchedEffect(pendingSearch) {
         if (!pendingSearch.isNullOrBlank()) {
             viewModel.runSearch(pendingSearch)
@@ -93,11 +120,18 @@ fun SearchScreen(
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
-        SearchField(
+        SearchHeader(
             query = query,
             onQueryChange = viewModel::setQuery,
             onSearch = { viewModel.runSearch() },
             onClear = viewModel::clear,
+            onBack = onBack,
+            onVoice = ::startVoiceSearch,
+        )
+
+        FilterRow(
+            filter = filter,
+            onFilterChange = viewModel::setFilter,
         )
 
         when {
@@ -115,7 +149,6 @@ fun SearchScreen(
 
             else -> SearchResultsBody(
                 filter = filter,
-                onFilterChange = viewModel::setFilter,
                 results = results,
                 query = query,
                 onRetry = { viewModel.runSearch() },
@@ -135,43 +168,143 @@ private fun shouldShowSuggestions(
 }
 
 @Composable
-private fun SearchField(
+private fun SearchHeader(
     query: String,
     onQueryChange: (String) -> Unit,
     onSearch: () -> Unit,
     onClear: () -> Unit,
+    onBack: () -> Unit,
+    onVoice: () -> Unit,
 ) {
-    TextField(
-        value = query,
-        onValueChange = onQueryChange,
-        placeholder = { Text("Songs, albums, artists…") },
-        leadingIcon = {
-            Icon(Icons.Filled.Search, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-        },
-        trailingIcon = {
-            if (query.isNotBlank()) {
-                IconButton(onClick = onClear) {
-                    Icon(Icons.Filled.Close, contentDescription = "Clear search")
-                }
-            }
-        },
-        singleLine = true,
-        shape = RoundedCornerShape(28.dp),
-        colors = TextFieldDefaults.colors(
-            focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-            focusedIndicatorColor = Color.Transparent,
-            unfocusedIndicatorColor = Color.Transparent,
-            cursorColor = MaterialTheme.colorScheme.primary,
-        ),
-        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-        keyboardActions = KeyboardActions(onSearch = { onSearch() }),
+    Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-    )
+            .padding(start = 12.dp, end = 12.dp, top = 10.dp, bottom = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Surface(
+            onClick = onBack,
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            modifier = Modifier.size(46.dp),
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "Back",
+                    tint = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.size(22.dp),
+                )
+            }
+        }
+        Spacer(Modifier.width(10.dp))
+        TextField(
+            value = query,
+            onValueChange = onQueryChange,
+            placeholder = {
+                Text("Search YouTube Music…", maxLines = 1, overflow = TextOverflow.Ellipsis)
+            },
+            leadingIcon = {
+                Icon(
+                    Icons.Filled.Search,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            },
+            trailingIcon = {
+                if (query.isNotBlank()) {
+                    IconButton(onClick = onClear) {
+                        Icon(Icons.Filled.Close, contentDescription = "Clear search")
+                    }
+                }
+            },
+            singleLine = true,
+            shape = RoundedCornerShape(50),
+            colors = TextFieldDefaults.colors(
+                focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                focusedIndicatorColor = Color.Transparent,
+                unfocusedIndicatorColor = Color.Transparent,
+                cursorColor = MaterialTheme.colorScheme.primary,
+            ),
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+            keyboardActions = KeyboardActions(onSearch = { onSearch() }),
+            modifier = Modifier.weight(1f),
+        )
+        Spacer(Modifier.width(6.dp))
+        IconButton(onClick = onVoice) {
+            Icon(
+                Icons.Filled.Mic,
+                contentDescription = "Search by voice",
+                tint = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.size(24.dp),
+            )
+        }
+    }
 }
 
+@Composable
+private fun FilterRow(
+    filter: SearchFilter,
+    onFilterChange: (SearchFilter) -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 2.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        SearchFilter.entries.forEach { option ->
+            SearchChip(
+                label = when (option) {
+                    SearchFilter.SONGS -> "Tracks"
+                    SearchFilter.ALBUMS -> "Albums"
+                    SearchFilter.ARTISTS -> "Artists"
+                    SearchFilter.PLAYLISTS -> "Playlists"
+                },
+                selected = filter == option,
+                onClick = { onFilterChange(option) },
+                modifier = Modifier.weight(1f),
+            )
+        }
+    }
+}
+
+@Composable
+private fun SearchChip(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(50),
+        color = if (selected) {
+            MaterialTheme.colorScheme.primary
+        } else {
+            MaterialTheme.colorScheme.surfaceContainerHigh
+        },
+        modifier = modifier,
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+                color = if (selected) {
+                    MaterialTheme.colorScheme.onPrimary
+                } else {
+                    MaterialTheme.colorScheme.onSurface
+                },
+                maxLines = 1,
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 11.dp),
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun BrowseAll(
     recentSearches: List<String>,
@@ -179,18 +312,16 @@ private fun BrowseAll(
     onClearRecent: () -> Unit,
 ) {
     val genres = listOf(
-        "Pop", "Hip-Hop", "Rock", "R&B", "Latin", "Electronic",
-        "Indie", "K-Pop", "Jazz", "Classical", "Metal", "Chill",
+        "Pop", "Rock", "Hip-Hop", "Lo-Fi", "Electronic", "Indie", "R&B", "Bollywood",
+        "Jazz", "Metal", "Acoustic", "Chill", "Anime", "Classical", "Synthwave",
     )
-    LazyVerticalGrid(
-        columns = GridCells.Fixed(2),
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 28.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+
+    LazyColumn(
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 28.dp),
         modifier = Modifier.fillMaxSize(),
     ) {
         if (recentSearches.isNotEmpty()) {
-            item(span = { GridItemSpan(maxLineSpan) }) {
+            item {
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
                     verticalAlignment = Alignment.CenterVertically,
@@ -198,81 +329,95 @@ private fun BrowseAll(
                     Text(
                         text = "Recent searches",
                         style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
+                        fontWeight = FontWeight.ExtraBold,
                         modifier = Modifier.weight(1f),
                     )
                     TextButton(onClick = onClearRecent) { Text("Clear") }
                 }
             }
-            recentSearches.forEach { recent ->
-                item(span = { GridItemSpan(maxLineSpan) }) {
-                    Surface(
-                        onClick = { onSearch(recent) },
-                        shape = RoundedCornerShape(18.dp),
-                        color = MaterialTheme.colorScheme.surfaceContainerLow,
-                        modifier = Modifier.fillMaxWidth(),
+            items(recentSearches) { recent ->
+                Surface(
+                    onClick = { onSearch(recent) },
+                    shape = RoundedCornerShape(18.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerLow,
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp),
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 13.dp),
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Icon(
-                                Icons.Filled.History,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(18.dp),
-                            )
-                            Spacer(Modifier.width(10.dp))
-                            Text(
-                                text = recent,
-                                style = MaterialTheme.typography.bodyMedium,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        }
+                        Icon(
+                            Icons.Filled.History,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(18.dp),
+                        )
+                        Spacer(Modifier.width(10.dp))
+                        Text(
+                            text = recent,
+                            style = MaterialTheme.typography.bodyMedium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
                     }
                 }
             }
-            item(span = { GridItemSpan(maxLineSpan) }) {
-                Text(
-                    text = "Browse all",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.ExtraBold,
-                    modifier = Modifier.padding(top = 12.dp, bottom = 2.dp),
+            item { Spacer(Modifier.height(10.dp)) }
+        }
+
+        item {
+            Row(
+                modifier = Modifier.padding(top = 6.dp, bottom = 14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    Icons.Filled.Explore,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(22.dp),
                 )
-            }
-        } else {
-            item(span = { GridItemSpan(maxLineSpan) }) {
+                Spacer(Modifier.width(10.dp))
                 Text(
-                    text = "Browse all",
-                    style = MaterialTheme.typography.titleLarge,
+                    text = "Explore genres & moods",
+                    style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.ExtraBold,
-                    modifier = Modifier.padding(top = 8.dp, bottom = 2.dp),
+                    color = MaterialTheme.colorScheme.onBackground,
                 )
             }
         }
 
-        items(genres) { genre ->
-            val pair = GenrePalette[genres.indexOf(genre) % GenrePalette.size]
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(100.dp)
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(Brush.linearGradient(listOf(pair.first, pair.second)))
-                    .clickable { onSearch("$genre music") },
+        item {
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(9.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                Text(
-                    text = genre,
-                    color = Color.White,
-                    fontWeight = FontWeight.ExtraBold,
-                    style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier
-                        .align(Alignment.TopStart)
-                        .padding(16.dp),
-                )
+                genres.forEach { genre ->
+                    GenreChip(label = genre, onClick = { onSearch("$genre music") })
+                }
             }
         }
+    }
+}
+
+@Composable
+private fun GenreChip(label: String, onClick: () -> Unit) {
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(50),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        border = androidx.compose.foundation.BorderStroke(
+            1.dp,
+            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f),
+        ),
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 13.dp),
+        )
     }
 }
 
@@ -332,36 +477,12 @@ private fun Suggestions(query: String, suggestions: List<String>, onPick: (Strin
 @Composable
 private fun SearchResultsBody(
     filter: SearchFilter,
-    onFilterChange: (SearchFilter) -> Unit,
     results: UiState<SearchResults>,
     query: String,
     onRetry: () -> Unit,
 ) {
     val actions = LocalAppActions.current
-    Column(modifier = Modifier.fillMaxSize()) {
-        LazyRow(
-            contentPadding = PaddingValues(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            items(SearchFilter.entries) { f ->
-                FilterChip(
-                    selected = filter == f,
-                    onClick = { onFilterChange(f) },
-                    label = {
-                        Text(
-                            when (f) {
-                                SearchFilter.SONGS -> "Songs"
-                                SearchFilter.ALBUMS -> "Albums"
-                                SearchFilter.ARTISTS -> "Artists"
-                                SearchFilter.PLAYLISTS -> "Playlists"
-                            },
-                        )
-                    },
-                )
-            }
-        }
-        Spacer(Modifier.height(8.dp))
-
+    Box(modifier = Modifier.fillMaxSize()) {
         when (results) {
             UiState.Loading -> {
                 Column(modifier = Modifier.padding(16.dp)) {
@@ -396,7 +517,7 @@ private fun SearchResultsBody(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
-                    return@Column
+                    return@Box
                 }
 
                 LazyColumn(modifier = Modifier.fillMaxSize()) {
@@ -450,7 +571,7 @@ private fun SearchResultsBody(
                                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                             ) {
                                 row.forEach { card ->
-                                    com.meoify.music.ui.components.ArtistCard(
+                                    ArtistCard(
                                         card = card,
                                         onClick = { actions.openArtist(card.id) },
                                         modifier = Modifier.weight(1f),

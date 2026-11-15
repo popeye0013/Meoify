@@ -103,6 +103,7 @@ fun MeoifyApp(container: AppContainer) {
             addToPlaylist = { id, track -> container.library.addToPlaylist(id, track) },
             removeFromPlaylist = { id, trackId -> container.library.removeFromPlaylist(id, trackId) },
             createPlaylist = { name -> container.library.createPlaylist(name) },
+            savePlaylist = { name, tracks -> container.library.savePlaylist(name, tracks) },
             deletePlaylist = { id -> container.library.deletePlaylist(id) },
             renamePlaylist = { id, name -> container.library.renamePlaylist(id, name) },
             clearRecentSearches = { container.library.clearRecentSearches() },
