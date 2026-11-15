@@ -28,15 +28,15 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.QueueMusic
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.filled.FormatQuote
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.Lyrics
-import androidx.compose.material.icons.filled.MoreHoriz
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.QueueMusic
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.RepeatOne
 import androidx.compose.material.icons.filled.Share
@@ -44,6 +44,8 @@ import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -66,19 +68,23 @@ import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
+import com.meoify.music.data.model.AudioQuality
 import com.meoify.music.data.model.Track
 import com.meoify.music.data.remote.TrackLyrics
 import com.meoify.music.playback.PlayerUiState
 import com.meoify.music.ui.components.TrackRow
+import com.meoify.music.ui.navigation.AppActions
 import com.meoify.music.ui.navigation.LocalAppActions
 import com.meoify.music.ui.navigation.LocalPlayerState
 import com.meoify.music.ui.theme.ArtworkColorCache
@@ -90,7 +96,7 @@ import kotlinx.coroutines.withContext
 fun PlayerScreen(onClose: () -> Unit) {
     val state = LocalPlayerState.current
     val activity = LocalContext.current as? Activity
-    val app = androidx.compose.ui.platform.LocalContext.current.applicationContext as com.meoify.music.MeoifyApplication
+    val app = (LocalContext.current.applicationContext as com.meoify.music.MeoifyApplication)
     val settings by app.container.settings.settings.collectAsStateWithLifecycle()
     val actions = LocalAppActions.current
     val context = LocalContext.current
@@ -101,11 +107,12 @@ fun PlayerScreen(onClose: () -> Unit) {
 
     var showLyrics by remember { mutableStateOf(false) }
     var showQueue by remember { mutableStateOf(false) }
+    var menuOpen by remember { mutableStateOf(false) }
     var lyrics by remember { mutableStateOf<TrackLyrics?>(null) }
     var lyricsLoading by remember { mutableStateOf(false) }
 
     DisposableEffect(activity) {
-        val view = activity?.window?.decorView ?: return@DisposableEffect onDispose {}
+        val view = activity?.window?.decorView ?: return@DisposableEffect onDispose { }
         val controller = WindowCompat.getInsetsController(activity.window, view)
         val oldStatus = controller.isAppearanceLightStatusBars
         val oldNav = controller.isAppearanceLightNavigationBars
@@ -132,6 +139,15 @@ fun PlayerScreen(onClose: () -> Unit) {
         lyricsLoading = false
     }
 
+    fun shareTrack() {
+        val t = track ?: return
+        val send = Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_TEXT, "https://music.youtube.com/watch?v=${t.id}\n\n${t.title} — ${t.artist}")
+        }
+        context.startActivity(Intent.createChooser(send, "Share song"))
+    }
+
     Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
         if (track?.thumbnailUrl != null) {
             AsyncImage(
@@ -155,8 +171,8 @@ fun PlayerScreen(onClose: () -> Unit) {
                 .background(
                     Brush.verticalGradient(
                         listOf(
-                            accent.copy(alpha = 0.58f),
-                            Color.Black.copy(alpha = 0.78f),
+                            accent.copy(alpha = 0.55f),
+                            Color.Black.copy(alpha = 0.82f),
                             Color.Black,
                         ),
                     ),
@@ -167,48 +183,17 @@ fun PlayerScreen(onClose: () -> Unit) {
             modifier = Modifier
                 .fillMaxSize()
                 .statusBarsPadding()
-                .navigationBarsPadding()
-                .padding(horizontal = 24.dp)
-                .padding(top = 8.dp, bottom = 10.dp),
+                .navigationBarsPadding(),
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                IconButton(onClick = onClose) {
-                    Icon(
-                        Icons.Filled.KeyboardArrowDown,
-                        contentDescription = "Close player",
-                        tint = Color.White,
-                        modifier = Modifier.size(30.dp),
-                    )
-                }
-                Column(
-                    modifier = Modifier.weight(1f),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    Text(
-                        text = "Playing from ${state.sourceTitle}",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = Color.White.copy(alpha = 0.72f),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-                IconButton(onClick = {
-                    val t = track ?: return@IconButton
-                    val send = Intent(Intent.ACTION_SEND).apply {
-                        type = "text/plain"
-                        putExtra(
-                            Intent.EXTRA_TEXT,
-                            "https://music.youtube.com/watch?v=${t.id}\n\n${t.title} — ${t.artist}",
-                        )
-                    }
-                    context.startActivity(Intent.createChooser(send, "Share song"))
-                }) {
-                    Icon(Icons.Filled.Share, contentDescription = "Share", tint = Color.White)
-                }
-            }
+            NowPlayingHeader(
+                source = state.sourceTitle,
+                onClose = onClose,
+                menuOpen = menuOpen,
+                onMenuOpenChange = { menuOpen = it },
+                onShare = ::shareTrack,
+                onShowQueue = { showQueue = true },
+                onShowLyrics = { showLyrics = true },
+            )
 
             Crossfade(targetState = showLyrics, label = "playerMode") { inLyrics ->
                 if (inLyrics) {
@@ -224,20 +209,10 @@ fun PlayerScreen(onClose: () -> Unit) {
                     PlayerMainContent(
                         state = state,
                         track = track,
+                        quality = settings.quality,
                         actions = actions,
                         onShowLyrics = { showLyrics = true },
                         onShowQueue = { showQueue = true },
-                        onShare = {
-                            val t = track ?: return@PlayerMainContent
-                            val send = Intent(Intent.ACTION_SEND).apply {
-                                type = "text/plain"
-                                putExtra(
-                                    Intent.EXTRA_TEXT,
-                                    "https://music.youtube.com/watch?v=${t.id}\n\n${t.title} — ${t.artist}",
-                                )
-                            }
-                            context.startActivity(Intent.createChooser(send, "Share song"))
-                        },
                     )
                 }
             }
@@ -261,43 +236,129 @@ fun PlayerScreen(onClose: () -> Unit) {
 }
 
 @Composable
+private fun NowPlayingHeader(
+    source: String,
+    onClose: () -> Unit,
+    menuOpen: Boolean,
+    onMenuOpenChange: (Boolean) -> Unit,
+    onShare: () -> Unit,
+    onShowQueue: () -> Unit,
+    onShowLyrics: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 6.dp, vertical = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        IconButton(onClick = onClose) {
+            Icon(
+                Icons.Filled.KeyboardArrowDown,
+                contentDescription = "Close player",
+                tint = Color.White,
+                modifier = Modifier.size(30.dp),
+            )
+        }
+        Column(
+            modifier = Modifier.weight(1f),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text(
+                text = "NOW PLAYING",
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.ExtraBold,
+                letterSpacing = 1.6.sp,
+                color = Color.White.copy(alpha = 0.82f),
+            )
+            Text(
+                text = source,
+                style = MaterialTheme.typography.bodySmall,
+                color = Color.White.copy(alpha = 0.62f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        Box {
+            IconButton(onClick = { onMenuOpenChange(true) }) {
+                Icon(
+                    Icons.Filled.MoreVert,
+                    contentDescription = "More options",
+                    tint = Color.White.copy(alpha = 0.9f),
+                )
+            }
+            DropdownMenu(expanded = menuOpen, onDismissRequest = { onMenuOpenChange(false) }) {
+                DropdownMenuItem(
+                    text = { Text("Share") },
+                    leadingIcon = { Icon(Icons.Filled.Share, contentDescription = null) },
+                    onClick = {
+                        onMenuOpenChange(false)
+                        onShare()
+                    },
+                )
+                DropdownMenuItem(
+                    text = { Text("Queue") },
+                    leadingIcon = { Icon(Icons.AutoMirrored.Filled.QueueMusic, contentDescription = null) },
+                    onClick = {
+                        onMenuOpenChange(false)
+                        onShowQueue()
+                    },
+                )
+                DropdownMenuItem(
+                    text = { Text("Lyrics") },
+                    leadingIcon = { Icon(Icons.Filled.FormatQuote, contentDescription = null) },
+                    onClick = {
+                        onMenuOpenChange(false)
+                        onShowLyrics()
+                    },
+                )
+            }
+        }
+    }
+}
+
+@Composable
 private fun PlayerMainContent(
     state: PlayerUiState,
     track: Track?,
-    actions: com.meoify.music.ui.navigation.AppActions,
+    quality: AudioQuality,
+    actions: AppActions,
     onShowLyrics: () -> Unit,
     onShowQueue: () -> Unit,
-    onShare: () -> Unit,
 ) {
     Column(
-        modifier = Modifier.fillMaxSize(),
-        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 18.dp)
+            .padding(bottom = 10.dp),
     ) {
-        Spacer(Modifier.height(14.dp))
+        // Big artwork — takes whatever vertical space is left over.
         Box(
             modifier = Modifier
-                .fillMaxWidth(0.84f)
-                .widthIn(max = 360.dp)
-                .aspectRatio(1f)
-                .clip(RoundedCornerShape(24.dp))
-                .background(Color.White.copy(alpha = 0.08f)),
+                .fillMaxWidth()
+                .weight(1f)
+                .padding(top = 6.dp, bottom = 12.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(Color.White.copy(alpha = 0.07f)),
         ) {
-            AsyncImage(
-                model = track?.thumbnailUrl,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize(),
-            )
-            if (track == null) {
+            if (track?.thumbnailUrl != null) {
+                AsyncImage(
+                    model = track.thumbnailUrl,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            } else {
                 Box(
-                    modifier = Modifier.fillMaxSize().background(
-                        Brush.linearGradient(
-                            listOf(
-                                MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
-                                Color.Black,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.linearGradient(
+                                listOf(
+                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.45f),
+                                    Color.Black,
+                                ),
                             ),
                         ),
-                    ),
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(
@@ -310,12 +371,7 @@ private fun PlayerMainContent(
             }
         }
 
-        Spacer(Modifier.height(26.dp))
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = track?.title ?: "Nothing playing",
@@ -325,25 +381,32 @@ private fun PlayerMainContent(
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
+                Spacer(Modifier.height(2.dp))
                 Text(
                     text = track?.artist.orEmpty(),
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = Color.White.copy(alpha = 0.76f),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = Color.White.copy(alpha = 0.72f),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-            IconButton(onClick = { track?.let { actions.toggleLike(it) } }) {
-                val liked = track != null && actions.isLiked(track.id)
-                Icon(
-                    imageVector = if (liked) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
-                    contentDescription = if (liked) "Remove from liked songs" else "Like",
-                    tint = if (liked) MaterialTheme.colorScheme.primary else Color.White,
-                )
-            }
+            Spacer(Modifier.width(10.dp))
+            CircleAction(
+                icon = if (track != null && actions.isLiked(track.id)) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
+                contentDescription = if (track != null && actions.isLiked(track.id)) "Remove from liked songs" else "Like",
+                tint = if (track != null && actions.isLiked(track.id)) MaterialTheme.colorScheme.primary else Color.White,
+                onClick = { track?.let { actions.toggleLike(it) } },
+            )
+            Spacer(Modifier.width(8.dp))
+            CircleAction(
+                icon = Icons.Filled.FormatQuote,
+                contentDescription = "Lyrics",
+                tint = Color.White,
+                onClick = onShowLyrics,
+            )
         }
 
-        Spacer(Modifier.height(10.dp))
+        Spacer(Modifier.height(8.dp))
 
         var dragging by remember { mutableStateOf(false) }
         var dragValue by remember { mutableStateOf(0f) }
@@ -362,22 +425,123 @@ private fun PlayerMainContent(
             colors = SliderDefaults.colors(
                 thumbColor = Color.White,
                 activeTrackColor = Color.White,
-                inactiveTrackColor = Color.White.copy(alpha = 0.25f),
+                inactiveTrackColor = Color.White.copy(alpha = 0.28f),
             ),
         )
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
+            val shownPosition = if (dragging) (dragValue * state.durationMs).toLong() else state.positionMs
+            val shownRemaining = (state.durationMs - shownPosition).coerceAtLeast(0L)
             Text(
-                text = formatDuration(if (dragging) (dragValue * state.durationMs).toLong() else state.positionMs),
-                style = MaterialTheme.typography.labelSmall,
-                color = Color.White.copy(alpha = 0.68f),
+                text = if (state.durationMs > 0) formatDuration(shownPosition) else "--:--",
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Medium,
+                color = Color.White.copy(alpha = 0.62f),
             )
             Text(
-                text = formatDuration(state.durationMs),
-                style = MaterialTheme.typography.labelSmall,
-                color = Color.White.copy(alpha = 0.68f),
+                text = if (state.durationMs > 0) "-${formatDuration(shownRemaining)}" else "--:--",
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Medium,
+                color = Color.White.copy(alpha = 0.62f),
+            )
+        }
+
+        Spacer(Modifier.height(6.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.Center,
+        ) {
+            Surface(
+                shape = RoundedCornerShape(50),
+                color = Color.White.copy(alpha = 0.12f),
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        Icons.Filled.GraphicEq,
+                        contentDescription = null,
+                        tint = Color.White.copy(alpha = 0.9f),
+                        modifier = Modifier.size(14.dp),
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        text = when (quality) {
+                            AudioQuality.HIGH -> "Audio • High"
+                            AudioQuality.NORMAL -> "Audio • Normal"
+                            AudioQuality.SAVER -> "Audio • Saver"
+                        },
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color.White.copy(alpha = 0.92f),
+                    )
+                }
+            }
+        }
+
+        Spacer(Modifier.height(14.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            CircleAction(
+                icon = Icons.Filled.SkipPrevious,
+                contentDescription = "Previous",
+                tint = Color.White,
+                size = 56.dp,
+                background = Color.White.copy(alpha = 0.12f),
+                onClick = actions.skipPrevious,
+            )
+            Surface(
+                onClick = actions.togglePlayPause,
+                shape = RoundedCornerShape(50),
+                color = Color.White.copy(alpha = 0.16f),
+                modifier = Modifier
+                    .weight(1f)
+                    .height(58.dp),
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxSize(),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    if (state.isPreparing || state.isBuffering) {
+                        CircularProgressIndicator(
+                            color = Color.White,
+                            modifier = Modifier.size(24.dp),
+                            strokeWidth = 2.5.dp,
+                        )
+                        Spacer(Modifier.width(10.dp))
+                    } else {
+                        Icon(
+                            imageVector = if (state.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(26.dp),
+                        )
+                        Spacer(Modifier.width(10.dp))
+                    }
+                    Text(
+                        text = if (state.isPlaying) "Pause" else "Play",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                    )
+                }
+            }
+            CircleAction(
+                icon = Icons.Filled.SkipNext,
+                contentDescription = "Next",
+                tint = Color.White,
+                size = 56.dp,
+                background = Color.White.copy(alpha = 0.12f),
+                onClick = actions.skipNext,
             )
         }
 
@@ -385,88 +549,111 @@ private fun PlayerMainContent(
 
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceEvenly,
-            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            IconButton(onClick = actions.toggleShuffle) {
+            PillButton(
+                active = state.shuffle,
+                contentDescription = "Shuffle",
+                onClick = actions.toggleShuffle,
+                modifier = Modifier.weight(1f),
+            ) {
                 Icon(
                     Icons.Filled.Shuffle,
-                    contentDescription = "Shuffle",
-                    tint = if (state.shuffle) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.78f),
-                    modifier = Modifier.size(26.dp),
+                    contentDescription = null,
+                    tint = if (state.shuffle) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.86f),
+                    modifier = Modifier.size(22.dp),
                 )
             }
-            IconButton(onClick = actions.skipPrevious) {
-                Icon(Icons.Filled.SkipPrevious, contentDescription = "Previous", tint = Color.White, modifier = Modifier.size(42.dp))
-            }
-            Surface(
-                onClick = actions.togglePlayPause,
-                shape = CircleShape,
-                color = Color.White,
-                modifier = Modifier.size(70.dp),
+            PillButton(
+                active = false,
+                contentDescription = "Queue",
+                onClick = onShowQueue,
+                modifier = Modifier.weight(1f),
             ) {
-                Box(contentAlignment = Alignment.Center) {
-                    if (state.isPreparing || state.isBuffering) {
-                        CircularProgressIndicator(
-                            color = Color.Black,
-                            modifier = Modifier.size(28.dp),
-                            strokeWidth = 3.dp,
-                        )
-                    } else {
-                        Icon(
-                            imageVector = if (state.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                            contentDescription = if (state.isPlaying) "Pause" else "Play",
-                            tint = Color.Black,
-                            modifier = Modifier.size(38.dp),
-                        )
-                    }
-                }
+                Icon(
+                    Icons.AutoMirrored.Filled.QueueMusic,
+                    contentDescription = null,
+                    tint = Color.White.copy(alpha = 0.86f),
+                    modifier = Modifier.size(22.dp),
+                )
             }
-            IconButton(onClick = actions.skipNext) {
-                Icon(Icons.Filled.SkipNext, contentDescription = "Next", tint = Color.White, modifier = Modifier.size(42.dp))
-            }
-            IconButton(onClick = actions.cycleRepeat) {
+            PillButton(
+                active = state.repeatMode != androidx.media3.common.Player.REPEAT_MODE_OFF,
+                contentDescription = "Repeat",
+                onClick = actions.cycleRepeat,
+                modifier = Modifier.weight(1f),
+            ) {
                 Icon(
                     imageVector = if (state.repeatMode == androidx.media3.common.Player.REPEAT_MODE_ONE) {
                         Icons.Filled.RepeatOne
                     } else {
                         Icons.Filled.Repeat
                     },
-                    contentDescription = "Repeat",
+                    contentDescription = null,
                     tint = if (state.repeatMode != androidx.media3.common.Player.REPEAT_MODE_OFF) {
                         MaterialTheme.colorScheme.primary
                     } else {
-                        Color.White.copy(alpha = 0.78f)
+                        Color.White.copy(alpha = 0.86f)
                     },
-                    modifier = Modifier.size(26.dp),
+                    modifier = Modifier.size(22.dp),
                 )
             }
-        }
-
-        Spacer(Modifier.weight(1f))
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceEvenly,
-        ) {
-            PlayerAction(Icons.Filled.Lyrics, "Lyrics", onShowLyrics)
-            PlayerAction(Icons.Filled.QueueMusic, "Queue", onShowQueue)
-            PlayerAction(Icons.Filled.Share, "Share", onShare)
         }
     }
 }
 
 @Composable
-private fun PlayerAction(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    label: String,
+private fun CircleAction(
+    icon: ImageVector,
+    contentDescription: String,
+    tint: Color,
     onClick: () -> Unit,
+    size: androidx.compose.ui.unit.Dp = 48.dp,
+    background: Color = Color.White.copy(alpha = 0.14f),
 ) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        IconButton(onClick = onClick) {
-            Icon(icon, contentDescription = label, tint = Color.White.copy(alpha = 0.9f))
+    Surface(
+        onClick = onClick,
+        shape = CircleShape,
+        color = background,
+        modifier = Modifier.size(size),
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Icon(
+                imageVector = icon,
+                contentDescription = contentDescription,
+                tint = tint,
+                modifier = Modifier.size(size * 0.46f),
+            )
         }
-        Text(label, style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.66f))
+    }
+}
+
+@Composable
+private fun PillButton(
+    active: Boolean,
+    contentDescription: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit,
+) {
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(50),
+        color = if (active) {
+            MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
+        } else {
+            Color.White.copy(alpha = 0.12f)
+        },
+        modifier = modifier.height(52.dp),
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Row(
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                content()
+            }
+        }
     }
 }
 
@@ -488,7 +675,7 @@ private fun LyricsView(
         }
     }
 
-    Column(modifier = Modifier.fillMaxSize()) {
+    Column(modifier = Modifier.fillMaxSize().padding(horizontal = 18.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,

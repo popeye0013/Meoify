@@ -38,6 +38,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -48,20 +49,27 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import coil3.compose.AsyncImage
+import com.meoify.music.MeoifyApplication
 import com.meoify.music.data.model.LocalPlaylist
 import com.meoify.music.data.model.MediaCard as MediaCardModel
 import com.meoify.music.data.model.MediaKind
 import com.meoify.music.data.model.Track
 import com.meoify.music.ui.components.MediaCard
 import com.meoify.music.ui.components.SectionHeader
+import com.meoify.music.ui.components.ShimmerBox
 import com.meoify.music.ui.components.TrackRow
 import com.meoify.music.ui.navigation.LocalAppActions
 import com.meoify.music.ui.navigation.LocalLibrary
 import com.meoify.music.ui.theme.ArtworkColorCache
+import com.meoify.music.ui.viewmodel.YtLibraryViewModel
+import com.meoify.music.ui.viewmodel.YtLibraryViewModelFactory
 
 @Composable
 fun LibraryScreen(
@@ -70,6 +78,19 @@ fun LibraryScreen(
 ) {
     val library = LocalLibrary.current
     val actions = LocalAppActions.current
+    val context = LocalContext.current
+    val app = context.applicationContext as MeoifyApplication
+    val settings by app.container.settings.settings.collectAsStateWithLifecycle()
+    val ytViewModel: YtLibraryViewModel = viewModel(
+        factory = YtLibraryViewModelFactory(app.container.repository),
+    )
+    val ytPlaylists by ytViewModel.playlists.collectAsStateWithLifecycle()
+    val ytLoading by ytViewModel.loading.collectAsStateWithLifecycle()
+
+    LaunchedEffect(settings.ytCookies) {
+        if (settings.ytCookies != null) ytViewModel.load(force = true) else ytViewModel.clear()
+    }
+
     var filter by remember { mutableStateOf(LibraryFilter.Playlists) }
     var menuPlaylist by remember { mutableStateOf<LocalPlaylist?>(null) }
     var renamePlaylist by remember { mutableStateOf<LocalPlaylist?>(null) }
@@ -127,6 +148,60 @@ fun LibraryScreen(
 
         when (filter) {
             LibraryFilter.Playlists -> {
+                if (settings.ytCookies != null) {
+                    item {
+                        SectionHeader(
+                            title = "Your YouTube Music",
+                            actionLabel = if (ytLoading) "Loading…" else null,
+                        )
+                    }
+                    item {
+                        if (ytPlaylists.isEmpty() && ytLoading) {
+                            LazyRow(
+                                contentPadding = PaddingValues(horizontal = 16.dp),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            ) {
+                                items(4) {
+                                    Column(modifier = Modifier.width(150.dp)) {
+                                        ShimmerBox(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .height(150.dp)
+                                                .clip(RoundedCornerShape(16.dp)),
+                                        )
+                                        Spacer(Modifier.height(8.dp))
+                                        ShimmerBox(
+                                            modifier = Modifier
+                                                .fillMaxWidth(0.8f)
+                                                .height(12.dp)
+                                                .clip(RoundedCornerShape(6.dp)),
+                                        )
+                                    }
+                                }
+                            }
+                        } else if (ytPlaylists.isEmpty()) {
+                            Text(
+                                text = "No saved playlists found on this account yet.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
+                            )
+                        } else {
+                            LazyRow(
+                                contentPadding = PaddingValues(horizontal = 16.dp),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            ) {
+                                items(ytPlaylists, key = { it.id }) { card ->
+                                    MediaCard(
+                                        card = card,
+                                        onClick = { actions.openPlaylist(card.id) },
+                                        width = 150.dp,
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
                 item {
                     LikedSongsRow(
                         count = library.liked.size,

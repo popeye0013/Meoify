@@ -132,6 +132,23 @@ class MusicRepository(private val settings: com.meoify.music.data.local.Settings
         return YTMusicParser.parsePlaylist(root, playlistId)
     }
 
+    /**
+     * The playlists saved in the signed-in person's YouTube Music library.
+     * `FEmusic_liked_playlists` is the dedicated page; `FEmusic_library_landing`
+     * is the fallback for accounts where the first page is empty or prompts for
+     * sign-in. Returns an empty list when nobody is signed in.
+     */
+    suspend fun libraryPlaylists(): List<MediaCard> {
+        if (!cookiesPresent) return emptyList()
+        val sources = listOf("FEmusic_liked_playlists", "FEmusic_library_landing")
+        for (source in sources) {
+            val root = runCatching { innerTube.browse(source) }.getOrNull() ?: continue
+            val playlists = YTMusicParser.parseLibraryPlaylists(root)
+            if (playlists.isNotEmpty()) return playlists
+        }
+        return emptyList()
+    }
+
     suspend fun artist(artistId: String): DetailPage {
         val root = innerTube.browse(artistId)
         return YTMusicParser.parseArtist(root, artistId)

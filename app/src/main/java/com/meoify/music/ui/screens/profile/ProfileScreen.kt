@@ -237,7 +237,7 @@ fun ProfileScreen(
                             )
                         }
                         Text(
-                            text = "Meoify 1.1.0",
+                            text = "Meoify 1.2.0",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )

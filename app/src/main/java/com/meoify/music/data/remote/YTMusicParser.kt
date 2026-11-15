@@ -98,6 +98,67 @@ object YTMusicParser {
         return cards.distinctBy { it.id }.take(24)
     }
 
+    /**
+     * Playlists saved to the signed-in person's YouTube Music library.
+     *
+     * `FEmusic_liked_playlists` normally answers with a grid of
+     * musicTwoRowItemRenderer cards, but some accounts get playlist rows
+     * (musicResponsiveListItemRenderer) instead, so both shapes are read.
+     * Albums, artists and bare browse shortcuts are dropped.
+     */
+    fun parseLibraryPlaylists(root: JsonObject): List<MediaCard> {
+        val cards = mutableListOf<MediaCard>()
+
+        root.findAll("musicTwoRowItemRenderer").forEach { element ->
+            val renderer = element.asObjectOrNull() ?: return@forEach
+            parseCard(renderer)?.let { card ->
+                if (card.kind == MediaKind.PLAYLIST || card.kind == MediaKind.MIX) cards.add(card)
+            }
+        }
+
+        root.findAll("musicResponsiveListItemRenderer").forEach { element ->
+            val renderer = element.asObjectOrNull() ?: return@forEach
+            parsePlaylistRow(renderer)?.let { cards.add(it) }
+        }
+
+        return cards
+            .filterNot { it.id.startsWith("FEmusic_") }
+            .distinctBy { it.id }
+            .take(50)
+    }
+
+    private fun parsePlaylistRow(renderer: JsonObject): MediaCard? {
+        val columns = renderer["flexColumns"]?.asArrayOrNull()?.mapNotNull { item ->
+            item.asObjectOrNull()?.get("musicResponsiveListItemFlexColumnRenderer")?.asObjectOrNull()
+        }.orEmpty()
+        val title = columns.firstOrNull()?.get("text")?.readText()?.trim().orEmpty()
+        if (title.isBlank()) return null
+
+        val endpoint = renderer["navigationEndpoint"]?.asObjectOrNull() ?: return null
+        val browseId = endpoint.findAll("browseEndpoint").firstOrNull()?.asObjectOrNull()
+            ?.get("browseId")?.readText() ?: return null
+        val pageType = endpoint.browsePageType()
+
+        val kind = when {
+            pageType == "MUSIC_PAGE_TYPE_ALBUM" || browseId.startsWith("MPREb") -> return null
+            pageType == "MUSIC_PAGE_TYPE_ARTIST" || pageType == "MUSIC_PAGE_TYPE_USER_CHANNEL" -> return null
+            browseId.startsWith("UC") -> return null
+            browseId.startsWith("RD") -> MediaKind.MIX
+            pageType == "MUSIC_PAGE_TYPE_PLAYLIST" ||
+                browseId.startsWith("VL") || browseId.startsWith("PL") -> MediaKind.PLAYLIST
+            else -> return null
+        }
+
+        val subtitle = columns.getOrNull(1)?.get("text")?.readText()?.trim()?.takeIf { it.isNotBlank() }
+        return MediaCard(
+            id = browseId,
+            kind = kind,
+            title = title,
+            subtitle = subtitle,
+            thumbnailUrl = renderer.findThumbnail(),
+        )
+    }
+
     fun parseCharts(root: JsonObject): Pair<List<MediaCard>, List<MediaCard>> {
         val artists = mutableListOf<MediaCard>()
         val playlists = mutableListOf<MediaCard>()

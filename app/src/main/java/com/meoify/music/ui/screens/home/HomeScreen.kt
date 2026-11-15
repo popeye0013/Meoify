@@ -22,7 +22,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.WifiOff
 import androidx.compose.material3.CircularProgressIndicator
@@ -106,7 +105,6 @@ fun HomeScreen() {
                     account = account,
                     signedIn = settings.ytCookies != null,
                     onProfile = actions.openProfile,
-                    onSettings = actions.openSettings,
                     onSearch = { query -> actions.search(query) },
                 )
             }
@@ -281,7 +279,6 @@ private fun HomeHeader(
     account: com.meoify.music.data.model.AccountInfo?,
     signedIn: Boolean,
     onProfile: () -> Unit,
-    onSettings: () -> Unit,
     onSearch: (String) -> Unit,
 ) {
     val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
@@ -303,13 +300,6 @@ private fun HomeHeader(
                     text = "What do you want to hear today?",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            IconButton(onClick = onSettings) {
-                Icon(
-                    Icons.Filled.Settings,
-                    contentDescription = "Settings",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
             Box(

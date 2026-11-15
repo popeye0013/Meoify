@@ -9,7 +9,8 @@ Inspired by the layout and feature set of [LastWave](https://github.com/Clash-Pr
 - **Home feed** — personalised greeting, quick picks, made-for-you mixes, trending songs, new releases, top artists and charts, with pull to refresh.
 - **Search** — songs, albums, artists and playlists, live suggestions, recent searches and genre browsing.
 - **Library** — liked songs, local playlists (create / rename / delete), saved albums and recently played tracks.
-- **Player** — blurred artwork backdrop, dynamic artwork colour, seek, shuffle, repeat, like, queue management and a mini player.
+- **Your YouTube Music playlists** — when signed in, the Library tab lists the playlists saved to your own YouTube Music account and opens them in the player.
+- **Player** — big artwork with a blurred backdrop, centred "Now Playing" header with source and overflow menu, remaining-time seek bar, audio-quality pill, wide play/pause control, bottom shuffle / queue / repeat pills, synced lyrics, queue management and a mini player.
 - **Synced lyrics** — LRC lyrics from LRCLIB with auto-scroll and tap-to-seek, plus a plain-text fallback.
 - **Playback** — ExoPlayer/Media3 background playback with lockscreen and notification controls.
 - **Accounts** — optional YouTube Music web sign-in for a personalised home feed.

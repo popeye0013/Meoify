@@ -305,7 +305,7 @@ fun SettingsScreen(
                                 fontWeight = FontWeight.ExtraBold,
                             )
                             Text(
-                                text = "Version 1.1.0",
+                                text = "Version 1.2.0",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
