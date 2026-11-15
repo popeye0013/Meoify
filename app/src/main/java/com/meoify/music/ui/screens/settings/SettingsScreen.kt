@@ -32,7 +32,6 @@ import androidx.compose.material.icons.filled.ArrowOutward
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Badge
 import androidx.compose.material.icons.filled.Backup
-import androidx.compose.material.icons.filled.BlurOn
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.ColorLens
 import androidx.compose.material.icons.filled.ContentCopy
@@ -46,7 +45,6 @@ import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Restore
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.SignalCellularAlt
 import androidx.compose.material.icons.filled.Verified
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -433,28 +431,6 @@ fun SettingsScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     ToggleRow(
-                        icon = Icons.Filled.BlurOn,
-                        title = "Blur player background",
-                        subtitle = "Use a soft artwork backdrop on the player",
-                        checked = settings.blurPlayerBackground,
-                        onCheckedChange = { app.container.settings.setBlur(it) },
-                    )
-                    ToggleRow(
-                        icon = Icons.Filled.AutoAwesome,
-                        title = "Animated canvas",
-                        subtitle = "Animate album artwork with a slow motion loop",
-                        checked = settings.animatedCanvas,
-                        onCheckedChange = { app.container.settings.setAnimatedCanvas(it) },
-                    )
-                    ToggleRow(
-                        icon = Icons.Filled.SignalCellularAlt,
-                        title = "Canvas over cellular",
-                        subtitle = "Keep motion artwork running on mobile data",
-                        checked = settings.canvasOverCellular,
-                        enabled = settings.animatedCanvas,
-                        onCheckedChange = { app.container.settings.setCanvasOverCellular(it) },
-                    )
-                    ToggleRow(
                         icon = Icons.Filled.History,
                         title = "Sync to YouTube Music history",
                         subtitle = if (settings.ytCookies != null) {
@@ -536,7 +512,7 @@ fun SettingsScreen(
                                 fontWeight = FontWeight.ExtraBold,
                             )
                             Text(
-                                text = "Version 1.5.1",
+                                text = "Version 1.5.2",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )

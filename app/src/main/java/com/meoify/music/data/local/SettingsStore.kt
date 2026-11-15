@@ -31,9 +31,6 @@ class SettingsStore(private val context: Context) {
         val dynamic = booleanPreferencesKey("dynamic_color")
         val pureBlack = booleanPreferencesKey("pure_black")
         val quality = stringPreferencesKey("quality")
-        val blur = booleanPreferencesKey("blur_player")
-        val animatedCanvas = booleanPreferencesKey("animated_canvas")
-        val canvasOverCellular = booleanPreferencesKey("canvas_over_cellular")
         val historySync = booleanPreferencesKey("history_sync")
         val onboarding = booleanPreferencesKey("onboarding_completed")
         val ytCookies = stringPreferencesKey("yt_cookies")
@@ -52,9 +49,6 @@ class SettingsStore(private val context: Context) {
                 pureBlack = prefs[Keys.pureBlack] ?: true,
                 quality = runCatching { AudioQuality.valueOf(prefs[Keys.quality] ?: "") }
                     .getOrDefault(AudioQuality.HIGH),
-                blurPlayerBackground = prefs[Keys.blur] ?: true,
-                animatedCanvas = prefs[Keys.animatedCanvas] ?: true,
-                canvasOverCellular = prefs[Keys.canvasOverCellular] ?: false,
                 historySync = prefs[Keys.historySync] ?: true,
                 onboardingCompleted = prefs[Keys.onboarding] ?: false,
                 ytCookies = prefs[Keys.ytCookies],
@@ -79,18 +73,6 @@ class SettingsStore(private val context: Context) {
 
     fun setQuality(quality: AudioQuality) = scope.launch {
         context.settingsStore.edit { it[Keys.quality] = quality.name }
-    }
-
-    fun setBlur(enabled: Boolean) = scope.launch {
-        context.settingsStore.edit { it[Keys.blur] = enabled }
-    }
-
-    fun setAnimatedCanvas(enabled: Boolean) = scope.launch {
-        context.settingsStore.edit { it[Keys.animatedCanvas] = enabled }
-    }
-
-    fun setCanvasOverCellular(enabled: Boolean) = scope.launch {
-        context.settingsStore.edit { it[Keys.canvasOverCellular] = enabled }
     }
 
     fun setHistorySync(enabled: Boolean) = scope.launch {
