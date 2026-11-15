@@ -10,7 +10,7 @@ Grab the latest APK from the [Releases page](https://github.com/popeye0013/Meoif
 
 | Version | Package | Min Android |
 |---|---|---|
-| 1.5.0 | `com.meoify.music` | 8.0 (API 26) |
+| 1.5.1 | `com.meoify.music` | 8.0 (API 26) |
 
 ## Features
 
@@ -19,7 +19,9 @@ Grab the latest APK from the [Releases page](https://github.com/popeye0013/Meoif
 - **Library** — liked songs, local playlists (create / rename / delete) with list or grid layout, saved albums and recently played tracks.
 - **Your YouTube Music playlists** — when signed in, the Library tab lists the playlists saved to your own YouTube Music account and opens them in the player.
 - **Player** — rounded animated album canvas with a gradient blend, tap for full-screen edge-to-edge artwork, thin seek bar with a large tinted thumb, circular close/overflow header buttons, heart and lyrics circles, an Audio pill that switches quality, a wide accent play/pause pill, and bottom shuffle / mute + video / repeat controls, plus queue management and a mini player.
-- **Lyrics screen** — full-screen `LYRICS` header with track title, sleep-timer and overflow circles, a `WORD SYNC` pill, a large glowing active line that scrolls itself, fullscreen and share circles, a wavy seek bar with a large thumb, and previous / play / next circles flanked by the elapsed and remaining times.
+- **Lyrics screen** — a single `LYRICS` header with the track title, sleep-timer and overflow circles, a `WORD SYNC` pill, a large glowing active line that scrolls itself, fullscreen and share circles, a wavy seek bar with a large thumb, and previous / play / next circles flanked by the elapsed and remaining times.
+- **Full-screen lyrics** — the lyrics fullscreen button hides the system bars and shows edge-to-edge, oversized lyrics over a slowly rotating artwork backdrop, with tap-to-seek lines and a thin progress bar.
+- **Share lyrics** — the lyrics share button renders a 1080×1920 card with the artwork, track and artist, the current lyric lines and a Meoify logo with credit, then opens the system share sheet for Instagram, WhatsApp, Telegram and the rest.
 - **YouTube Music history sync** — songs you actually listen to in Meoify are reported to your signed-in YouTube Music account history, including lossless streams and downloaded files, using the same per-play tracking ping YouTube's own web player sends. A listen counts after 30 seconds or half the track (4 minutes maximum); pauses, buffering and seeks don't count.
 - **Album & playlist pages** — circular back button, oversized rounded artwork with soft shadow, centred title and "source • N tracks" meta, Play and Shuffle pills, a wide "Save to library" button and rounded track cards with artwork, artist • album, duration and a menu.
 - **Navigation** — floating pill navigation bar that expands the active tab into a labelled pill.
