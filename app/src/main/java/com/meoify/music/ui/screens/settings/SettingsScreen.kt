@@ -33,6 +33,7 @@ import androidx.compose.material.icons.filled.ArrowOutward
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Badge
 import androidx.compose.material.icons.filled.Backup
+import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.ColorLens
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.CurrencyRupee
@@ -87,6 +88,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.meoify.music.MeoifyApplication
 import com.meoify.music.R
+import com.meoify.music.data.UpdateChecker
 import com.meoify.music.data.backup.BackupManager
 import com.meoify.music.data.model.AudioQuality
 import com.meoify.music.data.model.DeveloperInfo
@@ -101,6 +103,7 @@ import com.meoify.music.util.copyText
 import com.meoify.music.util.openUpiPayment
 import com.meoify.music.util.openUrl
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -130,6 +133,13 @@ fun SettingsScreen(
     var editProfile by remember { mutableStateOf(false) }
     var nameDraft by remember { mutableStateOf("") }
     var restoreUri by remember { mutableStateOf<Uri?>(null) }
+    var checkingUpdate by remember { mutableStateOf(false) }
+    var updateRelease by remember { mutableStateOf<UpdateChecker.Release?>(null) }
+    val versionName = remember {
+        runCatching {
+            context.packageManager.getPackageInfo(context.packageName, 0).versionName
+        }.getOrNull().orEmpty().ifBlank { "1.5.5" }
+    }
 
     val avatarPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         if (uri != null) {
@@ -323,23 +333,6 @@ fun SettingsScreen(
                 }
             }
 
-            item {
-                SettingsCard {
-                    ActionRow(
-                        icon = Icons.Filled.Backup,
-                        title = "Back up to .json",
-                        subtitle = "Save your playlists and local profile",
-                        onClick = { backupLauncher.launch(backupManager.suggestedFileName()) },
-                    )
-                    ActionRow(
-                        icon = Icons.Filled.Restore,
-                        title = "Restore from .json",
-                        subtitle = "Replaces local playlists and profile",
-                        onClick = { restoreLauncher.launch("application/json") },
-                    )
-                }
-            }
-
             item { SectionLabel("Appearance") }
             item {
                 SettingsCard {
@@ -472,6 +465,24 @@ fun SettingsScreen(
                 )
             }
 
+            item { SectionLabel("Backup & restore") }
+            item {
+                SettingsCard {
+                    ActionRow(
+                        icon = Icons.Filled.Backup,
+                        title = "Back up to .json",
+                        subtitle = "Save your playlists and local profile",
+                        onClick = { backupLauncher.launch(backupManager.suggestedFileName()) },
+                    )
+                    ActionRow(
+                        icon = Icons.Filled.Restore,
+                        title = "Restore from .json",
+                        subtitle = "Replaces local playlists and profile",
+                        onClick = { restoreLauncher.launch("application/json") },
+                    )
+                }
+            }
+
             item { SectionLabel("Support") }
             item {
                 DonateCard(
@@ -534,7 +545,7 @@ fun SettingsScreen(
                                 fontWeight = FontWeight.ExtraBold,
                             )
                             Text(
-                                text = "Version 1.5.4",
+                                text = "Version $versionName",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -552,9 +563,63 @@ fun SettingsScreen(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                    Spacer(Modifier.height(6.dp))
+                    ActionRow(
+                        icon = Icons.Filled.Refresh,
+                        title = "Check for updates",
+                        subtitle = if (checkingUpdate) {
+                            "Checking GitHub for a newer release…"
+                        } else {
+                            "Installed version $versionName"
+                        },
+                        onClick = {
+                            if (checkingUpdate) return@ActionRow
+                            checkingUpdate = true
+                            scope.launch {
+                                val latest = UpdateChecker.latest()
+                                checkingUpdate = false
+                                when {
+                                    latest == null -> actions.showSnackbar(
+                                        "Couldn't check for updates — try again later",
+                                    )
+                                    UpdateChecker.isNewer(latest.version, versionName) -> updateRelease = latest
+                                    else -> actions.showSnackbar("Meoify is up to date ($versionName)")
+                                }
+                            }
+                        },
+                    )
+                    ActionRow(
+                        icon = Icons.Filled.Code,
+                        title = "Source Code",
+                        subtitle = "github.com/${DeveloperInfo.HANDLE}/Meoify",
+                        onClick = { context.openUrl(DeveloperInfo.REPO_URL) },
+                    )
                 }
             }
         }
+    }
+
+    val pendingUpdate = updateRelease
+    if (pendingUpdate != null) {
+        AlertDialog(
+            onDismissRequest = { updateRelease = null },
+            icon = { Icon(Icons.Filled.Refresh, contentDescription = null) },
+            title = { Text("Update available") },
+            text = {
+                Text("Meoify ${pendingUpdate.version} is available. You are on $versionName.")
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        updateRelease = null
+                        context.openUrl(pendingUpdate.url)
+                    },
+                ) { Text("Download") }
+            },
+            dismissButton = {
+                TextButton(onClick = { updateRelease = null }) { Text("Later") }
+            },
+        )
     }
 
     if (editProfile) {
