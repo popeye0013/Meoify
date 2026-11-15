@@ -124,6 +124,7 @@ fun SettingsScreen(
     )
     val account by profileViewModel.account.collectAsStateWithLifecycle()
     val profileLoading by profileViewModel.loading.collectAsStateWithLifecycle()
+    val historyStatus by app.container.historySync.status.collectAsStateWithLifecycle()
 
     val scope = rememberCoroutineScope()
     val backupManager = remember(app) {
@@ -138,7 +139,7 @@ fun SettingsScreen(
     val versionName = remember {
         runCatching {
             context.packageManager.getPackageInfo(context.packageName, 0).versionName
-        }.getOrNull().orEmpty().ifBlank { "1.5.7" }
+        }.getOrNull().orEmpty().ifBlank { "1.5.8" }
     }
 
     val avatarPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
@@ -430,10 +431,12 @@ fun SettingsScreen(
                     ToggleRow(
                         icon = Icons.Filled.History,
                         title = "Sync to YouTube Music history",
-                        subtitle = if (settings.ytCookies != null) {
-                            "Songs you listen to appear in your account history, whatever the source"
-                        } else {
-                            "Sign in to YouTube Music to mirror your listening"
+                        subtitle = when {
+                            settings.ytCookies == null ->
+                                "Sign in to YouTube Music to mirror your listening"
+                            historyStatus != null -> historyStatus.orEmpty()
+                            else ->
+                                "Songs you listen to appear in your account history, whatever the source"
                         },
                         checked = settings.historySync,
                         enabled = settings.ytCookies != null,
@@ -456,13 +459,6 @@ fun SettingsScreen(
                         onClick = actions.clearRecent,
                     )
                 }
-            }
-
-            item { SectionLabel("Developer") }
-            item {
-                DeveloperCard(
-                    onOpen = { url -> context.openUrl(url) },
-                )
             }
 
             item { SectionLabel("Backup & restore") }
@@ -500,6 +496,13 @@ fun SettingsScreen(
                     onCopy = {
                         context.copyText("UPI ID", DeveloperInfo.UPI_ID)
                     },
+                )
+            }
+
+            item { SectionLabel("Developer") }
+            item {
+                DeveloperCard(
+                    onOpen = { url -> context.openUrl(url) },
                 )
             }
 

@@ -9,10 +9,12 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlin.random.Random
-import kotlin.math.min
 
 /**
  * Mirrors songs genuinely listened to in Meoify into the connected YouTube
@@ -31,9 +33,10 @@ import kotlin.math.min
  * responses return a URL whose ping is accepted but never recorded, so the
  * sync only runs while signed in.
  *
- * A listen qualifies after max(30s, min(50% of the track, 4min)); unknown
- * durations fall back to 90s. Only real position movement while playing and
- * not buffering counts — pauses, buffering and seeks contribute nothing.
+ * A listen qualifies after 30 seconds of real playback, the same bar YouTube
+ * Music itself uses before it writes an item to history. Only real position
+ * movement while playing and not buffering counts — pauses, buffering and
+ * seeks contribute nothing.
  */
 class HistorySync(
     private val player: PlayerConnection,
@@ -42,6 +45,11 @@ class HistorySync(
 ) {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
+    private val _status = MutableStateFlow<String?>(null)
+
+    /** Short, human readable result of the last attempt, shown in Settings. */
+    val status: StateFlow<String?> = _status.asStateFlow()
 
     private var sessionTrackId: String? = null
     private var lastPositionMs = 0L
@@ -102,11 +110,18 @@ class HistorySync(
     }
 
     private suspend fun submit(track: Track) {
-        if (!VIDEO_ID.matches(track.id)) return
+        if (!VIDEO_ID.matches(track.id)) {
+            _status.value = "Skipped “${track.title}” — not a YouTube song"
+            return
+        }
         val prefs = settings.current()
         if (!prefs.historySync || prefs.ytCookies.isNullOrBlank()) return
 
-        val trackingUrl = repository.historyTrackingUrl(track.id) ?: return
+        val playback = repository.historyPlayback(track.id)
+        if (playback == null) {
+            _status.value = "Couldn't sync — YouTube Music didn't return a tracking URL"
+            return
+        }
         val cpn = buildString {
             repeat(CPN_LENGTH) { append(CPN_ALPHABET[Random.nextInt(CPN_ALPHABET.length)]) }
         }
@@ -115,30 +130,39 @@ class HistorySync(
         while (attempt < MAX_ATTEMPTS) {
             attempt++
             if (!settings.settings.value.historySync) return
-            val code = repository.submitHistoryPlayback(trackingUrl, cpn)
+            val code = repository.submitHistoryPlayback(
+                trackingBaseUrl = playback.trackingUrl,
+                cpn = cpn,
+                visitorData = playback.visitorData,
+            )
             when {
-                code in 200..299 -> return
+                code in 200..299 -> {
+                    _status.value = "Synced “${track.title}” to YouTube Music history"
+                    return
+                }
                 // Bad credentials or invalid tracking URL: retrying can't help.
-                code == 0 || code == 401 || code == 403 -> return
+                code == 0 -> {
+                    _status.value = "Couldn't sync — YouTube rejected the tracking URL"
+                    return
+                }
+                code == 401 || code == 403 -> {
+                    _status.value = "Couldn't sync — sign in to YouTube Music again"
+                    return
+                }
                 code == 408 || code == 429 || code in 500..599 -> delay(RETRY_DELAY_MS * attempt)
-                else -> return
+                else -> {
+                    _status.value = "Couldn't sync (HTTP $code)"
+                    return
+                }
             }
         }
+        _status.value = "Couldn't sync — YouTube Music didn't respond in time"
     }
 
-    private fun requiredListenMs(durationMs: Long): Long {
-        val half = if (durationMs > 0) {
-            min(durationMs / 2, MAX_LISTEN_THRESHOLD_MS)
-        } else {
-            FALLBACK_LISTEN_THRESHOLD_MS
-        }
-        return maxOf(half, MIN_LISTEN_THRESHOLD_MS)
-    }
+    private fun requiredListenMs(durationMs: Long): Long = LISTEN_THRESHOLD_MS
 
     private companion object {
-        const val MIN_LISTEN_THRESHOLD_MS = 30_000L
-        const val MAX_LISTEN_THRESHOLD_MS = 240_000L
-        const val FALLBACK_LISTEN_THRESHOLD_MS = 90_000L
+        const val LISTEN_THRESHOLD_MS = 30_000L
 
         const val MAX_POSITION_DELTA_MS = 2_500L
         const val POSITION_JITTER_MS = 500L

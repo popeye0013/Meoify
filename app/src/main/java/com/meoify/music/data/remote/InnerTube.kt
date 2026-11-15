@@ -17,6 +17,9 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.IOException
 import java.security.MessageDigest
+import java.time.LocalDate
+import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
 
 class MusicApiException(message: String, cause: Throwable? = null) : IOException(message, cause)
 
@@ -31,6 +34,12 @@ class InnerTube(private val client: OkHttpClient) {
 
     @Volatile
     private var cookies: String? = null
+
+    @Volatile
+    private var cachedVersionDay: String? = null
+
+    @Volatile
+    private var cachedVersion: String? = null
 
     fun setCookies(raw: String?) {
         cookies = raw
@@ -99,23 +108,42 @@ class InnerTube(private val client: OkHttpClient) {
         return post("account/account_menu", buildJsonObject { })
     }
 
+    /** One authenticated play-tracking ping, plus the session that produced it. */
+    data class HistoryPlayback(
+        val trackingUrl: String,
+        val visitorData: String?,
+    )
+
     /**
      * Asks the authenticated player for the per-play tracking URL used to
      * register a listen in YouTube Music history. Anonymous responses return a
      * URL whose ping is accepted but never recorded, so this returns null when
      * no cookies are present.
+     *
+     * The visitor id is returned with the URL because YouTube only credits the
+     * listen to the account when the ping carries the same visitor id as the
+     * player call that produced it.
      */
-    suspend fun historyTrackingUrl(videoId: String): String? {
+    suspend fun historyPlayback(videoId: String): HistoryPlayback? {
         if (cookies.isNullOrBlank()) return null
+        // Make sure a visitor id exists before asking for the tracking URL.
+        if (visitorData.isNullOrBlank()) runCatching { post("browse", buildJsonObject { put("browseId", "FEmusic_home") }) }
         val root = post(
             "player",
             buildJsonObject {
                 put("videoId", videoId)
                 put("contentCheckOk", true)
                 put("racyCheckOk", true)
+                // Same shape ytmusicapi sends: the player needs a playback
+                // context before it hands out a usable tracking URL.
+                putJsonObject("playbackContext") {
+                    putJsonObject("contentPlaybackContext") {
+                        put("signatureTimestamp", System.currentTimeMillis() / 1000 - 1)
+                    }
+                }
             },
         )
-        return root["playbackTracking"]
+        val url = root["playbackTracking"]
             ?.jsonObject
             ?.get("videostatsPlaybackUrl")
             ?.jsonObject
@@ -123,50 +151,68 @@ class InnerTube(private val client: OkHttpClient) {
             ?.jsonPrimitive
             ?.contentOrNull
             ?.takeIf { it.startsWith("https://") }
+            ?: return null
+        val pingVisitor = root["responseContext"]
+            ?.jsonObject
+            ?.get("visitorData")
+            ?.jsonPrimitive
+            ?.contentOrNull
+            ?: visitorData
+        return HistoryPlayback(url, pingVisitor)
     }
 
     /**
      * Registers one listen in the signed-in account's YouTube Music history by
      * GET-ing the tracking URL, exactly as ytmusicapi's `add_history_item` does.
-     * Returns the HTTP status; 2xx means YouTube accepted the ping.
+     * Returns the HTTP status; 204 means YouTube accepted the ping.
+     *
+     * The ping deliberately repeats the visitor id and the SAPISIDHASH
+     * authorization of the player call: without them YouTube answers 204 but
+     * never writes the item to the account's history.
      */
-    suspend fun submitHistoryPlayback(trackingBaseUrl: String, cpn: String): Int =
-        withContext(Dispatchers.IO) {
-            val base = trackingBaseUrl.toHttpUrlOrNull() ?: return@withContext 0
-            if (!base.isHttps || (base.host != "youtube.com" && !base.host.endsWith(".youtube.com"))) {
-                return@withContext 0
-            }
-            val url = base.newBuilder()
-                .setQueryParameter("ver", "2")
-                .setQueryParameter("c", "WEB_REMIX")
-                .setQueryParameter("cpn", cpn)
-                .build()
-            val request = Request.Builder()
-                .url(url)
-                .get()
-                .header("User-Agent", USER_AGENT)
-                .header("Origin", "https://music.youtube.com")
-                .header("X-Origin", "https://music.youtube.com")
-                .header("Referer", "https://music.youtube.com/")
-                .header("X-Youtube-Client-Name", "67")
-                .header("X-Youtube-Client-Version", CLIENT_VERSION)
-                .apply { authHeader()?.let { header("Authorization", it) } }
-                .apply { if (cookies != null) header("X-Goog-AuthUser", "0") }
-                .header("Cookie", cookies?.takeIf { it.isNotBlank() } ?: "SOCS=CAI")
-                .build()
-            try {
-                client.newCall(request).execute().use { it.code }
-            } catch (e: IOException) {
-                throw MusicApiException("Couldn't reach YouTube Music history.", e)
-            }
+    suspend fun submitHistoryPlayback(
+        trackingBaseUrl: String,
+        cpn: String,
+        visitorData: String? = null,
+    ): Int = withContext(Dispatchers.IO) {
+        val base = trackingBaseUrl.toHttpUrlOrNull() ?: return@withContext 0
+        if (!base.isHttps || (base.host != "youtube.com" && !base.host.endsWith(".youtube.com"))) {
+            return@withContext 0
         }
+        val url = base.newBuilder()
+            .setQueryParameter("ver", "2")
+            .setQueryParameter("c", "WEB_REMIX")
+            .setQueryParameter("cpn", cpn)
+            .build()
+        val visitor = visitorData ?: this@InnerTube.visitorData
+        val request = Request.Builder()
+            .url(url)
+            .get()
+            .header("User-Agent", USER_AGENT)
+            .header("Accept", "*/*")
+            .header("Origin", "https://music.youtube.com")
+            .header("X-Origin", "https://music.youtube.com")
+            .header("Referer", "https://music.youtube.com/")
+            .header("X-Youtube-Client-Name", "67")
+            .header("X-Youtube-Client-Version", clientVersion())
+            .apply { authHeader()?.let { header("Authorization", it) } }
+            .apply { if (cookies != null) header("X-Goog-AuthUser", "0") }
+            .apply { visitor?.takeIf { it.isNotBlank() }?.let { header("X-Goog-Visitor-Id", it) } }
+            .header("Cookie", cookies?.takeIf { it.isNotBlank() } ?: "SOCS=CAI")
+            .build()
+        try {
+            client.newCall(request).execute().use { it.code }
+        } catch (e: IOException) {
+            throw MusicApiException("Couldn't reach YouTube Music history.", e)
+        }
+    }
 
     private suspend fun post(endpoint: String, payload: JsonObject): JsonObject = withContext(Dispatchers.IO) {
         val body = buildJsonObject {
             putJsonObject("context") {
                 putJsonObject("client") {
                     put("clientName", "WEB_REMIX")
-                    put("clientVersion", CLIENT_VERSION)
+                    put("clientVersion", clientVersion())
                     put("hl", "en")
                     put("gl", "US")
                     put("timeZone", "UTC")
@@ -188,7 +234,7 @@ class InnerTube(private val client: OkHttpClient) {
             .header("Referer", "https://music.youtube.com/")
             .header("Accept-Language", "en-US,en;q=0.9")
             .header("X-Youtube-Client-Name", "67")
-            .header("X-Youtube-Client-Version", CLIENT_VERSION)
+            .header("X-Youtube-Client-Version", clientVersion())
             .apply { authHeader()?.let { header("Authorization", it) } }
             .apply { if (cookies != null) header("X-Goog-AuthUser", "0") }
             .header("Cookie", cookies?.takeIf { it.isNotBlank() } ?: "SOCS=CAI")
@@ -220,8 +266,21 @@ class InnerTube(private val client: OkHttpClient) {
         }
     }
 
+    /**
+     * YouTube Music rejects web-client requests whose version is stale, so the
+     * version tracks the current UTC date the same way ytmusicapi does.
+     */
+    private fun clientVersion(): String {
+        val day = LocalDate.now(ZoneOffset.UTC).format(DateTimeFormatter.BASIC_ISO_DATE)
+        val cached = cachedVersion
+        if (cached != null && cachedVersionDay == day) return cached
+        val version = "1.$day.01.00"
+        cachedVersionDay = day
+        cachedVersion = version
+        return version
+    }
+
     companion object {
-        private const val CLIENT_VERSION = "1.20250101.00.00"
         const val USER_AGENT =
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
                 "(KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36"

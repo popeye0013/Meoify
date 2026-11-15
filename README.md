@@ -10,7 +10,7 @@ Grab the latest APK from the [Releases page](https://github.com/popeye0013/Meoif
 
 | Version | Package | Min Android |
 |---|---|---|
-| 1.5.7 | `com.meoify.music` | 8.0 (API 26) |
+| 1.5.8 | `com.meoify.music` | 8.0 (API 26) |
 
 ## Features
 
@@ -21,7 +21,7 @@ Grab the latest APK from the [Releases page](https://github.com/popeye0013/Meoif
 - **Player** — square album canvas shown at its natural aspect ratio, circular close/overflow header buttons, heart and lyrics circles, a wavy seek bar with a large tinted thumb, an Audio pill that switches quality, a wide accent play/pause pill, and shuffle / mute / repeat pills, plus queue management and a mini player.
 - **Lyrics** — a single `LYRICS` header with the track title, a large glowing active line that scrolls itself, a wavy seek bar and previous / play / next circles flanked by the elapsed and remaining times.
 - **Responsive layout** — the player lays out side by side in landscape, artwork stays square, and no screen takes over the display or hides the system bars.
-- **YouTube Music history sync** — songs you actually listen to in Meoify are reported to your signed-in YouTube Music account history, including lossless streams and downloaded files, using the same per-play tracking ping YouTube's own web player sends. A listen counts after 30 seconds or half the track (4 minutes maximum); pauses, buffering and seeks don't count.
+- **YouTube Music history sync** — songs you actually listen to in Meoify are reported to your signed-in YouTube Music account history, including lossless streams and downloaded files, using the same per-play tracking ping YouTube's own web player sends, with the account's visitor id so YouTube credits the listen. A listen counts after 30 seconds of real playback; pauses, buffering and seeks don't count.
 - **Album & playlist pages** — circular back button, oversized rounded artwork with soft shadow, centred title and "source • N tracks" meta, Play and Shuffle pills, a wide "Save to library" button and rounded track cards with artwork, artist • album, duration and a menu.
 - **Navigation** — floating pill navigation bar that expands the active tab into a labelled pill.
 - **Synced lyrics** — LRC lyrics from LRCLIB with auto-scroll and tap-to-seek, plus a plain-text fallback.
