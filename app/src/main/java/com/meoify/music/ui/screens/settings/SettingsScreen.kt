@@ -4,6 +4,7 @@ import android.net.Uri
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -27,12 +28,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.Logout
-import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.ArrowOutward
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Badge
 import androidx.compose.material.icons.filled.Backup
-import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.ColorLens
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.CurrencyRupee
@@ -75,14 +74,18 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.core.graphics.drawable.toBitmap
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.meoify.music.MeoifyApplication
+import com.meoify.music.R
 import com.meoify.music.data.backup.BackupManager
 import com.meoify.music.data.model.AudioQuality
 import com.meoify.music.data.model.DeveloperInfo
@@ -492,17 +495,35 @@ fun SettingsScreen(
             item {
                 SettingsCard {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Surface(
-                            shape = CircleShape,
-                            color = MaterialTheme.colorScheme.primaryContainer,
-                            modifier = Modifier.size(48.dp),
-                        ) {
-                            Icon(
-                                Icons.Filled.Badge,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                                modifier = Modifier.padding(12.dp),
+                        val appIcon = remember {
+                            runCatching {
+                                context.packageManager
+                                    .getApplicationIcon(context.packageName)
+                                    .toBitmap(144, 144)
+                                    .asImageBitmap()
+                            }.getOrNull()
+                        }
+                        if (appIcon != null) {
+                            Image(
+                                bitmap = appIcon,
+                                contentDescription = "Meoify icon",
+                                modifier = Modifier
+                                    .size(48.dp)
+                                    .clip(RoundedCornerShape(14.dp)),
                             )
+                        } else {
+                            Surface(
+                                shape = RoundedCornerShape(14.dp),
+                                color = MaterialTheme.colorScheme.primaryContainer,
+                                modifier = Modifier.size(48.dp),
+                            ) {
+                                Icon(
+                                    Icons.Filled.Badge,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    modifier = Modifier.padding(12.dp),
+                                )
+                            }
                         }
                         Spacer(Modifier.width(12.dp))
                         Column {
@@ -512,7 +533,7 @@ fun SettingsScreen(
                                 fontWeight = FontWeight.ExtraBold,
                             )
                             Text(
-                                text = "Version 1.5.2",
+                                text = "Version 1.5.3",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -870,7 +891,7 @@ private fun DeveloperCard(onOpen: (String) -> Unit) {
 
             Spacer(Modifier.height(14.dp))
             Text(
-                text = "Meoify is built and maintained by Akash. Bug reports, ideas and pull requests are always welcome.",
+                text = "Meoify is built and maintained by Akash S Lal. Bug reports, ideas and pull requests are always welcome.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -879,14 +900,14 @@ private fun DeveloperCard(onOpen: (String) -> Unit) {
             SocialRow(
                 label = "GitHub",
                 value = "github.com/${DeveloperInfo.HANDLE}",
-                icon = Icons.Filled.Code,
-                brandColor = Color(0xFF4B5563),
+                icon = ImageVector.vectorResource(R.drawable.ic_github),
+                brandColor = Color(0xFF24292F),
                 onClick = { onOpen(DeveloperInfo.GITHUB_URL) },
             )
             SocialRow(
                 label = "Telegram",
                 value = DeveloperInfo.TELEGRAM_LABEL,
-                icon = Icons.AutoMirrored.Filled.Send,
+                icon = ImageVector.vectorResource(R.drawable.ic_telegram),
                 brandColor = Color(0xFF229ED9),
                 onClick = { onOpen(DeveloperInfo.TELEGRAM_URL) },
             )

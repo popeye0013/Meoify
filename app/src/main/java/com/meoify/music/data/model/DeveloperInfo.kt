@@ -5,7 +5,7 @@ package com.meoify.music.data.model
  * the settings screen, the profile screen and the donate card all agree.
  */
 object DeveloperInfo {
-    const val NAME = "Akash"
+    const val NAME = "Akash S Lal"
     const val HANDLE = "popeye0013"
 
     const val GITHUB_URL = "https://github.com/popeye0013"
