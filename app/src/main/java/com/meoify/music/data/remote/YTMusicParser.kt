@@ -308,6 +308,7 @@ object YTMusicParser {
 
     fun parsePlaylist(root: JsonObject, playlistId: String): DetailPage {
         val header = root.findAll("musicResponsiveHeaderRenderer").firstOrNull()?.asObjectOrNull()
+            ?: root.findAll("musicDetailHeaderRenderer").firstOrNull()?.asObjectOrNull()
         val title = header?.get("title")?.readText().orEmpty().ifBlank { "Playlist" }
         val subtitle = header?.get("subtitle")?.readText().orEmpty()
         val secondSubtitle = header?.get("secondSubtitle")?.readText().orEmpty()
@@ -315,15 +316,10 @@ object YTMusicParser {
         val description = root.findAll("musicDescriptionShelfRenderer").firstOrNull()?.asObjectOrNull()
             ?.get("description")?.readText()
 
-        val tracks = mutableListOf<Track>()
-        root.findAll("musicPlaylistShelfRenderer").forEach { element ->
-            val shelf = element.asObjectOrNull() ?: return@forEach
-            shelf["contents"]?.asArrayOrNull()?.forEach { item ->
-                item.asObjectOrNull()?.get("musicResponsiveListItemRenderer")?.asObjectOrNull()?.let { renderer ->
-                    parseTrack(renderer)?.let { tracks.add(it) }
-                }
-            }
-        }
+        // Playlist layouts differ between public playlists, the signed-in
+        // library and Liked Music. Collect every responsive list row that has
+        // a video id instead of relying on one shelf renderer name.
+        val tracks = parseTracks(root)
 
         return DetailPage(
             id = playlistId,
@@ -332,8 +328,35 @@ object YTMusicParser {
             subtitle = listOf(subtitle, secondSubtitle).filter { it.isNotBlank() }.joinToString(" • "),
             thumbnailUrl = thumbnail,
             description = description,
-            tracks = tracks.distinctBy { it.id }.map { it.copy(thumbnailUrl = it.thumbnailUrl ?: thumbnail) },
+            tracks = tracks.map { it.copy(thumbnailUrl = it.thumbnailUrl ?: thumbnail) },
         )
+    }
+
+    /** Every playable row in a page, regardless of which shelf holds it. */
+    fun parseTracks(root: JsonObject): List<Track> {
+        val tracks = mutableListOf<Track>()
+        root.findAll("musicResponsiveListItemRenderer").forEach { element ->
+            element.asObjectOrNull()?.let { renderer ->
+                parseTrack(renderer)?.let { tracks.add(it) }
+            }
+        }
+        return tracks.distinctBy { it.id }
+    }
+
+    /** Continuation token for the next batch of rows, if the page has one. */
+    fun nextContinuation(root: JsonObject): String? {
+        root.findAll("continuationItemRenderer").forEach { element ->
+            val token = element.asObjectOrNull()
+                ?.findAll("continuationCommand")
+                ?.firstOrNull()
+                ?.asObjectOrNull()
+                ?.get("token")
+                ?.readText()
+            if (!token.isNullOrBlank()) return token
+        }
+        return root.findAll("continuationCommand")
+            .mapNotNull { it.asObjectOrNull()?.get("token")?.readText() }
+            .firstOrNull { it.isNotBlank() }
     }
 
     fun parseArtist(root: JsonObject, artistId: String): DetailPage {
@@ -424,17 +447,20 @@ object YTMusicParser {
             run.asObjectOrNull()?.browsePageType() == "MUSIC_PAGE_TYPE_ALBUM"
         }?.asObjectOrNull()
 
-        val subtitleParts = subtitleRuns.mapNotNull { run ->
+        val subtitleTexts = subtitleRuns.mapNotNull { run ->
             val obj = run.asObjectOrNull() ?: return@mapNotNull null
-            runText(obj).takeIf { it.isNotBlank() && it != "•" && !DURATION_REGEX.matches(it) }
+            runText(obj).takeIf { it.isNotBlank() && it != "•" }
         }
+        val subtitleParts = subtitleTexts.filterNot { DURATION_REGEX.matches(it) }
         val artist = artistRun?.let(::runText)
             ?: subtitleParts.firstOrNull()?.takeIf { it.isNotBlank() }
             ?: ""
         val album = albumRun?.let(::runText)
             ?: subtitleParts.getOrNull(1)?.takeIf { it != artist }
 
-        var durationText = subtitleParts.lastOrNull { DURATION_REGEX.matches(it) }
+        // Some layouts put the duration in the flex column instead of the
+        // fixed one, so check both before giving up on it.
+        var durationText = subtitleTexts.lastOrNull { DURATION_REGEX.matches(it) }
         if (durationText == null) {
             renderer["fixedColumns"]?.asArrayOrNull()?.forEach { column ->
                 val text = column.asObjectOrNull()

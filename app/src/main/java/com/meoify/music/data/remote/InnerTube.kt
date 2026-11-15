@@ -84,6 +84,11 @@ class InnerTube(private val client: OkHttpClient) {
         )
     }
 
+    /** Fetches the next batch of rows for a browse page. */
+    suspend fun browseContinuation(token: String): JsonObject {
+        return post("browse", buildJsonObject { put("continuation", token) })
+    }
+
     suspend fun search(query: String, params: String? = null): JsonObject {
         return post(
             "search",
@@ -211,16 +216,18 @@ class InnerTube(private val client: OkHttpClient) {
     }
 
     /** Adds or removes a song from the account's Liked music (LM). */
-    suspend fun rateSong(videoId: String, liked: Boolean): Boolean {
+    suspend fun rateSong(videoId: String, liked: Boolean): Boolean = runCatching {
         val endpoint = if (liked) "like/like" else "like/removelike"
-        val root = post(
+        post(
             endpoint,
             buildJsonObject {
                 putJsonObject("target") { put("videoId", videoId) }
             },
         )
-        return root["status"]?.jsonPrimitive?.contentOrNull?.contains("SUCCEEDED") == true
-    }
+        // The like endpoint usually answers with a status field, but some
+        // sessions only return a response context. A 2xx response is enough.
+        true
+    }.getOrDefault(false)
 
     /** Creates a private playlist in the account and returns its id. */
     suspend fun createPlaylist(title: String, videoIds: List<String> = emptyList()): String? {
@@ -238,13 +245,13 @@ class InnerTube(private val client: OkHttpClient) {
         return root["playlistId"]?.jsonPrimitive?.contentOrNull
     }
 
-    suspend fun deletePlaylist(playlistId: String): Boolean {
-        val root = post(
+    suspend fun deletePlaylist(playlistId: String): Boolean = runCatching {
+        post(
             "playlist/delete",
             buildJsonObject { put("playlistId", playlistId.removePrefix("VL")) },
         )
-        return root["status"]?.jsonPrimitive?.contentOrNull?.contains("SUCCEEDED") == true
-    }
+        true
+    }.getOrDefault(false)
 
     suspend fun renamePlaylist(playlistId: String, title: String): Boolean = runCatching {
         post(

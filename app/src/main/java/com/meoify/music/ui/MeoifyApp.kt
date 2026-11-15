@@ -122,6 +122,8 @@ fun MeoifyApp(container: AppContainer) {
             },
             openSettings = { settingsOpen = true },
             search = { query ->
+                settingsOpen = false
+                detailStack.clear()
                 tab = Tab.Search
                 pendingSearch = query
             },

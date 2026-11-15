@@ -79,6 +79,7 @@ import com.meoify.music.ui.components.ArtistCard
 import com.meoify.music.ui.components.MediaCard
 import com.meoify.music.ui.components.SectionHeader
 import com.meoify.music.ui.components.TrackRow
+import com.meoify.music.ui.components.rememberTrackCover
 import com.meoify.music.ui.navigation.Destination
 import com.meoify.music.ui.navigation.LocalAppActions
 import com.meoify.music.ui.navigation.LocalLibrary
@@ -176,9 +177,8 @@ private fun DetailContent(
     playerState: PlayerUiState,
     destination: Destination,
 ) {
-    var accent by remember(page.id) { mutableStateOf(ArtworkColorCache.fallbackColor(page.title)) }
-    LaunchedEffect(page.id) { accent = ArtworkColorCache.extract(page.thumbnailUrl, page.title) }
     val pair = ArtworkColorCache.gradientPair(page.id)
+    val background = MaterialTheme.colorScheme.background
 
     val currentTrackId = playerState.track?.id
     val isCurrentPage = currentTrackId != null && page.tracks.any { it.id == currentTrackId }
@@ -205,17 +205,18 @@ private fun DetailContent(
         if (page.tracks.isNotEmpty()) "${page.tracks.size} tracks" else null,
     ).joinToString(" • ")
 
-    LazyColumn(modifier = Modifier.fillMaxSize()) {
+    LazyColumn(modifier = Modifier.fillMaxSize().background(background)) {
         item {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(
+                        // Theme colours keep the header (and the status bar
+                        // strip above it) in sync with light/dark/dynamic mode.
                         Brush.verticalGradient(
-                            listOf(
-                                accent.copy(alpha = 0.30f),
-                                MaterialTheme.colorScheme.background,
-                            ),
+                            0f to background,
+                            0.28f to MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f),
+                            1f to background,
                         ),
                     )
                     .padding(bottom = 4.dp),
@@ -342,7 +343,7 @@ private fun DetailContent(
                             }
                         } else {
                             AsyncImage(
-                                model = page.thumbnailUrl,
+                                model = com.meoify.music.data.remote.Artwork.highRes(page.thumbnailUrl),
                                 contentDescription = null,
                                 contentScale = ContentScale.Crop,
                                 modifier = Modifier.fillMaxSize(),
@@ -590,6 +591,7 @@ private fun TrackCard(
     onClick: () -> Unit,
     onMoreClick: () -> Unit,
 ) {
+    val cover = rememberTrackCover(track)
     Surface(
         onClick = onClick,
         shape = RoundedCornerShape(18.dp),
@@ -604,7 +606,7 @@ private fun TrackCard(
         ) {
             Box(modifier = Modifier.size(46.dp)) {
                 AsyncImage(
-                    model = track.thumbnailUrl,
+                    model = cover,
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier

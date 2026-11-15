@@ -29,10 +29,13 @@ object Artwork {
                     }
 
             isVideoStill(url) -> url
-                .replace("mqdefault", "maxresdefault")
-                .replace("hqdefault", "maxresdefault")
-                .replace("sddefault", "maxresdefault")
-                .replace("/default.jpg", "/maxresdefault.jpg")
+                // maxresdefault is missing for many uploads and leaves a blank
+                // tile, so use the size YouTube always generates. Real cover
+                // art is resolved separately from the album when available.
+                .replace("maxresdefault", "hqdefault")
+                .replace("sddefault", "hqdefault")
+                .replace("mqdefault", "hqdefault")
+                .replace("/default.jpg", "/hqdefault.jpg")
 
             else -> url
         }

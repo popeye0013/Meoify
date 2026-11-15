@@ -48,9 +48,12 @@ import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -90,6 +93,7 @@ fun SearchScreen(
     val results by viewModel.results.collectAsStateWithLifecycle()
     val library = LocalLibrary.current
     val actions = LocalAppActions.current
+    val focusRequester = remember { FocusRequester() }
 
     val voiceSearch = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult(),
@@ -113,8 +117,16 @@ fun SearchScreen(
     }
 
     LaunchedEffect(pendingSearch) {
-        if (!pendingSearch.isNullOrBlank()) {
-            viewModel.runSearch(pendingSearch)
+        if (pendingSearch != null) {
+            if (pendingSearch.isBlank()) {
+                // Opened from the Settings search button: put the caret in the
+                // field so the keyboard is ready without a second tap. The
+                // small delay lets the screen transition finish first.
+                kotlinx.coroutines.delay(120)
+                runCatching { focusRequester.requestFocus() }
+            } else {
+                viewModel.runSearch(pendingSearch)
+            }
             onConsumedPending()
         }
     }
@@ -127,6 +139,7 @@ fun SearchScreen(
             onClear = viewModel::clear,
             onBack = onBack,
             onVoice = ::startVoiceSearch,
+            focusRequester = focusRequester,
         )
 
         FilterRow(
@@ -175,6 +188,7 @@ private fun SearchHeader(
     onClear: () -> Unit,
     onBack: () -> Unit,
     onVoice: () -> Unit,
+    focusRequester: FocusRequester,
 ) {
     Row(
         modifier = Modifier
@@ -229,7 +243,9 @@ private fun SearchHeader(
             ),
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
             keyboardActions = KeyboardActions(onSearch = { onSearch() }),
-            modifier = Modifier.weight(1f),
+            modifier = Modifier
+                .weight(1f)
+                .focusRequester(focusRequester),
         )
         Spacer(Modifier.width(6.dp))
         IconButton(onClick = onVoice) {

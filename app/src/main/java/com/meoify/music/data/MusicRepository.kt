@@ -130,13 +130,40 @@ class MusicRepository(private val settings: com.meoify.music.data.local.Settings
     }
 
     suspend fun playlist(playlistId: String): DetailPage {
-        val browseId = if (playlistId.startsWith("VL") || playlistId.startsWith("MPRE")) {
-            playlistId
-        } else {
-            "VL$playlistId"
+        val bare = playlistId.removePrefix("VL")
+        val candidates = listOf("VL$bare", bare).distinct()
+        var fallback: DetailPage? = null
+        for (browseId in candidates) {
+            val root = runCatching { innerTube.browse(browseId) }.getOrNull() ?: continue
+            val page = runCatching { YTMusicParser.parsePlaylist(root, playlistId) }.getOrNull() ?: continue
+            if (page.tracks.isNotEmpty()) {
+                // Long playlists arrive in pages of ~100; keep asking for the
+                // next batch so the whole playlist is visible.
+                return page.copy(tracks = withContinuations(root, page.tracks))
+            }
+            fallback = page
         }
-        val root = innerTube.browse(browseId)
-        return YTMusicParser.parsePlaylist(root, playlistId)
+        return fallback ?: throw MusicApiException("Couldn't load this playlist")
+    }
+
+    /** Appends every continuation row to [initial], up to a sane cap. */
+    private suspend fun withContinuations(
+        firstPage: JsonObject,
+        initial: List<Track>,
+        max: Int = 1500,
+    ): List<Track> {
+        val tracks = initial.toMutableList()
+        var token = YTMusicParser.nextContinuation(firstPage)
+        var rounds = 0
+        while (token != null && tracks.size < max && rounds < 40) {
+            val next = runCatching { innerTube.browseContinuation(token) }.getOrNull() ?: break
+            val more = YTMusicParser.parseTracks(next)
+            if (more.isEmpty()) break
+            tracks += more
+            token = YTMusicParser.nextContinuation(next)
+            rounds++
+        }
+        return tracks.distinctBy { it.id }
     }
 
     /** High-resolution square cover art for an album, or null when unavailable. */
@@ -162,8 +189,20 @@ class MusicRepository(private val settings: com.meoify.music.data.local.Settings
         val sources = listOf("FEmusic_liked_playlists", "FEmusic_library_landing")
         for (source in sources) {
             val root = runCatching { innerTube.browse(source) }.getOrNull() ?: continue
-            val playlists = YTMusicParser.parseLibraryPlaylists(root)
-            if (playlists.isNotEmpty()) return playlists
+            val playlists = YTMusicParser.parseLibraryPlaylists(root).toMutableList()
+            if (playlists.isEmpty()) continue
+
+            var token = YTMusicParser.nextContinuation(root)
+            var rounds = 0
+            while (token != null && playlists.size < 200 && rounds < 10) {
+                val next = runCatching { innerTube.browseContinuation(token) }.getOrNull() ?: break
+                val more = YTMusicParser.parseLibraryPlaylists(next)
+                if (more.isEmpty()) break
+                playlists += more
+                token = YTMusicParser.nextContinuation(next)
+                rounds++
+            }
+            return playlists.distinctBy { it.id }
         }
         return emptyList()
     }
@@ -219,9 +258,20 @@ class MusicRepository(private val settings: com.meoify.music.data.local.Settings
      */
     suspend fun likedSongs(limit: Int = 300): List<Track>? {
         if (!cookiesPresent) return null
-        val root = runCatching { innerTube.browse("VLLM") }.getOrNull() ?: return null
         return runCatching {
-            YTMusicParser.parsePlaylist(root, "LM").tracks.take(limit)
+            val root = innerTube.browse("VLLM")
+            val tracks = YTMusicParser.parseTracks(root).toMutableList()
+            var token = YTMusicParser.nextContinuation(root)
+            var rounds = 0
+            while (token != null && tracks.size < limit && rounds < 10) {
+                val next = innerTube.browseContinuation(token)
+                val more = YTMusicParser.parseTracks(next)
+                if (more.isEmpty()) break
+                tracks += more
+                token = YTMusicParser.nextContinuation(next)
+                rounds++
+            }
+            tracks.distinctBy { it.id }.take(limit)
         }.getOrNull()
     }
 

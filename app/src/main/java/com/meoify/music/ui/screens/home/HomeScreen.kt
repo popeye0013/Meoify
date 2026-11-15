@@ -63,6 +63,7 @@ import com.meoify.music.ui.components.SectionHeader
 import com.meoify.music.ui.components.ProfileAvatar
 import com.meoify.music.ui.components.ShimmerBox
 import com.meoify.music.ui.components.TrackRow
+import com.meoify.music.ui.components.rememberTrackCover
 import com.meoify.music.ui.navigation.LocalAppActions
 import com.meoify.music.ui.navigation.LocalLibrary
 import com.meoify.music.ui.viewmodel.HomeViewModel
@@ -379,7 +380,7 @@ private fun FeaturedCard(card: MediaCardModel, onClick: () -> Unit) {
             .background(MaterialTheme.colorScheme.surfaceContainerHigh),
     ) {
         AsyncImage(
-            model = card.thumbnailUrl,
+            model = com.meoify.music.data.remote.Artwork.highRes(card.thumbnailUrl),
             contentDescription = null,
             contentScale = ContentScale.Crop,
             modifier = Modifier.fillMaxSize(),
@@ -450,6 +451,7 @@ private fun QuickAccessGrid(tracks: List<Track>, onPlay: (Track) -> Unit) {
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 row.forEach { track ->
+                    val cover = rememberTrackCover(track)
                     Surface(
                         onClick = { onPlay(track) },
                         shape = RoundedCornerShape(14.dp),
@@ -460,7 +462,7 @@ private fun QuickAccessGrid(tracks: List<Track>, onPlay: (Track) -> Unit) {
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             AsyncImage(
-                                model = track.thumbnailUrl,
+                                model = cover,
                                 contentDescription = null,
                                 contentScale = ContentScale.Crop,
                                 modifier = Modifier

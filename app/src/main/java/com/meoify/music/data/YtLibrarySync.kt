@@ -98,9 +98,9 @@ class YtLibrarySync(
     /** Adds or removes [track] from the account's Liked music. */
     suspend fun setLiked(track: Track, liked: Boolean): Boolean {
         if (!repository.signedIn) return false
-        val ok = repository.setSongLiked(track.id, liked)
-        if (!ok) return false
 
+        // Update the mirror first so the heart responds instantly, then write
+        // through to YouTube Music and roll back if the request fails.
         val current = library.current().liked
         val updated = if (liked) {
             if (current.any { it.id == track.id }) current else listOf(track) + current
@@ -108,7 +108,10 @@ class YtLibrarySync(
             current.filterNot { it.id == track.id }
         }
         library.setLiked(updated)
-        return true
+
+        val ok = repository.setSongLiked(track.id, liked)
+        if (!ok) library.setLiked(current)
+        return ok
     }
 
     suspend fun createPlaylist(name: String, tracks: List<Track> = emptyList()): String? {

@@ -530,7 +530,7 @@ private fun PlaylistRow(
             ) {
                 if (!playlist.artworkUrl.isNullOrBlank()) {
                     AsyncImage(
-                        model = playlist.artworkUrl,
+                        model = com.meoify.music.data.remote.Artwork.highRes(playlist.artworkUrl),
                         contentDescription = null,
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize(),

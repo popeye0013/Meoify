@@ -21,13 +21,17 @@ class ArtworkTest {
     }
 
     @Test
-    fun videoStillsPreferTheLargestFrame() {
+    fun videoStillsUseAResolutionThatAlwaysExists() {
         assertEquals(
-            "https://i.ytimg.com/vi/abc/maxresdefault.jpg",
+            "https://i.ytimg.com/vi/abc/hqdefault.jpg",
             Artwork.highRes("https://i.ytimg.com/vi/abc/hqdefault.jpg"),
         )
         assertEquals(
-            "https://i.ytimg.com/vi/abc/maxresdefault.jpg",
+            "https://i.ytimg.com/vi/abc/hqdefault.jpg",
+            Artwork.highRes("https://i.ytimg.com/vi/abc/maxresdefault.jpg"),
+        )
+        assertEquals(
+            "https://i.ytimg.com/vi/abc/hqdefault.jpg",
             Artwork.highRes("https://i.ytimg.com/vi/abc/default.jpg"),
         )
     }
