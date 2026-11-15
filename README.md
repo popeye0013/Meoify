@@ -10,7 +10,7 @@ Grab the latest APK from the [Releases page](https://github.com/popeye0013/Meoif
 
 | Version | Package | Min Android |
 |---|---|---|
-| 1.5.8 | `com.meoify.music` | 8.0 (API 26) |
+| 1.6.0 | `com.meoify.music` | 8.0 (API 26) |
 
 ## Features
 

@@ -54,6 +54,7 @@ import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
@@ -104,7 +105,6 @@ import com.meoify.music.util.openUpiPayment
 import com.meoify.music.util.openUrl
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 
@@ -139,7 +139,7 @@ fun SettingsScreen(
     val versionName = remember {
         runCatching {
             context.packageManager.getPackageInfo(context.packageName, 0).versionName
-        }.getOrNull().orEmpty().ifBlank { "1.5.8" }
+        }.getOrNull().orEmpty().ifBlank { "1.6.0" }
     }
 
     val avatarPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
@@ -255,18 +255,20 @@ fun SettingsScreen(
             ),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
+            item { SectionLabel("Account") }
             item {
-                ProfileHeader(
-                    name = account?.displayName
-                        ?: settings.localProfileName
-                        ?: settings.accountName
-                        ?: "Your profile",
+                val displayName = account?.displayName
+                    ?: settings.localProfileName
+                    ?: settings.accountName
+                    ?: "Your profile"
+                ProfileCard(
+                    name = displayName,
                     subtitle = account?.email
                         ?: account?.handle
                         ?: when {
-                            settings.ytCookies != null -> "YouTube Music account"
+                            settings.ytCookies != null -> "Signed in to YouTube Music"
                             settings.localProfileName != null -> "Local profile · not signed in"
-                            else -> "Not signed in"
+                            else -> "No account connected"
                         },
                     avatarUrl = account?.avatarUrl
                         ?: settings.localAvatarPath?.let { File(it) },
@@ -274,64 +276,24 @@ fun SettingsScreen(
                         ?: settings.localProfileName?.trim()?.take(1)?.uppercase(),
                     signedIn = settings.ytCookies != null,
                     loading = profileLoading,
+                    liked = library.liked.size,
+                    playlists = library.playlists.size,
+                    played = library.recent.size,
+                    onLiked = { actions.openLiked() },
+                    onPlaylists = { actions.openLibrary() },
+                    onPlayed = { actions.openLibrary() },
                     onRefresh = { profileViewModel.refresh(force = true) },
-                    onEditProfile = {
+                    onEditLocal = {
                         nameDraft = settings.localProfileName.orEmpty()
                         editProfile = true
                     },
+                    onSignIn = onOpenLogin,
+                    onSignOut = {
+                        app.container.settings.logoutYouTube()
+                        profileViewModel.clear()
+                        actions.showSnackbar("Signed out of YouTube Music")
+                    },
                 )
-            }
-
-            item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    StatCard("Liked", library.liked.size.toString(), Modifier.weight(1f)) {
-                        actions.openLiked()
-                    }
-                    StatCard("Playlists", library.playlists.size.toString(), Modifier.weight(1f)) {
-                        actions.openLibrary()
-                    }
-                    StatCard("Played", library.recent.size.toString(), Modifier.weight(1f)) {
-                        actions.openLibrary()
-                    }
-                }
-            }
-
-            item {
-                SettingsCard {
-                    if (settings.ytCookies != null) {
-                        ActionRow(
-                            icon = Icons.AutoMirrored.Filled.Logout,
-                            title = "Sign out of YouTube Music",
-                            onClick = {
-                                app.container.settings.logoutYouTube()
-                                profileViewModel.clear()
-                                actions.showSnackbar("Signed out of YouTube Music")
-                            },
-                        )
-                    } else {
-                        ActionRow(
-                            icon = Icons.Filled.Login,
-                            title = "Sign in to YouTube Music",
-                            onClick = onOpenLogin,
-                        )
-                        ActionRow(
-                            icon = Icons.Filled.Person,
-                            title = if (settings.localProfileName == null) {
-                                "Set up local profile"
-                            } else {
-                                "Edit local profile"
-                            },
-                            subtitle = "Name and picture used without signing in",
-                            onClick = {
-                                nameDraft = settings.localProfileName.orEmpty()
-                                editProfile = true
-                            },
-                        )
-                    }
-                }
             }
 
             item { SectionLabel("Appearance") }
@@ -629,68 +591,111 @@ fun SettingsScreen(
     }
 
     if (editProfile) {
-        AlertDialog(
+        ModalBottomSheet(
             onDismissRequest = { editProfile = false },
-            title = { Text("Local profile") },
-            text = {
-                Column {
-                    Text(
-                        text = "This profile is shown when you are not signed in to YouTube Music. It is included in your .json backups.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+            shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp)
+                    .padding(bottom = 24.dp),
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    ProfileAvatar(
+                        name = nameDraft.ifBlank { "Profile" },
+                        url = settings.localAvatarPath?.let { File(it) },
+                        initials = nameDraft.trim().take(1).uppercase().ifBlank { "M" },
+                        size = 64.dp,
                     )
-                    Spacer(Modifier.height(14.dp))
-                    OutlinedTextField(
-                        value = nameDraft,
-                        onValueChange = { nameDraft = it },
-                        label = { Text("Display name") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    Spacer(Modifier.height(12.dp))
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    Spacer(Modifier.width(16.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Local profile",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.ExtraBold,
+                        )
+                        Spacer(Modifier.height(2.dp))
+                        Text(
+                            text = "Shown around Meoify while you're not signed in",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+
+                Spacer(Modifier.height(20.dp))
+                OutlinedTextField(
+                    value = nameDraft,
+                    onValueChange = { nameDraft = it },
+                    label = { Text("Display name") },
+                    placeholder = { Text("Your name") },
+                    leadingIcon = { Icon(Icons.Filled.Person, contentDescription = null) },
+                    singleLine = true,
+                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+
+                Spacer(Modifier.height(14.dp))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    FilledTonalButton(
+                        onClick = { avatarPicker.launch("image/*") },
+                        shape = RoundedCornerShape(50),
                     ) {
-                        FilledTonalButton(onClick = { avatarPicker.launch("image/*") }) {
-                            Icon(
-                                Icons.Filled.PhotoCamera,
-                                contentDescription = null,
-                                modifier = Modifier.size(18.dp),
-                            )
-                            Spacer(Modifier.width(8.dp))
-                            Text(if (settings.localAvatarPath == null) "Choose photo" else "Change photo")
-                        }
-                        if (settings.localAvatarPath != null) {
-                            TextButton(
-                                onClick = {
-                                    app.container.settings.setLocalAvatarPath(null)
-                                    actions.showSnackbar("Profile photo removed")
-                                },
-                            ) {
-                                Text("Remove")
-                            }
+                        Icon(
+                            Icons.Filled.PhotoCamera,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(if (settings.localAvatarPath == null) "Add photo" else "Change photo")
+                    }
+                    if (settings.localAvatarPath != null) {
+                        TextButton(
+                            onClick = {
+                                app.container.settings.setLocalAvatarPath(null)
+                                actions.showSnackbar("Profile photo removed")
+                            },
+                        ) {
+                            Text("Remove")
                         }
                     }
                 }
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        app.container.settings.setLocalProfileName(nameDraft)
-                        editProfile = false
-                        actions.showSnackbar(
-                            if (nameDraft.isBlank()) "Local profile cleared" else "Local profile saved",
-                        )
-                    },
-                ) {
-                    Text("Save")
+
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = "Saved with your .json backups.",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+
+                Spacer(Modifier.height(22.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    TextButton(
+                        onClick = { editProfile = false },
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        Text("Cancel")
+                    }
+                    Button(
+                        onClick = {
+                            app.container.settings.setLocalProfileName(nameDraft)
+                            editProfile = false
+                            actions.showSnackbar(
+                                if (nameDraft.isBlank()) "Local profile cleared" else "Local profile saved",
+                            )
+                        },
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        Text("Save")
+                    }
                 }
-            },
-            dismissButton = {
-                TextButton(onClick = { editProfile = false }) { Text("Cancel") }
-            },
-        )
+            }
+        }
     }
 
     val pendingRestore = restoreUri
@@ -729,158 +734,178 @@ fun SettingsScreen(
 }
 
 @Composable
-private fun ProfileHeader(
+private fun ProfileCard(
     name: String,
     subtitle: String,
     avatarUrl: Any?,
     initials: String?,
     signedIn: Boolean,
     loading: Boolean,
+    liked: Int,
+    playlists: Int,
+    played: Int,
+    onLiked: () -> Unit,
+    onPlaylists: () -> Unit,
+    onPlayed: () -> Unit,
     onRefresh: () -> Unit,
-    onEditProfile: () -> Unit,
+    onEditLocal: () -> Unit,
+    onSignIn: () -> Unit,
+    onSignOut: () -> Unit,
 ) {
-    val pair = ArtworkColorCache.gradientPair(name)
+    val accent = ArtworkColorCache.gradientPair(name)
     Surface(
         shape = RoundedCornerShape(28.dp),
         color = MaterialTheme.colorScheme.surfaceContainerLow,
         modifier = Modifier.fillMaxWidth(),
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(
-                    Brush.verticalGradient(
-                        listOf(
-                            pair.first.copy(alpha = 0.32f),
-                            MaterialTheme.colorScheme.surfaceContainerLow,
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(
+                                accent.first.copy(alpha = 0.30f),
+                                MaterialTheme.colorScheme.surfaceContainerLow,
+                            ),
                         ),
-                    ),
-                )
-                .padding(horizontal = 20.dp, vertical = 22.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Box(contentAlignment = Alignment.BottomEnd) {
-                ProfileAvatar(
-                    name = name,
-                    url = avatarUrl,
-                    initials = initials ?: name.take(1).uppercase(),
-                    size = 88.dp,
-                    ring = signedIn,
-                )
-                if (loading) {
+                    )
+                    .padding(start = 18.dp, end = 10.dp, top = 20.dp, bottom = 18.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box {
+                    ProfileAvatar(
+                        name = name,
+                        url = avatarUrl,
+                        initials = initials ?: name.take(1).uppercase(),
+                        size = 76.dp,
+                        ring = signedIn,
+                    )
                     Surface(
                         shape = CircleShape,
-                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                        modifier = Modifier.size(30.dp),
+                        color = if (signedIn) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.surfaceContainerHighest
+                        },
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .size(26.dp),
                     ) {
                         Box(contentAlignment = Alignment.Center) {
-                            androidx.compose.material3.CircularProgressIndicator(
-                                modifier = Modifier.size(16.dp),
-                                strokeWidth = 2.dp,
+                            Icon(
+                                imageVector = if (signedIn) Icons.Filled.Verified else Icons.Filled.Person,
+                                contentDescription = null,
+                                tint = if (signedIn) {
+                                    MaterialTheme.colorScheme.onPrimary
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                },
+                                modifier = Modifier.size(15.dp),
                             )
                         }
                     }
                 }
-            }
-            Spacer(Modifier.height(12.dp))
-            Text(
-                text = name,
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.ExtraBold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Spacer(Modifier.height(2.dp))
-            Text(
-                text = subtitle,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Spacer(Modifier.height(10.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Surface(
-                    shape = RoundedCornerShape(50),
-                    color = if (signedIn) {
-                        MaterialTheme.colorScheme.primaryContainer
+                Spacer(Modifier.width(16.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = name,
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.ExtraBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Spacer(Modifier.height(3.dp))
+                    Text(
+                        text = subtitle,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Spacer(Modifier.height(9.dp))
+                    if (loading) {
+                        SyncChip("Syncing account…", active = true)
                     } else {
-                        MaterialTheme.colorScheme.surfaceContainerHigh
-                    },
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Icon(
-                            Icons.Filled.Verified,
-                            contentDescription = null,
-                            tint = if (signedIn) {
-                                MaterialTheme.colorScheme.onPrimaryContainer
-                            } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            },
-                            modifier = Modifier.size(15.dp),
-                        )
-                        Spacer(Modifier.width(6.dp))
-                        Text(
-                            text = if (signedIn) "YouTube Music" else "Local profile",
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.SemiBold,
-                            color = if (signedIn) {
-                                MaterialTheme.colorScheme.onPrimaryContainer
-                            } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            },
+                        SyncChip(
+                            text = if (signedIn) "YouTube Music connected" else "Local profile",
+                            active = signedIn,
                         )
                     }
                 }
-                Surface(
+                IconButton(
                     onClick = onRefresh,
-                    shape = RoundedCornerShape(50),
-                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    enabled = !loading,
+                    modifier = Modifier.size(40.dp),
                 ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Icon(
-                            Icons.Filled.Refresh,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(15.dp),
-                        )
-                        Spacer(Modifier.width(6.dp))
-                        Text(
-                            text = "Refresh",
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
+                    Icon(
+                        imageVector = Icons.Filled.Refresh,
+                        contentDescription = "Refresh account",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(20.dp),
+                    )
                 }
-                Surface(
-                    onClick = onEditProfile,
-                    shape = RoundedCornerShape(50),
-                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically,
+            }
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                ProfileStat("Liked", liked, Modifier.weight(1f), onLiked)
+                StatDivider()
+                ProfileStat("Playlists", playlists, Modifier.weight(1f), onPlaylists)
+                StatDivider()
+                ProfileStat("Played", played, Modifier.weight(1f), onPlayed)
+            }
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(1.dp)
+                    .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
+            )
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 14.dp, vertical = 12.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (signedIn) {
+                    FilledTonalButton(
+                        onClick = onRefresh,
+                        enabled = !loading,
+                        modifier = Modifier.weight(1f),
                     ) {
+                        Icon(Icons.Filled.Refresh, contentDescription = null, modifier = Modifier.size(17.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Refresh")
+                    }
+                    TextButton(onClick = onSignOut) {
                         Icon(
-                            Icons.Filled.Edit,
+                            Icons.AutoMirrored.Filled.Logout,
                             contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(15.dp),
+                            modifier = Modifier.size(17.dp),
                         )
-                        Spacer(Modifier.width(6.dp))
-                        Text(
-                            text = "Edit",
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text("Sign out")
+                    }
+                } else {
+                    Button(
+                        onClick = onSignIn,
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        Icon(Icons.Filled.Login, contentDescription = null, modifier = Modifier.size(17.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Sign in")
+                    }
+                    TextButton(onClick = onEditLocal) {
+                        Icon(Icons.Filled.Edit, contentDescription = null, modifier = Modifier.size(17.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Edit profile")
                     }
                 }
             }
@@ -889,28 +914,66 @@ private fun ProfileHeader(
 }
 
 @Composable
-private fun StatCard(
+private fun SyncChip(text: String, active: Boolean) {
+    Surface(
+        shape = RoundedCornerShape(50),
+        color = if (active) {
+            MaterialTheme.colorScheme.primaryContainer
+        } else {
+            MaterialTheme.colorScheme.surfaceContainerHigh
+        },
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = if (active) Icons.Filled.Verified else Icons.Filled.Person,
+                contentDescription = null,
+                tint = if (active) {
+                    MaterialTheme.colorScheme.onPrimaryContainer
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
+                modifier = Modifier.size(13.dp),
+            )
+            Spacer(Modifier.width(5.dp))
+            Text(
+                text = text,
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.SemiBold,
+                color = if (active) {
+                    MaterialTheme.colorScheme.onPrimaryContainer
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
+            )
+        }
+    }
+}
+
+@Composable
+private fun ProfileStat(
     label: String,
-    value: String,
+    value: Int,
     modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
     Surface(
         onClick = onClick,
-        shape = RoundedCornerShape(20.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        color = Color.Transparent,
         modifier = modifier,
     ) {
         Column(
-            modifier = Modifier.padding(vertical = 14.dp),
+            modifier = Modifier.padding(vertical = 10.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Text(
-                text = value,
-                style = MaterialTheme.typography.titleLarge,
+                text = value.toString(),
+                style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.ExtraBold,
-                color = MaterialTheme.colorScheme.primary,
             )
+            Spacer(Modifier.height(1.dp))
             Text(
                 text = label,
                 style = MaterialTheme.typography.labelSmall,
@@ -918,6 +981,16 @@ private fun StatCard(
             )
         }
     }
+}
+
+@Composable
+private fun StatDivider() {
+    Box(
+        modifier = Modifier
+            .width(1.dp)
+            .height(26.dp)
+            .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+    )
 }
 
 @Composable
