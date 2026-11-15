@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -32,10 +33,16 @@ import androidx.compose.ui.unit.dp
 import com.meoify.music.data.model.Track
 import com.meoify.music.ui.navigation.LocalAppActions
 import com.meoify.music.ui.navigation.LocalLibrary
+import com.meoify.music.ui.navigation.LocalSignedIn
+import com.meoify.music.ui.navigation.LocalYtLoading
+import com.meoify.music.ui.navigation.LocalYtPlaylists
 
 @Composable
 fun AddToPlaylistDialog(track: Track, onDismiss: () -> Unit) {
     val library = LocalLibrary.current
+    val ytPlaylists = LocalYtPlaylists.current
+    val signedIn = LocalSignedIn.current
+    val ytLoading = LocalYtLoading.current
     val actions = LocalAppActions.current
     var showCreate by remember { mutableStateOf(false) }
     var newName by remember { mutableStateOf("") }
@@ -45,11 +52,36 @@ fun AddToPlaylistDialog(track: Track, onDismiss: () -> Unit) {
         title = { Text("Add to playlist") },
         text = {
             Column {
-                if (library.playlists.isEmpty()) {
-                    Text("No playlists yet. Create one below.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                val empty = if (signedIn) ytPlaylists.isEmpty() else library.playlists.isEmpty()
+                if (empty) {
+                    Text(
+                        text = when {
+                            signedIn && ytLoading -> "Loading your YouTube Music playlists…"
+                            signedIn -> "No playlists yet. Create one below — it will be saved to YouTube Music."
+                            else -> "No playlists yet. Create one below."
+                        },
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                } else if (signedIn) {
+                    LazyColumn(modifier = Modifier.heightIn(max = 280.dp)) {
+                        items(ytPlaylists, key = { it.id }) { card ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        actions.addToPlaylist(card.id, track)
+                                        onDismiss()
+                                    }
+                                    .padding(vertical = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text(card.title, modifier = Modifier.weight(1f))
+                            }
+                        }
+                    }
                 } else {
-                    LazyColumn {
-                        items(library.playlists) { playlist ->
+                    LazyColumn(modifier = Modifier.heightIn(max = 280.dp)) {
+                        items(library.playlists, key = { it.id }) { playlist ->
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -79,8 +111,7 @@ fun AddToPlaylistDialog(track: Track, onDismiss: () -> Unit) {
                     Spacer(Modifier.height(8.dp))
                     TextButton(onClick = {
                         if (newName.isNotBlank()) {
-                            val id = actions.createPlaylist(newName)
-                            actions.addToPlaylist(id, track)
+                            actions.createPlaylistWithTrack(newName.trim(), track)
                             onDismiss()
                         }
                     }) { Text("Create & add") }
@@ -104,18 +135,29 @@ fun CreatePlaylistDialog(
     onNameChange: (String) -> Unit,
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
+    signedIn: Boolean = false,
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("New playlist") },
+        title = { Text(if (signedIn) "New YouTube Music playlist" else "New playlist") },
         text = {
-            OutlinedTextField(
-                value = name,
-                onValueChange = onNameChange,
-                label = { Text("Name") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-            )
+            Column {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = onNameChange,
+                    label = { Text("Name") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                if (signedIn) {
+                    Spacer(Modifier.height(10.dp))
+                    Text(
+                        text = "Created as a private playlist in your YouTube Music account.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
         },
         confirmButton = {
             TextButton(onClick = onConfirm, enabled = name.isNotBlank()) {

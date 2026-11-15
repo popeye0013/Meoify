@@ -49,6 +49,7 @@ fun TrackMenuSheet(
     val library = LocalLibrary.current
     val context = LocalContext.current
     val sheetState = rememberModalBottomSheetState()
+    val cover = rememberTrackCover(track)
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -66,7 +67,7 @@ fun TrackMenuSheet(
                         .background(MaterialTheme.colorScheme.surfaceContainerHigh),
                 ) {
                     coil3.compose.AsyncImage(
-                        model = track.thumbnailUrl,
+                        model = cover,
                         contentDescription = null,
                         contentScale = androidx.compose.ui.layout.ContentScale.Crop,
                         modifier = Modifier.fillMaxWidth().height(56.dp),

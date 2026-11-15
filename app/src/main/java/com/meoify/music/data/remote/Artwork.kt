@@ -1,0 +1,40 @@
+package com.meoify.music.data.remote
+
+/**
+ * Upgrades artwork URLs to the best resolution YouTube serves.
+ *
+ * `lh3.googleusercontent.com` / `yt3.ggpht.com` URLs are the square album and
+ * artist covers used by YouTube Music; the `=w…-h…` suffix controls the size.
+ * `i.ytimg.com/vi/<id>/…default.jpg` URLs are video stills (4:3 video frames)
+ * and are only used as a last resort, because a song's original cover art is
+ * the album artwork, not a frame from its music video.
+ */
+object Artwork {
+
+    private val GOOGLE_SIZE = Regex("=w\\d+-h\\d+")
+    private val GOOGLE_SQUARE = Regex("=s\\d+(-[a-z0-9]+)*$")
+
+    /** True when [url] is a music-video still rather than real cover art. */
+    fun isVideoStill(url: String?): Boolean =
+        url != null && (url.contains("ytimg.com") || url.contains("img.youtube.com"))
+
+    /** The highest quality version of a cover or still URL. */
+    fun highRes(url: String?): String? {
+        if (url.isNullOrBlank()) return null
+        return when {
+            url.contains("googleusercontent.com") || url.contains("ggpht.com") ->
+                GOOGLE_SIZE.replace(url, "=w1200-h1200")
+                    .let { upgraded ->
+                        if (upgraded == url) GOOGLE_SQUARE.replace(url, "=s1200") else upgraded
+                    }
+
+            isVideoStill(url) -> url
+                .replace("mqdefault", "maxresdefault")
+                .replace("hqdefault", "maxresdefault")
+                .replace("sddefault", "maxresdefault")
+                .replace("/default.jpg", "/maxresdefault.jpg")
+
+            else -> url
+        }
+    }
+}

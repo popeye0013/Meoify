@@ -116,6 +116,7 @@ import com.meoify.music.data.model.Track
 import com.meoify.music.data.remote.TrackLyrics
 import com.meoify.music.playback.PlayerUiState
 import com.meoify.music.ui.components.TrackRow
+import com.meoify.music.ui.components.rememberTrackCover
 import com.meoify.music.ui.navigation.AppActions
 import com.meoify.music.ui.navigation.LocalAppActions
 import com.meoify.music.ui.navigation.LocalPlayerState
@@ -135,9 +136,10 @@ fun PlayerScreen(onClose: () -> Unit) {
     val actions = LocalAppActions.current
     val context = LocalContext.current
     val track = state.track
+    val cover = rememberTrackCover(track)
 
     var accent by remember(track?.id) { mutableStateOf(ArtworkColorCache.fallbackColor(track?.title ?: "meoify")) }
-    LaunchedEffect(track?.id) { accent = ArtworkColorCache.extract(track?.thumbnailUrl, track?.title ?: "meoify") }
+    LaunchedEffect(cover, track?.title) { accent = ArtworkColorCache.extract(cover, track?.title ?: "meoify") }
 
     var showLyrics by remember { mutableStateOf(false) }
     var showQueue by remember { mutableStateOf(false) }
@@ -377,6 +379,7 @@ private fun PlayerMainContent(
     onToggleMute: () -> Unit,
     onQualityChange: (AudioQuality) -> Unit,
 ) {
+    val cover = rememberTrackCover(track)
     val wide = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
     if (wide) {
         Row(
@@ -393,7 +396,7 @@ private fun PlayerMainContent(
             ) {
                 val side = minOf(maxWidth, maxHeight)
                 MotionCanvas(
-                    url = track?.thumbnailUrl,
+                    url = cover,
                     accent = accent,
                     modifier = Modifier
                         .size(side)
@@ -433,7 +436,7 @@ private fun PlayerMainContent(
             ) {
                 val side = minOf(maxWidth, maxHeight)
                 MotionCanvas(
-                    url = track?.thumbnailUrl,
+                    url = cover,
                     accent = accent,
                     modifier = Modifier
                         .size(side)

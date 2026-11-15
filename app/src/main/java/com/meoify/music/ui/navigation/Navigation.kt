@@ -3,6 +3,7 @@ package com.meoify.music.ui.navigation
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.compositionLocalOf
 import com.meoify.music.data.model.LibraryData
+import com.meoify.music.data.model.MediaCard
 import com.meoify.music.data.model.Track
 import com.meoify.music.playback.PlayerUiState
 
@@ -41,7 +42,8 @@ data class AppActions(
     val isLiked: (String) -> Boolean,
     val addToPlaylist: (String, Track) -> Unit,
     val removeFromPlaylist: (String, String) -> Unit,
-    val createPlaylist: (String) -> String,
+    val createPlaylist: (String) -> Unit,
+    val createPlaylistWithTrack: (String, Track) -> Unit,
     val savePlaylist: (String, List<Track>) -> Unit,
     val deletePlaylist: (String) -> Unit,
     val renamePlaylist: (String, String) -> Unit,
@@ -53,6 +55,11 @@ val LocalAppActions = compositionLocalOf<AppActions> { error("AppActions not pro
 val LocalLibrary = compositionLocalOf<LibraryData> { LibraryData() }
 val LocalPlayerState = compositionLocalOf<PlayerUiState> { PlayerUiState() }
 val LocalLikedIds = compositionLocalOf<Set<String>> { emptySet() }
+
+/** Playlists in the signed-in YouTube Music account. Empty when signed out. */
+val LocalYtPlaylists = compositionLocalOf<List<MediaCard>> { emptyList() }
+val LocalYtLoading = compositionLocalOf { false }
+val LocalSignedIn = compositionLocalOf { false }
 
 @Composable
 fun rememberAppActions(): AppActions = LocalAppActions.current

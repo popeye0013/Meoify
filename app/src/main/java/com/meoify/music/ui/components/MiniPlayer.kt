@@ -42,6 +42,7 @@ fun MiniPlayer(onOpen: () -> Unit) {
     val state = LocalPlayerState.current
     val actions = LocalAppActions.current
     val track = state.track ?: return
+    val cover = rememberTrackCover(track)
 
     Surface(
         onClick = onOpen,
@@ -67,7 +68,7 @@ fun MiniPlayer(onOpen: () -> Unit) {
                         .background(MaterialTheme.colorScheme.surfaceContainerHighest),
                 ) {
                     AsyncImage(
-                        model = track.thumbnailUrl,
+                        model = cover,
                         contentDescription = null,
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxWidth().height(46.dp),

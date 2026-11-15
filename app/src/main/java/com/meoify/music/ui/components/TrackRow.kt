@@ -87,6 +87,7 @@ fun TrackRow(
     isCurrent: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
+    val cover = rememberTrackCover(track)
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -105,7 +106,7 @@ fun TrackRow(
         if (showArtwork) {
             Box(modifier = Modifier.size(48.dp)) {
                 AsyncImage(
-                    model = track.thumbnailUrl,
+                    model = cover,
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier

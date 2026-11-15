@@ -56,6 +56,17 @@ class LibraryStore(private val context: Context) {
         }
     }
 
+    /**
+     * Replaces the whole liked list. Used when the signed-in account's Liked
+     * music is mirrored from YouTube Music, which is the source of truth while
+     * the person is signed in.
+     */
+    suspend fun setLiked(tracks: List<Track>) {
+        context.libraryStore.edit { prefs ->
+            prefs[Keys.liked] = json.encodeToString(tracks.distinctBy { it.id }.take(500))
+        }
+    }
+
     fun toggleLike(track: Track) = scope.launch {
         context.libraryStore.edit { prefs ->
             val current = decodeTracks(prefs[Keys.liked])

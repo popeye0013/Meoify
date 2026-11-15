@@ -23,6 +23,9 @@ import com.meoify.music.ui.navigation.Destination
 import com.meoify.music.ui.navigation.LocalAppActions
 import com.meoify.music.ui.navigation.LocalLibrary
 import com.meoify.music.ui.navigation.LocalPlayerState
+import com.meoify.music.ui.navigation.LocalSignedIn
+import com.meoify.music.ui.navigation.LocalYtLoading
+import com.meoify.music.ui.navigation.LocalYtPlaylists
 import kotlinx.coroutines.launch
 
 enum class Tab { Home, Search, Library }
@@ -31,9 +34,20 @@ enum class Tab { Home, Search, Library }
 fun MeoifyApp(container: AppContainer) {
     val library by container.library.library.collectAsStateWithLifecycle(initialValue = LibraryData())
     val playerState by container.player.state.collectAsStateWithLifecycle(initialValue = PlayerUiState())
+    val settings by container.settings.settings.collectAsStateWithLifecycle()
+    val ytState by container.ytLibrary.state.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
 
     val snackbarHostState = androidx.compose.material3.SnackbarHostState()
+
+    LaunchedEffect(settings.ytCookies) {
+        container.repository.applyCookies(settings.ytCookies)
+        if (settings.ytCookies != null) {
+            container.ytLibrary.ensureLoaded()
+        } else {
+            container.ytLibrary.reset()
+        }
+    }
 
     LaunchedEffect(Unit) {
         container.player.events.collect { event ->
@@ -74,7 +88,21 @@ fun MeoifyApp(container: AppContainer) {
             },
             playNext = { track -> container.player.playNext(track) },
             addToQueue = { track -> container.player.addToQueue(track) },
-            toggleLike = { track -> container.library.toggleLike(track) },
+            toggleLike = { track ->
+                if (container.repository.signedIn) {
+                    val wasLiked = library.liked.any { it.id == track.id }
+                    scope.launch {
+                        val ok = container.ytLibrary.setLiked(track, !wasLiked)
+                        if (!ok) {
+                            snackbarHostState.showSnackbar(
+                                "Couldn't update Liked Music on YouTube Music",
+                            )
+                        }
+                    }
+                } else {
+                    container.library.toggleLike(track)
+                }
+            },
             togglePlayPause = { container.player.togglePlayPause() },
             skipNext = { container.player.skipNext() },
             skipPrevious = { container.player.skipPrevious() },
@@ -100,12 +128,89 @@ fun MeoifyApp(container: AppContainer) {
             showSnackbar = { message -> scope.launch { snackbarHostState.showSnackbar(message) } },
             openPlayer = { showPlayer = true },
             isLiked = { id -> library.liked.any { it.id == id } },
-            addToPlaylist = { id, track -> container.library.addToPlaylist(id, track) },
+            addToPlaylist = { id, track ->
+                if (container.repository.signedIn && !id.startsWith("local_")) {
+                    scope.launch {
+                        val ok = container.ytLibrary.addToPlaylist(id, track)
+                        if (!ok) snackbarHostState.showSnackbar("Couldn't add to that playlist")
+                    }
+                } else {
+                    container.library.addToPlaylist(id, track)
+                }
+            },
             removeFromPlaylist = { id, trackId -> container.library.removeFromPlaylist(id, trackId) },
-            createPlaylist = { name -> container.library.createPlaylist(name) },
-            savePlaylist = { name, tracks -> container.library.savePlaylist(name, tracks) },
-            deletePlaylist = { id -> container.library.deletePlaylist(id) },
-            renamePlaylist = { id, name -> container.library.renamePlaylist(id, name) },
+            createPlaylist = { name ->
+                if (container.repository.signedIn) {
+                    scope.launch {
+                        val id = container.ytLibrary.createPlaylist(name)
+                        snackbarHostState.showSnackbar(
+                            if (id != null) {
+                                "Playlist created on YouTube Music"
+                            } else {
+                                "Couldn't create playlist"
+                            },
+                        )
+                    }
+                } else {
+                    container.library.createPlaylist(name)
+                    scope.launch { snackbarHostState.showSnackbar("Playlist created") }
+                }
+            },
+            createPlaylistWithTrack = { name, track ->
+                if (container.repository.signedIn) {
+                    scope.launch {
+                        val id = container.ytLibrary.createPlaylist(name, listOf(track))
+                        snackbarHostState.showSnackbar(
+                            if (id != null) {
+                                "Added to “$name” on YouTube Music"
+                            } else {
+                                "Couldn't create playlist"
+                            },
+                        )
+                    }
+                } else {
+                    val id = container.library.createPlaylist(name)
+                    container.library.addToPlaylist(id, track)
+                }
+            },
+            savePlaylist = { name, tracks ->
+                if (container.repository.signedIn) {
+                    scope.launch {
+                        val id = container.ytLibrary.createPlaylist(name, tracks)
+                        snackbarHostState.showSnackbar(
+                            if (id != null) {
+                                "Saved to YouTube Music"
+                            } else {
+                                "Couldn't save playlist"
+                            },
+                        )
+                    }
+                } else {
+                    container.library.savePlaylist(name, tracks)
+                }
+            },
+            deletePlaylist = { id ->
+                if (container.repository.signedIn && !id.startsWith("local_")) {
+                    scope.launch {
+                        val ok = container.ytLibrary.deletePlaylist(id)
+                        snackbarHostState.showSnackbar(
+                            if (ok) "Playlist deleted" else "Couldn't delete playlist",
+                        )
+                    }
+                } else {
+                    container.library.deletePlaylist(id)
+                }
+            },
+            renamePlaylist = { id, name ->
+                if (container.repository.signedIn && !id.startsWith("local_")) {
+                    scope.launch {
+                        val ok = container.ytLibrary.renamePlaylist(id, name)
+                        if (!ok) snackbarHostState.showSnackbar("Couldn't rename playlist")
+                    }
+                } else {
+                    container.library.renamePlaylist(id, name)
+                }
+            },
             clearRecentSearches = { container.library.clearRecentSearches() },
             clearRecent = { container.library.clearRecent() },
         )
@@ -115,6 +220,9 @@ fun MeoifyApp(container: AppContainer) {
         LocalAppActions provides actions,
         LocalLibrary provides library,
         LocalPlayerState provides playerState,
+        LocalYtPlaylists provides ytState.playlists,
+        LocalYtLoading provides ytState.loading,
+        LocalSignedIn provides (settings.ytCookies != null),
     ) {
         MeoifyScaffold(
             tab = tab,

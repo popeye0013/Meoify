@@ -58,7 +58,7 @@ fun MediaCard(
         ) {
             if (!card.thumbnailUrl.isNullOrBlank()) {
                 AsyncImage(
-                    model = card.thumbnailUrl,
+                    model = com.meoify.music.data.remote.Artwork.highRes(card.thumbnailUrl),
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize(),
@@ -135,7 +135,7 @@ fun ArtistCard(
         ) {
             if (!card.thumbnailUrl.isNullOrBlank()) {
                 AsyncImage(
-                    model = card.thumbnailUrl,
+                    model = com.meoify.music.data.remote.Artwork.highRes(card.thumbnailUrl),
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize(),

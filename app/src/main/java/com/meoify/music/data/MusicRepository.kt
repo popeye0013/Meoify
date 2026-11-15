@@ -57,6 +57,8 @@ class MusicRepository(private val settings: com.meoify.music.data.local.Settings
         innerTube.setCookies(raw)
     }
     private val homeMutex = Mutex()
+    private val artworkMutex = Mutex()
+    private val albumArtCache = mutableMapOf<String, String>()
 
     @Volatile
     private var cachedHome: Pair<HomeFeed, Long>? = null
@@ -128,8 +130,25 @@ class MusicRepository(private val settings: com.meoify.music.data.local.Settings
     }
 
     suspend fun playlist(playlistId: String): DetailPage {
-        val root = innerTube.browse(playlistId)
+        val browseId = if (playlistId.startsWith("VL") || playlistId.startsWith("MPRE")) {
+            playlistId
+        } else {
+            "VL$playlistId"
+        }
+        val root = innerTube.browse(browseId)
         return YTMusicParser.parsePlaylist(root, playlistId)
+    }
+
+    /** High-resolution square cover art for an album, or null when unavailable. */
+    suspend fun albumArtwork(albumId: String): String? = artworkMutex.withLock {
+        albumArtCache[albumId]?.let { return@withLock it }
+        val url = runCatching { album(albumId).thumbnailUrl }.getOrNull()
+            ?.let(com.meoify.music.data.remote.Artwork::highRes)
+        if (!url.isNullOrBlank()) {
+            if (albumArtCache.size > 400) albumArtCache.clear()
+            albumArtCache[albumId] = url
+        }
+        url
     }
 
     /**
@@ -192,6 +211,47 @@ class MusicRepository(private val settings: com.meoify.music.data.local.Settings
 
     /** True when the app currently holds YouTube Music cookies. */
     val signedIn: Boolean get() = cookiesPresent
+
+    /**
+     * Songs in the account's Liked music playlist, newest first. Returns null
+     * when the request failed so callers can avoid overwriting a good mirror
+     * with an empty list.
+     */
+    suspend fun likedSongs(limit: Int = 300): List<Track>? {
+        if (!cookiesPresent) return null
+        val root = runCatching { innerTube.browse("VLLM") }.getOrNull() ?: return null
+        return runCatching {
+            YTMusicParser.parsePlaylist(root, "LM").tracks.take(limit)
+        }.getOrNull()
+    }
+
+    suspend fun setSongLiked(videoId: String, liked: Boolean): Boolean {
+        if (!cookiesPresent) return false
+        return runCatching { innerTube.rateSong(videoId, liked) }.getOrDefault(false)
+    }
+
+    suspend fun createPlaylist(
+        title: String,
+        videoIds: List<String> = emptyList(),
+    ): String? {
+        if (!cookiesPresent) return null
+        return runCatching { innerTube.createPlaylist(title, videoIds) }.getOrNull()
+    }
+
+    suspend fun deletePlaylist(playlistId: String): Boolean {
+        if (!cookiesPresent) return false
+        return runCatching { innerTube.deletePlaylist(playlistId) }.getOrDefault(false)
+    }
+
+    suspend fun renamePlaylist(playlistId: String, title: String): Boolean {
+        if (!cookiesPresent) return false
+        return runCatching { innerTube.renamePlaylist(playlistId, title) }.getOrDefault(false)
+    }
+
+    suspend fun addSongToPlaylist(playlistId: String, videoId: String): Boolean {
+        if (!cookiesPresent) return false
+        return runCatching { innerTube.addToPlaylist(playlistId, videoId) }.getOrDefault(false)
+    }
 
     /**
      * Per-play YouTube tracking URL for the signed-in account, or null when

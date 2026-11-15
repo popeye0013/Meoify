@@ -12,8 +12,10 @@ import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.google.common.util.concurrent.ListenableFuture
+import com.meoify.music.data.CoverArtResolver
 import com.meoify.music.data.local.LibraryStore
 import com.meoify.music.data.model.Track
+import com.meoify.music.data.remote.Artwork
 import com.meoify.music.data.remote.ResolvedAudio
 import com.meoify.music.data.remote.StreamResolver
 import kotlinx.coroutines.CancellationException
@@ -65,6 +67,7 @@ class PlayerConnection(
     private val context: Context,
     private val resolver: StreamResolver,
     private val library: LibraryStore,
+    private val coverArt: CoverArtResolver? = null,
 ) {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -462,14 +465,15 @@ class PlayerConnection(
         }
     }
 
-    private fun Track.toMediaItem(audio: ResolvedAudio): MediaItem {
+    private suspend fun Track.toMediaItem(audio: ResolvedAudio): MediaItem {
+        val artwork = coverArt?.cached(id) ?: Artwork.highRes(thumbnailUrl)
         val metadata = MediaMetadata.Builder()
             .setTitle(title)
             .setArtist(artist)
             .apply {
                 album?.takeIf { it.isNotBlank() }?.let { setAlbumTitle(it) }
                 if (durationMs > 0) setDurationMs(durationMs)
-                thumbnailUrl?.takeIf { it.isNotBlank() }?.let { setArtworkUri(Uri.parse(it)) }
+                artwork?.takeIf { it.isNotBlank() }?.let { setArtworkUri(Uri.parse(it)) }
             }
             .build()
         return MediaItem.Builder()

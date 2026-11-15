@@ -238,6 +238,7 @@ fun MeoifyScaffold(
     if (showCreatePlaylist) {
         com.meoify.music.ui.components.CreatePlaylistDialog(
             name = newPlaylistName,
+            signedIn = settings.ytCookies != null,
             onNameChange = onNewPlaylistNameChange,
             onConfirm = {
                 val name = newPlaylistName.trim()

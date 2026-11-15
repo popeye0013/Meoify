@@ -4,11 +4,14 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.add
+import kotlinx.serialization.json.addJsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.MediaType.Companion.toMediaType
@@ -206,6 +209,72 @@ class InnerTube(private val client: OkHttpClient) {
             throw MusicApiException("Couldn't reach YouTube Music history.", e)
         }
     }
+
+    /** Adds or removes a song from the account's Liked music (LM). */
+    suspend fun rateSong(videoId: String, liked: Boolean): Boolean {
+        val endpoint = if (liked) "like/like" else "like/removelike"
+        val root = post(
+            endpoint,
+            buildJsonObject {
+                putJsonObject("target") { put("videoId", videoId) }
+            },
+        )
+        return root["status"]?.jsonPrimitive?.contentOrNull?.contains("SUCCEEDED") == true
+    }
+
+    /** Creates a private playlist in the account and returns its id. */
+    suspend fun createPlaylist(title: String, videoIds: List<String> = emptyList()): String? {
+        val root = post(
+            "playlist/create",
+            buildJsonObject {
+                put("title", title)
+                put("description", "")
+                put("privacyStatus", "PRIVATE")
+                if (videoIds.isNotEmpty()) {
+                    putJsonArray("videoIds") { videoIds.forEach { add(it) } }
+                }
+            },
+        )
+        return root["playlistId"]?.jsonPrimitive?.contentOrNull
+    }
+
+    suspend fun deletePlaylist(playlistId: String): Boolean {
+        val root = post(
+            "playlist/delete",
+            buildJsonObject { put("playlistId", playlistId.removePrefix("VL")) },
+        )
+        return root["status"]?.jsonPrimitive?.contentOrNull?.contains("SUCCEEDED") == true
+    }
+
+    suspend fun renamePlaylist(playlistId: String, title: String): Boolean = runCatching {
+        post(
+            "browse/edit_playlist",
+            buildJsonObject {
+                put("playlistId", playlistId.removePrefix("VL"))
+                putJsonArray("actions") {
+                    addJsonObject {
+                        put("action", "ACTION_SET_PLAYLIST_NAME")
+                        put("playlistName", title)
+                    }
+                }
+            },
+        )
+    }.isSuccess
+
+    suspend fun addToPlaylist(playlistId: String, videoId: String): Boolean = runCatching {
+        post(
+            "browse/edit_playlist",
+            buildJsonObject {
+                put("playlistId", playlistId.removePrefix("VL"))
+                putJsonArray("actions") {
+                    addJsonObject {
+                        put("action", "ACTION_ADD_VIDEO")
+                        put("addedVideoId", videoId)
+                    }
+                }
+            },
+        )
+    }.isSuccess
 
     private suspend fun post(endpoint: String, payload: JsonObject): JsonObject = withContext(Dispatchers.IO) {
         val body = buildJsonObject {
