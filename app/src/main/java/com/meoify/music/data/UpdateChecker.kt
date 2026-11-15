@@ -30,6 +30,10 @@ object UpdateChecker {
     private const val MANIFEST_URL =
         "https://raw.githubusercontent.com/${DeveloperInfo.HANDLE}/${DeveloperInfo.HANDLE}/main/meoify-latest.json"
 
+    /** Public file in the profile repository, readable without a token. */
+    private const val CONTENTS_API_URL =
+        "https://api.github.com/repos/${DeveloperInfo.HANDLE}/${DeveloperInfo.HANDLE}/contents/meoify-latest.json?ref=main"
+
     private val client = OkHttpClient.Builder()
         .connectTimeout(12, TimeUnit.SECONDS)
         .readTimeout(12, TimeUnit.SECONDS)
@@ -41,10 +45,27 @@ object UpdateChecker {
         fromManifest() ?: fromGitHubApi()
     }
 
-    private fun fromManifest(): Release? = runCatching {
+    /**
+     * The raw CDN keeps a copy for a few minutes, so every check adds a
+     * cache-busting query. If raw is unreachable the Contents API is used,
+     * which is served fresh for this public manifest repository.
+     */
+    private fun fromManifest(): Release? = manifestFrom(MANIFEST_URL) ?: manifestFrom(CONTENTS_API_URL)
+
+    private fun manifestFrom(url: String): Release? = runCatching {
+        val busted = if (url.startsWith("https://raw.githubusercontent.com")) {
+            "$url?t=${System.currentTimeMillis() / 60_000}"
+        } else {
+            url
+        }
         val request = Request.Builder()
-            .url(MANIFEST_URL)
+            .url(busted)
             .header("User-Agent", "Meoify-Android")
+            .apply {
+                if (url == CONTENTS_API_URL) {
+                    header("Accept", "application/vnd.github.raw")
+                }
+            }
             .build()
         client.newCall(request).execute().use { response ->
             if (!response.isSuccessful) return@runCatching null
