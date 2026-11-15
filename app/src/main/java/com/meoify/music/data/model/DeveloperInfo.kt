@@ -9,8 +9,6 @@ object DeveloperInfo {
     const val HANDLE = "popeye0013"
 
     const val GITHUB_URL = "https://github.com/popeye0013"
-    const val GITHUB_AVATAR_URL = "https://github.com/popeye0013.png"
-
     const val TELEGRAM_LABEL = "t.me/popeye0013"
     const val TELEGRAM_URL = "https://t.me/popeye0013"
 

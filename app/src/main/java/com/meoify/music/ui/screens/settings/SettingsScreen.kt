@@ -1,5 +1,6 @@
 package com.meoify.music.ui.screens.settings
 
+import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -533,7 +534,7 @@ fun SettingsScreen(
                                 fontWeight = FontWeight.ExtraBold,
                             )
                             Text(
-                                text = "Version 1.5.3",
+                                text = "Version 1.5.4",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -857,9 +858,15 @@ private fun DeveloperCard(onOpen: (String) -> Unit) {
     ) {
         Column(modifier = Modifier.padding(18.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
+                val context = LocalContext.current
+                val developerPhoto = remember {
+                    BitmapFactory.decodeResource(context.resources, R.drawable.meoify_developer)
+                        ?.asImageBitmap()
+                }
                 ProfileAvatar(
                     name = DeveloperInfo.NAME,
-                    url = DeveloperInfo.GITHUB_AVATAR_URL,
+                    url = null,
+                    image = developerPhoto,
                     size = 54.dp,
                 )
                 Spacer(Modifier.width(14.dp))
@@ -890,12 +897,6 @@ private fun DeveloperCard(onOpen: (String) -> Unit) {
             }
 
             Spacer(Modifier.height(14.dp))
-            Text(
-                text = "Meoify is built and maintained by Akash S Lal. Bug reports, ideas and pull requests are always welcome.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Spacer(Modifier.height(10.dp))
 
             SocialRow(
                 label = "GitHub",

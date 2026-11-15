@@ -1,5 +1,6 @@
 package com.meoify.music.ui.components
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
@@ -17,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
@@ -37,6 +39,7 @@ fun ProfileAvatar(
     size: Dp = 40.dp,
     initials: String? = null,
     ring: Boolean = false,
+    image: ImageBitmap? = null,
 ) {
     val seed = name?.ifBlank { null } ?: "meoify"
     val pair = ArtworkColorCache.gradientPair(seed)
@@ -54,7 +57,14 @@ fun ProfileAvatar(
             ),
         contentAlignment = Alignment.Center,
     ) {
-        if (url != null) {
+        if (image != null) {
+            Image(
+                bitmap = image,
+                contentDescription = name?.let { "$it's profile picture" } ?: "Profile picture",
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize().clip(CircleShape),
+            )
+        } else if (url != null) {
             AsyncImage(
                 model = url,
                 contentDescription = name?.let { "$it's profile picture" } ?: "Profile picture",
