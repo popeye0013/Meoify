@@ -123,7 +123,12 @@ fun DetailScreen(destination: Destination, onBack: () -> Unit) {
         return
     }
 
-    val viewModel: DetailViewModel = viewModel(factory = DetailViewModelFactory(appContainer.repository, destination))
+    // Key the ViewModel by destination: reusing one instance across different playlists/albums
+    // kept showing the previously opened page.
+    val viewModel: DetailViewModel = viewModel(
+        key = destination.key,
+        factory = DetailViewModelFactory(appContainer.repository, destination),
+    )
     val state by viewModel.state.collectAsStateWithLifecycle()
     when (val s = state) {
         UiState.Loading -> {

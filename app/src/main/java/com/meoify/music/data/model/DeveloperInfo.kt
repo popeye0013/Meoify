@@ -11,9 +11,6 @@ object DeveloperInfo {
     const val GITHUB_URL = "https://github.com/popeye0013"
     const val GITHUB_AVATAR_URL = "https://github.com/popeye0013.png"
 
-    const val INSTAGRAM_LABEL = "instagram.com/cryptx.dev"
-    const val INSTAGRAM_URL = "https://instagram.com/cryptx.dev"
-
     const val TELEGRAM_LABEL = "t.me/popeye0013"
     const val TELEGRAM_URL = "https://t.me/popeye0013"
 

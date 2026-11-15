@@ -14,6 +14,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -36,6 +37,8 @@ class SettingsStore(private val context: Context) {
         val onboarding = booleanPreferencesKey("onboarding_completed")
         val ytCookies = stringPreferencesKey("yt_cookies")
         val accountName = stringPreferencesKey("yt_account")
+        val localProfileName = stringPreferencesKey("local_profile_name")
+        val localAvatarPath = stringPreferencesKey("local_avatar_path")
     }
 
     val settings: StateFlow<AppSettings> = context.settingsStore.data
@@ -54,6 +57,8 @@ class SettingsStore(private val context: Context) {
                 onboardingCompleted = prefs[Keys.onboarding] ?: false,
                 ytCookies = prefs[Keys.ytCookies],
                 accountName = prefs[Keys.accountName],
+                localProfileName = prefs[Keys.localProfileName],
+                localAvatarPath = prefs[Keys.localAvatarPath],
             )
         }
         .stateIn(scope, SharingStarted.Eagerly, AppSettings())
@@ -108,4 +113,19 @@ class SettingsStore(private val context: Context) {
     fun setOnboardingCompleted(completed: Boolean) = scope.launch {
         context.settingsStore.edit { it[Keys.onboarding] = completed }
     }
+
+    fun setLocalProfileName(name: String?) = scope.launch {
+        context.settingsStore.edit {
+            val clean = name?.trim()?.takeIf { it.isNotBlank() }
+            if (clean == null) it.remove(Keys.localProfileName) else it[Keys.localProfileName] = clean
+        }
+    }
+
+    fun setLocalAvatarPath(path: String?) = scope.launch {
+        context.settingsStore.edit {
+            if (path == null) it.remove(Keys.localAvatarPath) else it[Keys.localAvatarPath] = path
+        }
+    }
+
+    suspend fun current(): AppSettings = settings.first()
 }

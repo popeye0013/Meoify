@@ -27,6 +27,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -44,13 +45,15 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.QueueMusic
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.FormatQuote
 import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
@@ -60,6 +63,9 @@ import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
+import androidx.compose.material.icons.filled.VideoLibrary
+import androidx.compose.material.icons.filled.VolumeOff
+import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -81,6 +87,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -167,6 +174,13 @@ fun PlayerScreen(onClose: () -> Unit) {
         lyricsLoading = false
     }
 
+    fun openVideo() {
+        val t = track ?: return
+        val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://music.youtube.com/watch?v=${t.id}"))
+        runCatching { context.startActivity(intent) }
+            .onFailure { actions.showSnackbar("No app available to open the video") }
+    }
+
     fun shareTrack() {
         val t = track ?: return
         val send = Intent(Intent.ACTION_SEND).apply {
@@ -248,6 +262,9 @@ fun PlayerScreen(onClose: () -> Unit) {
                         onOpenArtwork = { fullArtwork = true },
                         onShowLyrics = { showLyrics = true },
                         onShowQueue = { showQueue = true },
+                        onToggleMute = { app.container.player.toggleMute() },
+                        onOpenVideo = ::openVideo,
+                        onQualityChange = { app.container.settings.setQuality(it) },
                     )
                 }
             }
@@ -341,16 +358,23 @@ private fun NowPlayingHeader(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 6.dp, vertical = 2.dp),
+            .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        IconButton(onClick = onClose) {
-            Icon(
-                Icons.Filled.KeyboardArrowDown,
-                contentDescription = "Close player",
-                tint = Color.White,
-                modifier = Modifier.size(30.dp),
-            )
+        Surface(
+            onClick = onClose,
+            shape = CircleShape,
+            color = Color.White.copy(alpha = 0.10f),
+            modifier = Modifier.size(42.dp),
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    Icons.Filled.KeyboardArrowDown,
+                    contentDescription = "Close player",
+                    tint = Color.White,
+                    modifier = Modifier.size(26.dp),
+                )
+            }
         }
         Column(
             modifier = Modifier.weight(1f),
@@ -360,24 +384,32 @@ private fun NowPlayingHeader(
                 text = "NOW PLAYING",
                 style = MaterialTheme.typography.labelSmall,
                 fontWeight = FontWeight.ExtraBold,
-                letterSpacing = 1.6.sp,
-                color = Color.White.copy(alpha = 0.82f),
+                letterSpacing = 1.8.sp,
+                color = Color.White.copy(alpha = 0.78f),
             )
             Text(
                 text = source,
                 style = MaterialTheme.typography.bodySmall,
-                color = Color.White.copy(alpha = 0.62f),
+                color = Color.White.copy(alpha = 0.52f),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
         }
         Box {
-            IconButton(onClick = { onMenuOpenChange(true) }) {
-                Icon(
-                    Icons.Filled.MoreVert,
-                    contentDescription = "More options",
-                    tint = Color.White.copy(alpha = 0.9f),
-                )
+            Surface(
+                onClick = { onMenuOpenChange(true) },
+                shape = CircleShape,
+                color = Color.White.copy(alpha = 0.10f),
+                modifier = Modifier.size(42.dp),
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        Icons.Filled.MoreVert,
+                        contentDescription = "More options",
+                        tint = Color.White.copy(alpha = 0.92f),
+                        modifier = Modifier.size(22.dp),
+                    )
+                }
             }
             DropdownMenu(expanded = menuOpen, onDismissRequest = { onMenuOpenChange(false) }) {
                 DropdownMenuItem(
@@ -428,14 +460,18 @@ private fun PlayerMainContent(
     onOpenArtwork: () -> Unit,
     onShowLyrics: () -> Unit,
     onShowQueue: () -> Unit,
+    onToggleMute: () -> Unit,
+    onOpenVideo: () -> Unit,
+    onQualityChange: (AudioQuality) -> Unit,
 ) {
+    val liked = track != null && actions.isLiked(track.id)
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 18.dp)
+            .padding(horizontal = 22.dp)
             .padding(bottom = 10.dp),
     ) {
-        // Animated album canvas — takes whatever vertical space is left over.
+        // Big rounded album canvas — takes whatever vertical space is left over.
         MotionCanvas(
             url = track?.thumbnailUrl,
             accent = accent,
@@ -443,8 +479,9 @@ private fun PlayerMainContent(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f)
-                .padding(top = 6.dp, bottom = 12.dp),
-            cornerRadius = 14.dp,
+                .padding(top = 8.dp, bottom = 20.dp)
+                .shadow(18.dp, RoundedCornerShape(30.dp), clip = false),
+            cornerRadius = 30.dp,
             onClick = onOpenArtwork,
         )
 
@@ -455,42 +492,47 @@ private fun PlayerMainContent(
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.ExtraBold,
                     color = Color.White,
-                    maxLines = 2,
+                    maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                Spacer(Modifier.height(2.dp))
+                Spacer(Modifier.height(3.dp))
                 Text(
                     text = track?.artist.orEmpty(),
                     style = MaterialTheme.typography.titleMedium,
-                    color = Color.White.copy(alpha = 0.72f),
+                    color = Color.White.copy(alpha = 0.66f),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-            Spacer(Modifier.width(10.dp))
+            Spacer(Modifier.width(12.dp))
             CircleAction(
-                icon = if (track != null && actions.isLiked(track.id)) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
-                contentDescription = if (track != null && actions.isLiked(track.id)) "Remove from liked songs" else "Like",
-                tint = if (track != null && actions.isLiked(track.id)) MaterialTheme.colorScheme.primary else Color.White,
+                icon = if (liked) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
+                contentDescription = if (liked) "Remove from liked songs" else "Like",
+                tint = if (liked) MaterialTheme.colorScheme.primary else Color.White,
+                size = 48.dp,
+                background = Color.White.copy(alpha = 0.10f),
                 onClick = { track?.let { actions.toggleLike(it) } },
             )
-            Spacer(Modifier.width(8.dp))
+            Spacer(Modifier.width(10.dp))
             CircleAction(
                 icon = Icons.Filled.FormatQuote,
                 contentDescription = "Lyrics",
                 tint = Color.White,
+                size = 48.dp,
+                background = Color.White.copy(alpha = 0.10f),
                 onClick = onShowLyrics,
             )
         }
 
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(14.dp))
 
         var seeking by remember { mutableStateOf(false) }
         var seekValue by remember { mutableStateOf(0f) }
-        WavySeekBar(
+        ThinSeekBar(
             progress = state.progress,
-            activeColor = Color.White,
-            inactiveColor = Color.White.copy(alpha = 0.26f),
+            trackColor = Color.White,
+            thumbColor = MaterialTheme.colorScheme.primary,
+            inactiveColor = Color.White.copy(alpha = 0.22f),
             onProgressChange = { value ->
                 seeking = true
                 seekValue = value
@@ -509,51 +551,22 @@ private fun PlayerMainContent(
             val shownRemaining = (state.durationMs - shownPosition).coerceAtLeast(0L)
             Text(
                 text = if (state.durationMs > 0) formatDuration(shownPosition) else "--:--",
-                style = MaterialTheme.typography.labelMedium,
+                style = MaterialTheme.typography.labelSmall,
                 fontWeight = FontWeight.Medium,
-                color = Color.White.copy(alpha = 0.62f),
+                color = Color.White.copy(alpha = 0.56f),
             )
             Text(
                 text = if (state.durationMs > 0) "-${formatDuration(shownRemaining)}" else "--:--",
-                style = MaterialTheme.typography.labelMedium,
+                style = MaterialTheme.typography.labelSmall,
                 fontWeight = FontWeight.Medium,
-                color = Color.White.copy(alpha = 0.62f),
+                color = Color.White.copy(alpha = 0.56f),
             )
         }
 
-        Spacer(Modifier.height(6.dp))
+        Spacer(Modifier.height(10.dp))
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.Center,
-        ) {
-            Surface(
-                shape = RoundedCornerShape(50),
-                color = Color.White.copy(alpha = 0.12f),
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Icon(
-                        Icons.Filled.GraphicEq,
-                        contentDescription = null,
-                        tint = Color.White.copy(alpha = 0.9f),
-                        modifier = Modifier.size(14.dp),
-                    )
-                    Spacer(Modifier.width(6.dp))
-                    Text(
-                        text = when (quality) {
-                            AudioQuality.HIGH -> "Audio • High"
-                            AudioQuality.NORMAL -> "Audio • Normal"
-                            AudioQuality.SAVER -> "Audio • Saver"
-                        },
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = Color.White.copy(alpha = 0.92f),
-                    )
-                }
-            }
+        Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+            AudioPill(quality = quality, onQualityChange = onQualityChange)
         }
 
         Spacer(Modifier.height(14.dp))
@@ -561,23 +574,23 @@ private fun PlayerMainContent(
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             CircleAction(
                 icon = Icons.Filled.SkipPrevious,
                 contentDescription = "Previous",
                 tint = Color.White,
                 size = 56.dp,
-                background = Color.White.copy(alpha = 0.12f),
+                background = Color.White.copy(alpha = 0.10f),
                 onClick = actions.skipPrevious,
             )
             Surface(
                 onClick = actions.togglePlayPause,
                 shape = RoundedCornerShape(50),
-                color = Color.White.copy(alpha = 0.16f),
+                color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier
                     .weight(1f)
-                    .height(58.dp),
+                    .height(60.dp),
             ) {
                 Row(
                     modifier = Modifier.fillMaxSize(),
@@ -586,7 +599,7 @@ private fun PlayerMainContent(
                 ) {
                     if (state.isPreparing || state.isBuffering) {
                         CircularProgressIndicator(
-                            color = Color.White,
+                            color = MaterialTheme.colorScheme.onPrimary,
                             modifier = Modifier.size(24.dp),
                             strokeWidth = 2.5.dp,
                         )
@@ -595,8 +608,8 @@ private fun PlayerMainContent(
                         Icon(
                             imageVector = if (state.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
                             contentDescription = null,
-                            tint = Color.White,
-                            modifier = Modifier.size(26.dp),
+                            tint = MaterialTheme.colorScheme.onPrimary,
+                            modifier = Modifier.size(28.dp),
                         )
                         Spacer(Modifier.width(10.dp))
                     }
@@ -604,7 +617,7 @@ private fun PlayerMainContent(
                         text = if (state.isPlaying) "Pause" else "Play",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
-                        color = Color.White,
+                        color = MaterialTheme.colorScheme.onPrimary,
                     )
                 }
             }
@@ -613,7 +626,7 @@ private fun PlayerMainContent(
                 contentDescription = "Next",
                 tint = Color.White,
                 size = 56.dp,
-                background = Color.White.copy(alpha = 0.12f),
+                background = Color.White.copy(alpha = 0.10f),
                 onClick = actions.skipNext,
             )
         }
@@ -637,19 +650,54 @@ private fun PlayerMainContent(
                     modifier = Modifier.size(22.dp),
                 )
             }
-            PillButton(
-                active = false,
-                contentDescription = "Queue",
-                onClick = onShowQueue,
-                modifier = Modifier.weight(1f),
+
+            // Split pill: mute on the left, open the YouTube video on the right.
+            Surface(
+                shape = RoundedCornerShape(50),
+                color = Color.White.copy(alpha = 0.12f),
+                modifier = Modifier
+                    .weight(1.35f)
+                    .height(52.dp),
             ) {
-                Icon(
-                    Icons.AutoMirrored.Filled.QueueMusic,
-                    contentDescription = null,
-                    tint = Color.White.copy(alpha = 0.86f),
-                    modifier = Modifier.size(22.dp),
-                )
+                Row(modifier = Modifier.fillMaxSize()) {
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                            .clickable(onClick = onToggleMute),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            imageVector = if (state.muted) Icons.Filled.VolumeOff else Icons.Filled.VolumeUp,
+                            contentDescription = if (state.muted) "Unmute" else "Mute",
+                            tint = if (state.muted) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.86f),
+                            modifier = Modifier.size(21.dp),
+                        )
+                    }
+                    Box(
+                        modifier = Modifier
+                            .width(1.dp)
+                            .fillMaxHeight()
+                            .padding(vertical = 13.dp)
+                            .background(Color.White.copy(alpha = 0.16f)),
+                    )
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                            .clickable(onClick = onOpenVideo),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            Icons.Filled.VideoLibrary,
+                            contentDescription = "Open video",
+                            tint = Color.White.copy(alpha = 0.86f),
+                            modifier = Modifier.size(22.dp),
+                        )
+                    }
+                }
             }
+
             PillButton(
                 active = state.repeatMode != androidx.media3.common.Player.REPEAT_MODE_OFF,
                 contentDescription = "Repeat",
@@ -669,6 +717,71 @@ private fun PlayerMainContent(
                         Color.White.copy(alpha = 0.86f)
                     },
                     modifier = Modifier.size(22.dp),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun AudioPill(
+    quality: AudioQuality,
+    onQualityChange: (AudioQuality) -> Unit,
+) {
+    var open by remember { mutableStateOf(false) }
+    Box {
+        Surface(
+            onClick = { open = true },
+            shape = RoundedCornerShape(50),
+            color = Color.White.copy(alpha = 0.10f),
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 15.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    Icons.Filled.GraphicEq,
+                    contentDescription = null,
+                    tint = Color.White.copy(alpha = 0.85f),
+                    modifier = Modifier.size(15.dp),
+                )
+                Spacer(Modifier.width(7.dp))
+                Text(
+                    text = "Audio",
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color.White.copy(alpha = 0.92f),
+                )
+                Spacer(Modifier.width(2.dp))
+                Icon(
+                    Icons.Filled.KeyboardArrowRight,
+                    contentDescription = "Audio quality",
+                    tint = Color.White.copy(alpha = 0.55f),
+                    modifier = Modifier.size(17.dp),
+                )
+            }
+        }
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            AudioQuality.entries.forEach { option ->
+                DropdownMenuItem(
+                    text = {
+                        Text(
+                            when (option) {
+                                AudioQuality.HIGH -> "High quality"
+                                AudioQuality.NORMAL -> "Normal quality"
+                                AudioQuality.SAVER -> "Data saver"
+                            },
+                        )
+                    },
+                    leadingIcon = {
+                        if (option == quality) {
+                            Icon(Icons.Filled.Check, contentDescription = null)
+                        }
+                    },
+                    onClick = {
+                        open = false
+                        onQualityChange(option)
+                    },
                 )
             }
         }
@@ -787,9 +900,10 @@ private fun MotionCanvas(
 }
 
 @Composable
-private fun WavySeekBar(
+private fun ThinSeekBar(
     progress: Float,
-    activeColor: Color,
+    trackColor: Color,
+    thumbColor: Color,
     inactiveColor: Color,
     onSeek: (Float) -> Unit,
     modifier: Modifier = Modifier,
@@ -797,24 +911,12 @@ private fun WavySeekBar(
 ) {
     var dragging by remember { mutableStateOf(false) }
     var dragProgress by remember { mutableStateOf(0f) }
-    val shown = if (dragging) dragProgress else progress.coerceIn(0f, 1f)
-
-    val transition = rememberInfiniteTransition(label = "waveSeek")
-    val phase by transition.animateFloat(
-        initialValue = 0f,
-        targetValue = (2 * PI).toFloat(),
-        animationSpec = infiniteRepeatable(
-            animation = tween(5_000, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart,
-        ),
-        label = "wavePhase",
-    )
+    val shown = (if (dragging) dragProgress else progress).coerceIn(0f, 1f)
 
     Canvas(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 6.dp)
-            .height(44.dp)
+            .height(38.dp)
             .pointerInput(Unit) {
                 detectTapGestures { offset ->
                     onSeek((offset.x / size.width).coerceIn(0f, 1f))
@@ -844,7 +946,7 @@ private fun WavySeekBar(
     ) {
         val centerY = size.height / 2f
         val progressX = size.width * shown
-        val track = 6.dp.toPx()
+        val track = 4.dp.toPx()
 
         drawLine(
             color = inactiveColor,
@@ -855,62 +957,27 @@ private fun WavySeekBar(
         )
 
         if (progressX > 0f) {
-            clipRect(right = progressX) {
-                val amplitude = 5.dp.toPx()
-                val body = Path().apply {
-                    moveTo(0f, centerY)
-                    var x = 0f
-                    while (x <= size.width + 2f) {
-                        val y = centerY + sin((x / size.width) * 6f * PI.toFloat() + phase) * amplitude
-                        lineTo(x, y)
-                        x += 3f
-                    }
-                    lineTo(size.width, size.height)
-                    lineTo(0f, size.height)
-                    close()
-                }
-                drawPath(body, color = activeColor.copy(alpha = 0.20f))
-                drawWave(centerY, amplitude, phase, activeColor.copy(alpha = 0.95f), 2.4f.dp.toPx(), 0f)
-                drawWave(
-                    centerY,
-                    amplitude * 0.62f,
-                    phase + 1.5f,
-                    activeColor.copy(alpha = 0.48f),
-                    1.4f.dp.toPx(),
-                    1.4f.dp.toPx(),
-                )
-            }
+            drawLine(
+                color = trackColor,
+                start = Offset(0f, centerY),
+                end = Offset(progressX, centerY),
+                strokeWidth = track,
+                cap = StrokeCap.Round,
+            )
         }
 
+        // Large tinted thumb with a soft halo, like the reference design.
         drawCircle(
-            color = activeColor.copy(alpha = 0.28f),
-            radius = 13.dp.toPx(),
+            color = thumbColor.copy(alpha = 0.24f),
+            radius = 15.dp.toPx(),
             center = Offset(progressX, centerY),
         )
         drawCircle(
-            color = Color.White,
-            radius = 7.dp.toPx(),
+            color = thumbColor,
+            radius = 8.dp.toPx(),
             center = Offset(progressX, centerY),
         )
     }
-}
-
-private fun DrawScope.drawWave(
-    centerY: Float,
-    amplitude: Float,
-    phase: Float,
-    color: Color,
-    strokeWidth: Float,
-    offsetY: Float,
-) {
-    val path = Path()
-    var x = 0f
-    while (x <= size.width + 3f) {
-        val y = centerY + offsetY + sin((x / size.width) * 6f * PI.toFloat() + phase) * amplitude
-        if (x == 0f) path.moveTo(x, y) else path.lineTo(x, y)
-        x += 3f
-    }
-    drawPath(path, color = color, style = Stroke(width = strokeWidth, cap = StrokeCap.Round))
 }
 
 /** True when the active connection is mobile data (and not Wi-Fi, ethernet or VPN). */

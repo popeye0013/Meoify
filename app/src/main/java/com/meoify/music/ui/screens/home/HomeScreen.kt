@@ -69,6 +69,7 @@ import com.meoify.music.ui.viewmodel.HomeViewModel
 import com.meoify.music.ui.viewmodel.ProfileViewModel
 import com.meoify.music.ui.viewmodel.ProfileViewModelFactory
 import com.meoify.music.util.greetingForHour
+import java.io.File
 import java.util.Calendar
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -104,6 +105,8 @@ fun HomeScreen() {
                 HomeHeader(
                     account = account,
                     signedIn = settings.ytCookies != null,
+                    localName = settings.localProfileName,
+                    localAvatar = settings.localAvatarPath?.let { File(it) },
                     onProfile = actions.openProfile,
                     onSearch = { query -> actions.search(query) },
                 )
@@ -278,6 +281,8 @@ private fun openCard(card: MediaCardModel, actions: com.meoify.music.ui.navigati
 private fun HomeHeader(
     account: com.meoify.music.data.model.AccountInfo?,
     signedIn: Boolean,
+    localName: String?,
+    localAvatar: Any?,
     onProfile: () -> Unit,
     onSearch: (String) -> Unit,
 ) {
@@ -308,9 +313,12 @@ private fun HomeHeader(
                     .clickable(onClick = onProfile),
             ) {
                 ProfileAvatar(
-                    name = account?.displayName ?: if (signedIn) "YouTube Music" else null,
-                    url = account?.avatarUrl,
-                    initials = account?.initials,
+                    name = account?.displayName
+                        ?: localName
+                        ?: if (signedIn) "YouTube Music" else null,
+                    url = account?.avatarUrl ?: localAvatar,
+                    initials = account?.initials
+                        ?: localName?.trim()?.take(1)?.uppercase(),
                     size = 38.dp,
                     ring = signedIn,
                 )

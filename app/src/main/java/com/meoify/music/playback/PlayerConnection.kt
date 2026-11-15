@@ -47,6 +47,8 @@ data class PlayerUiState(
     val queue: List<Track> = emptyList(),
     val queueIndex: Int = -1,
     val sourceTitle: String = "YouTube Music",
+    val volume: Float = 1f,
+    val muted: Boolean = false,
 ) {
     val hasNext: Boolean get() = queueIndex in 0 until queue.lastIndex
     val hasPrevious: Boolean get() = queueIndex > 0
@@ -83,6 +85,7 @@ class PlayerConnection(
     private var sourceTitle: String = "YouTube Music"
     private var appendJob: Job? = null
     private var generation = 0
+    private var lastVolume: Float = 1f
 
     private val controllerListener = object : Player.Listener {
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
@@ -263,6 +266,22 @@ class PlayerConnection(
         refresh()
     }
 
+    fun setVolume(value: Float) {
+        val c = controller ?: return
+        val level = value.coerceIn(0f, 1f)
+        c.volume = level
+        if (level > 0f) lastVolume = level
+        _state.update { it.copy(volume = level, muted = level == 0f) }
+    }
+
+    fun toggleMute() {
+        val c = controller ?: return
+        val next = if (c.volume > 0f) 0f else lastVolume.takeIf { it > 0f } ?: 1f
+        c.volume = next
+        if (next > 0f) lastVolume = next
+        _state.update { it.copy(volume = next, muted = next == 0f) }
+    }
+
     fun seekTo(positionMs: Long) {
         val c = controller ?: return
         c.seekTo(positionMs.coerceAtLeast(0))
@@ -428,6 +447,8 @@ class PlayerConnection(
                 queue = queue.ifEmpty { it.queue },
                 queueIndex = queueIndex,
                 sourceTitle = sourceTitle,
+                volume = c.volume,
+                muted = c.volume == 0f,
             )
         }
     }

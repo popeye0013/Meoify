@@ -128,6 +128,8 @@ data class AppSettings(
     val canvasOverCellular: Boolean = false,
     val ytCookies: String? = null,
     val accountName: String? = null,
+    val localProfileName: String? = null,
+    val localAvatarPath: String? = null,
     val onboardingCompleted: Boolean = false,
 )
 

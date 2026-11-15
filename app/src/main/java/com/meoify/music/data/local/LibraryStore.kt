@@ -13,6 +13,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
@@ -45,6 +46,15 @@ class LibraryStore(private val context: Context) {
                 recentSearches = decodeStrings(prefs[Keys.searches]),
             )
         }
+
+    suspend fun current(): LibraryData = library.first()
+
+    /** Replaces every local playlist (used when restoring a backup). */
+    fun replacePlaylists(playlists: List<LocalPlaylist>) = scope.launch {
+        context.libraryStore.edit { prefs ->
+            prefs[Keys.playlists] = json.encodeToString(playlists)
+        }
+    }
 
     fun toggleLike(track: Track) = scope.launch {
         context.libraryStore.edit { prefs ->

@@ -1,6 +1,9 @@
 package com.meoify.music.ui.screens.settings
 
+import android.net.Uri
 import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -27,24 +30,31 @@ import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.ArrowOutward
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Badge
+import androidx.compose.material.icons.filled.Backup
 import androidx.compose.material.icons.filled.BlurOn
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.ColorLens
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.CurrencyRupee
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Login
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Restore
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SignalCellularAlt
 import androidx.compose.material.icons.filled.Verified
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
@@ -52,10 +62,15 @@ import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -63,14 +78,13 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.meoify.music.MeoifyApplication
-import com.meoify.music.R
+import com.meoify.music.data.backup.BackupManager
 import com.meoify.music.data.model.AudioQuality
 import com.meoify.music.data.model.DeveloperInfo
 import com.meoify.music.data.model.ThemeMode
@@ -83,6 +97,10 @@ import com.meoify.music.ui.viewmodel.ProfileViewModelFactory
 import com.meoify.music.util.copyText
 import com.meoify.music.util.openUpiPayment
 import com.meoify.music.util.openUrl
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.File
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -100,6 +118,59 @@ fun SettingsScreen(
     )
     val account by profileViewModel.account.collectAsStateWithLifecycle()
     val profileLoading by profileViewModel.loading.collectAsStateWithLifecycle()
+
+    val scope = rememberCoroutineScope()
+    val backupManager = remember(app) {
+        BackupManager(app, app.container.settings, app.container.library)
+    }
+
+    var editProfile by remember { mutableStateOf(false) }
+    var nameDraft by remember { mutableStateOf("") }
+    var restoreUri by remember { mutableStateOf<Uri?>(null) }
+
+    val avatarPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri != null) {
+            scope.launch {
+                val saved = withContext(Dispatchers.IO) {
+                    runCatching {
+                        val dir = File(context.filesDir, "profile").apply { mkdirs() }
+                        val file = File(dir, "avatar_${System.currentTimeMillis()}.jpg")
+                        context.contentResolver.openInputStream(uri)?.use { input ->
+                            file.outputStream().use { output -> input.copyTo(output) }
+                        } ?: error("Couldn't read the selected image")
+                        dir.listFiles()?.filter { it != file }?.forEach { it.delete() }
+                        file.absolutePath
+                    }.getOrNull()
+                }
+                if (saved != null) {
+                    app.container.settings.setLocalAvatarPath(saved)
+                    actions.showSnackbar("Profile photo updated")
+                } else {
+                    actions.showSnackbar("Couldn't read that image")
+                }
+            }
+        }
+    }
+
+    val backupLauncher =
+        rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
+            if (uri != null) {
+                scope.launch {
+                    val count = runCatching { backupManager.exportTo(uri) }.getOrNull()
+                    actions.showSnackbar(
+                        if (count != null) {
+                            "Backed up $count playlist${if (count == 1) "" else "s"}"
+                        } else {
+                            "Backup failed — try another location"
+                        },
+                    )
+                }
+            }
+        }
+
+    val restoreLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri != null) restoreUri = uri
+    }
 
     LaunchedEffect(settings.ytCookies) {
         if (settings.ytCookies != null) profileViewModel.refresh(force = true)
@@ -133,15 +204,28 @@ fun SettingsScreen(
         ) {
             item {
                 ProfileHeader(
-                    name = account?.displayName ?: settings.accountName ?: "Your profile",
+                    name = account?.displayName
+                        ?: settings.localProfileName
+                        ?: settings.accountName
+                        ?: "Your profile",
                     subtitle = account?.email
                         ?: account?.handle
-                        ?: if (settings.ytCookies != null) "YouTube Music account" else "Not signed in",
-                    avatarUrl = account?.avatarUrl,
-                    initials = account?.initials,
+                        ?: when {
+                            settings.ytCookies != null -> "YouTube Music account"
+                            settings.localProfileName != null -> "Local profile · not signed in"
+                            else -> "Not signed in"
+                        },
+                    avatarUrl = account?.avatarUrl
+                        ?: settings.localAvatarPath?.let { File(it) },
+                    initials = account?.initials
+                        ?: settings.localProfileName?.trim()?.take(1)?.uppercase(),
                     signedIn = settings.ytCookies != null,
                     loading = profileLoading,
                     onRefresh = { profileViewModel.refresh(force = true) },
+                    onEditProfile = {
+                        nameDraft = settings.localProfileName.orEmpty()
+                        editProfile = true
+                    },
                 )
             }
 
@@ -180,7 +264,37 @@ fun SettingsScreen(
                             title = "Sign in to YouTube Music",
                             onClick = onOpenLogin,
                         )
+                        ActionRow(
+                            icon = Icons.Filled.Person,
+                            title = if (settings.localProfileName == null) {
+                                "Set up local profile"
+                            } else {
+                                "Edit local profile"
+                            },
+                            subtitle = "Name and picture used without signing in",
+                            onClick = {
+                                nameDraft = settings.localProfileName.orEmpty()
+                                editProfile = true
+                            },
+                        )
                     }
+                }
+            }
+
+            item {
+                SettingsCard {
+                    ActionRow(
+                        icon = Icons.Filled.Backup,
+                        title = "Back up to .json",
+                        subtitle = "Save your playlists and local profile",
+                        onClick = { backupLauncher.launch(backupManager.suggestedFileName()) },
+                    )
+                    ActionRow(
+                        icon = Icons.Filled.Restore,
+                        title = "Restore from .json",
+                        subtitle = "Replaces local playlists and profile",
+                        onClick = { restoreLauncher.launch("application/json") },
+                    )
                 }
             }
 
@@ -370,7 +484,7 @@ fun SettingsScreen(
                                 fontWeight = FontWeight.ExtraBold,
                             )
                             Text(
-                                text = "Version 1.3.0",
+                                text = "Version 1.4.0",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -392,17 +506,117 @@ fun SettingsScreen(
             }
         }
     }
+
+    if (editProfile) {
+        AlertDialog(
+            onDismissRequest = { editProfile = false },
+            title = { Text("Local profile") },
+            text = {
+                Column {
+                    Text(
+                        text = "This profile is shown when you are not signed in to YouTube Music. It is included in your .json backups.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.height(14.dp))
+                    OutlinedTextField(
+                        value = nameDraft,
+                        onValueChange = { nameDraft = it },
+                        label = { Text("Display name") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        FilledTonalButton(onClick = { avatarPicker.launch("image/*") }) {
+                            Icon(
+                                Icons.Filled.PhotoCamera,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp),
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(if (settings.localAvatarPath == null) "Choose photo" else "Change photo")
+                        }
+                        if (settings.localAvatarPath != null) {
+                            TextButton(
+                                onClick = {
+                                    app.container.settings.setLocalAvatarPath(null)
+                                    actions.showSnackbar("Profile photo removed")
+                                },
+                            ) {
+                                Text("Remove")
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        app.container.settings.setLocalProfileName(nameDraft)
+                        editProfile = false
+                        actions.showSnackbar(
+                            if (nameDraft.isBlank()) "Local profile cleared" else "Local profile saved",
+                        )
+                    },
+                ) {
+                    Text("Save")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { editProfile = false }) { Text("Cancel") }
+            },
+        )
+    }
+
+    val pendingRestore = restoreUri
+    if (pendingRestore != null) {
+        AlertDialog(
+            onDismissRequest = { restoreUri = null },
+            title = { Text("Restore backup?") },
+            text = {
+                Text("This replaces your local playlists and local profile with the contents of the selected file.")
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        restoreUri = null
+                        scope.launch {
+                            val result = runCatching { backupManager.restoreFrom(pendingRestore) }.getOrNull()
+                            actions.showSnackbar(
+                                if (result != null) {
+                                    "Restored ${result.playlists} playlist${if (result.playlists == 1) "" else "s"}" +
+                                        if (result.profileName != null) " and local profile" else ""
+                                } else {
+                                    "Couldn't restore that file"
+                                },
+                            )
+                        }
+                    },
+                ) {
+                    Text("Restore")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { restoreUri = null }) { Text("Cancel") }
+            },
+        )
+    }
 }
 
 @Composable
 private fun ProfileHeader(
     name: String,
     subtitle: String,
-    avatarUrl: String?,
+    avatarUrl: Any?,
     initials: String?,
     signedIn: Boolean,
     loading: Boolean,
     onRefresh: () -> Unit,
+    onEditProfile: () -> Unit,
 ) {
     val pair = ArtworkColorCache.gradientPair(name)
     Surface(
@@ -524,6 +738,30 @@ private fun ProfileHeader(
                         )
                     }
                 }
+                Surface(
+                    onClick = onEditProfile,
+                    shape = RoundedCornerShape(50),
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(
+                            Icons.Filled.Edit,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(15.dp),
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            text = "Edit",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
             }
         }
     }
@@ -618,13 +856,6 @@ private fun DeveloperCard(onOpen: (String) -> Unit) {
                 onClick = { onOpen(DeveloperInfo.GITHUB_URL) },
             )
             SocialRow(
-                label = "Instagram",
-                value = DeveloperInfo.INSTAGRAM_LABEL,
-                icon = null,
-                brandColor = Color(0xFFE1306C),
-                onClick = { onOpen(DeveloperInfo.INSTAGRAM_URL) },
-            )
-            SocialRow(
                 label = "Telegram",
                 value = DeveloperInfo.TELEGRAM_LABEL,
                 icon = Icons.AutoMirrored.Filled.Send,
@@ -639,7 +870,7 @@ private fun DeveloperCard(onOpen: (String) -> Unit) {
 private fun SocialRow(
     label: String,
     value: String,
-    icon: ImageVector?,
+    icon: ImageVector,
     brandColor: Color,
     onClick: () -> Unit,
 ) {
@@ -658,21 +889,12 @@ private fun SocialRow(
                 .background(brandColor),
             contentAlignment = Alignment.Center,
         ) {
-            if (icon != null) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = Color.White,
-                    modifier = Modifier.size(20.dp),
-                )
-            } else {
-                Icon(
-                    painter = painterResource(R.drawable.ic_instagram),
-                    contentDescription = null,
-                    tint = Color.White,
-                    modifier = Modifier.size(20.dp),
-                )
-            }
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = Color.White,
+                modifier = Modifier.size(20.dp),
+            )
         }
         Spacer(Modifier.width(14.dp))
         Column(modifier = Modifier.weight(1f)) {
@@ -863,7 +1085,12 @@ private fun ToggleRow(
 }
 
 @Composable
-private fun ActionRow(icon: ImageVector, title: String, onClick: () -> Unit) {
+private fun ActionRow(
+    icon: ImageVector,
+    title: String,
+    subtitle: String? = null,
+    onClick: () -> Unit,
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -878,6 +1105,15 @@ private fun ActionRow(icon: ImageVector, title: String, onClick: () -> Unit) {
             modifier = Modifier.size(20.dp),
         )
         Spacer(Modifier.width(12.dp))
-        Text(text = title, style = MaterialTheme.typography.bodyLarge)
+        Column(modifier = Modifier.weight(1f)) {
+            Text(text = title, style = MaterialTheme.typography.bodyLarge)
+            if (subtitle != null) {
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
     }
 }

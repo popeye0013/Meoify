@@ -32,7 +32,7 @@ import com.meoify.music.ui.theme.ArtworkColorCache
 @Composable
 fun ProfileAvatar(
     name: String?,
-    url: String?,
+    url: Any?,
     modifier: Modifier = Modifier,
     size: Dp = 40.dp,
     initials: String? = null,
@@ -54,7 +54,7 @@ fun ProfileAvatar(
             ),
         contentAlignment = Alignment.Center,
     ) {
-        if (!url.isNullOrBlank()) {
+        if (url != null) {
             AsyncImage(
                 model = url,
                 contentDescription = name?.let { "$it's profile picture" } ?: "Profile picture",
