@@ -39,6 +39,28 @@ data class MediaCard(
     val round: Boolean = false,
 )
 
+/** The signed-in YouTube Music account, as far as the web client exposes it. */
+data class AccountInfo(
+    val name: String? = null,
+    val email: String? = null,
+    val handle: String? = null,
+    val avatarUrl: String? = null,
+) {
+    val displayName: String
+        get() = name?.takeIf { it.isNotBlank() }
+            ?: email?.substringBefore('@')?.takeIf { it.isNotBlank() }
+            ?: "You"
+
+    val initials: String
+        get() = displayName
+            .split(' ', '.', '_', '-')
+            .filter { it.isNotBlank() }
+            .take(2)
+            .map { it.first().uppercaseChar() }
+            .joinToString("")
+            .ifBlank { "M" }
+}
+
 data class HomeFeed(
     val quickPicks: List<Track> = emptyList(),
     val communityPlaylists: List<MediaCard> = emptyList(),

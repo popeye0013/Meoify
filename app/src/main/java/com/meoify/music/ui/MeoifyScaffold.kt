@@ -64,6 +64,7 @@ import com.meoify.music.ui.screens.library.LibraryScreen
 import com.meoify.music.ui.screens.login.YouTubeLoginScreen
 import com.meoify.music.ui.screens.onboarding.WelcomeScreen
 import com.meoify.music.ui.screens.player.PlayerScreen
+import com.meoify.music.ui.screens.profile.ProfileScreen
 import com.meoify.music.ui.screens.search.SearchScreen
 import com.meoify.music.ui.screens.settings.SettingsScreen
 
@@ -92,6 +93,17 @@ fun MeoifyScaffold(
 ) {
     val actions = LocalAppActions.current
     var loginOpen by remember { mutableStateOf(false) }
+    // Set when the profile is opened from Settings, so Back returns there.
+    var profileFromSettings by remember { mutableStateOf(false) }
+
+    fun closeDetail() {
+        val top = detailStack.lastOrNull() ?: return
+        detailStack.removeAt(detailStack.lastIndex)
+        if (top == Destination.Profile && profileFromSettings) {
+            profileFromSettings = false
+            onSettingsOpenChange(true)
+        }
+    }
     val app = androidx.compose.ui.platform.LocalContext.current.applicationContext as com.meoify.music.MeoifyApplication
     val settings by app.container.settings.settings.collectAsStateWithLifecycle()
     val playerState = LocalPlayerState.current
@@ -103,8 +115,8 @@ fun MeoifyScaffold(
             showPlayer -> onShowPlayerChange(false)
             trackMenuTrack != null -> onTrackMenuDismiss()
             loginOpen -> loginOpen = false
+            detailStack.isNotEmpty() -> closeDetail()
             settingsOpen -> onSettingsOpenChange(false)
-            detailStack.isNotEmpty() -> detailStack.removeAt(detailStack.lastIndex)
             tab != Tab.Home -> onTabChange(Tab.Home)
         }
     }
@@ -180,13 +192,23 @@ fun MeoifyScaffold(
                     settingsOpen -> SettingsScreen(
                         onBack = { onSettingsOpenChange(false) },
                         onOpenLogin = { loginOpen = true },
+                        onOpenProfile = {
+                            onSettingsOpenChange(false)
+                            profileFromSettings = true
+                            detailStack.add(Destination.Profile)
+                        },
+                    )
+
+                    detailStack.lastOrNull() == Destination.Profile -> ProfileScreen(
+                        onBack = { closeDetail() },
+                        onOpenLogin = { loginOpen = true },
+                        onOpenSettings = { onSettingsOpenChange(true) },
                     )
 
                     detailStack.isNotEmpty() -> DetailScreen(
                         destination = detailStack.last(),
-                        onBack = { detailStack.removeAt(detailStack.lastIndex) },
+                        onBack = { closeDetail() },
                     )
-
                     target == "tab:${Tab.Home.name}" -> HomeScreen()
 
                     target == "tab:${Tab.Search.name}" -> SearchScreen(

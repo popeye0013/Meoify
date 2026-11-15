@@ -38,6 +38,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -60,11 +61,14 @@ import com.meoify.music.data.model.UiState
 import com.meoify.music.ui.components.ArtistCard
 import com.meoify.music.ui.components.MediaCard
 import com.meoify.music.ui.components.SectionHeader
+import com.meoify.music.ui.components.ProfileAvatar
 import com.meoify.music.ui.components.ShimmerBox
 import com.meoify.music.ui.components.TrackRow
 import com.meoify.music.ui.navigation.LocalAppActions
 import com.meoify.music.ui.navigation.LocalLibrary
 import com.meoify.music.ui.viewmodel.HomeViewModel
+import com.meoify.music.ui.viewmodel.ProfileViewModel
+import com.meoify.music.ui.viewmodel.ProfileViewModelFactory
 import com.meoify.music.util.greetingForHour
 import java.util.Calendar
 
@@ -81,6 +85,15 @@ fun HomeScreen() {
     val refreshing by viewModel.refreshing.collectAsStateWithLifecycle()
     val library = LocalLibrary.current
     val actions = LocalAppActions.current
+    val settings by appContainer.settings.settings.collectAsStateWithLifecycle()
+    val profileViewModel: ProfileViewModel = viewModel(
+        factory = ProfileViewModelFactory(appContainer.repository),
+    )
+    val account by profileViewModel.account.collectAsStateWithLifecycle()
+
+    LaunchedEffect(settings.ytCookies) {
+        if (settings.ytCookies != null) profileViewModel.refresh(force = true) else profileViewModel.clear()
+    }
 
     PullToRefreshBox(
         isRefreshing = refreshing,
@@ -88,7 +101,15 @@ fun HomeScreen() {
         modifier = Modifier.fillMaxSize(),
     ) {
         LazyColumn(modifier = Modifier.fillMaxSize()) {
-            item { HomeHeader(onSettings = actions.openSettings, onSearch = { query -> actions.search(query) }) }
+            item {
+                HomeHeader(
+                    account = account,
+                    signedIn = settings.ytCookies != null,
+                    onProfile = actions.openProfile,
+                    onSettings = actions.openSettings,
+                    onSearch = { query -> actions.search(query) },
+                )
+            }
 
             when (val s = state) {
                 UiState.Loading -> {
@@ -256,7 +277,13 @@ private fun openCard(card: MediaCardModel, actions: com.meoify.music.ui.navigati
 }
 
 @Composable
-private fun HomeHeader(onSettings: () -> Unit, onSearch: (String) -> Unit) {
+private fun HomeHeader(
+    account: com.meoify.music.data.model.AccountInfo?,
+    signedIn: Boolean,
+    onProfile: () -> Unit,
+    onSettings: () -> Unit,
+    onSearch: (String) -> Unit,
+) {
     val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
     Column(modifier = Modifier.padding(top = 12.dp, bottom = 4.dp)) {
         Row(
@@ -283,6 +310,19 @@ private fun HomeHeader(onSettings: () -> Unit, onSearch: (String) -> Unit) {
                     Icons.Filled.Settings,
                     contentDescription = "Settings",
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Box(
+                modifier = Modifier
+                    .padding(start = 2.dp)
+                    .clickable(onClick = onProfile),
+            ) {
+                ProfileAvatar(
+                    name = account?.displayName ?: if (signedIn) "YouTube Music" else null,
+                    url = account?.avatarUrl,
+                    initials = account?.initials,
+                    size = 38.dp,
+                    ring = signedIn,
                 )
             }
         }

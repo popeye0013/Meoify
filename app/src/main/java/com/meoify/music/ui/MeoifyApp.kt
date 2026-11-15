@@ -87,6 +87,11 @@ fun MeoifyApp(container: AppContainer) {
             openPlaylist = { id -> detailStack.add(Destination.Playlist(id)) },
             openLiked = { detailStack.add(Destination.Liked) },
             openLocalPlaylist = { id -> detailStack.add(Destination.LocalPlaylist(id)) },
+            openProfile = { detailStack.add(Destination.Profile) },
+            openLibrary = {
+                detailStack.clear()
+                tab = Tab.Library
+            },
             openSettings = { settingsOpen = true },
             search = { query ->
                 tab = Tab.Search

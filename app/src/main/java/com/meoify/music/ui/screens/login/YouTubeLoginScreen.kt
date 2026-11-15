@@ -26,12 +26,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.meoify.music.MeoifyApplication
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -39,6 +41,18 @@ fun YouTubeLoginScreen(onBack: () -> Unit, onSignedIn: () -> Unit) {
     val context = LocalContext.current
     val app = context.applicationContext as MeoifyApplication
     var status by remember { mutableStateOf("Sign in to your YouTube Music account") }
+    val scope = rememberCoroutineScope()
+
+    fun applyCookies(cookies: String) {
+        val container = app.container
+        container.repository.applyCookies(cookies)
+        container.settings.setYtCookies(cookies)
+        container.settings.setAccountName("YouTube Music account")
+        scope.launch {
+            val account = container.repository.account()
+            if (account != null) container.settings.setAccountName(account.displayName)
+        }
+    }
 
     Scaffold(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
@@ -74,8 +88,7 @@ fun YouTubeLoginScreen(onBack: () -> Unit, onSignedIn: () -> Unit) {
                             override fun onPageFinished(view: WebView?, url: String?) {
                                 val cookies = CookieManager.getInstance().getCookie("https://music.youtube.com")
                                 if (cookies != null && (cookies.contains("SAPISID=") || cookies.contains("__Secure-3PAPISID="))) {
-                                    app.container.settings.setYtCookies(cookies)
-                                    app.container.settings.setAccountName("YouTube Music account")
+                                    applyCookies(cookies)
                                     status = "Signed in. You can go back."
                                     onSignedIn()
                                 }
@@ -98,8 +111,7 @@ fun YouTubeLoginScreen(onBack: () -> Unit, onSignedIn: () -> Unit) {
                     onClick = {
                         val cookies = CookieManager.getInstance().getCookie("https://music.youtube.com")
                         if (cookies != null && (cookies.contains("SAPISID=") || cookies.contains("__Secure-3PAPISID="))) {
-                            app.container.settings.setYtCookies(cookies)
-                            app.container.settings.setAccountName("YouTube Music account")
+                            applyCookies(cookies)
                             status = "Signed in. You can go back."
                             onSignedIn()
                         } else {

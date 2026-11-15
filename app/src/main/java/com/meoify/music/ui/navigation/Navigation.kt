@@ -12,6 +12,7 @@ sealed class Destination(val key: String) {
     data class Artist(val id: String) : Destination("artist:$id")
     data object Liked : Destination("liked")
     data class LocalPlaylist(val id: String) : Destination("local:$id")
+    data object Profile : Destination("profile")
 }
 
 data class AppActions(
@@ -32,6 +33,8 @@ data class AppActions(
     val openPlaylist: (String) -> Unit,
     val openLiked: () -> Unit,
     val openLocalPlaylist: (String) -> Unit,
+    val openProfile: () -> Unit,
+    val openLibrary: () -> Unit,
     val openSettings: () -> Unit,
     val search: (String) -> Unit,
     val showSnackbar: (String) -> Unit,

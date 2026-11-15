@@ -13,8 +13,21 @@ Inspired by the layout and feature set of [LastWave](https://github.com/Clash-Pr
 - **Synced lyrics** — LRC lyrics from LRCLIB with auto-scroll and tap-to-seek, plus a plain-text fallback.
 - **Playback** — ExoPlayer/Media3 background playback with lockscreen and notification controls.
 - **Accounts** — optional YouTube Music web sign-in for a personalised home feed.
+- **Profile** — your avatar sits in the home header; the profile screen shows your account, name/email, library stats and one-tap access to liked songs, playlists and history.
+- **Developer card** — the settings screen credits the developer with a live GitHub avatar and links to Instagram, Telegram and GitHub.
+- **Support** — a donation card with a UPI ID, copy button and a one-tap "Donate with UPI" intent that opens Google Pay, PhonePe, Paytm or any other UPI app.
 - **Material 3** — light/dark/system theme, pure black, dynamic colour on Android 12+, expressive rounded surfaces, Figtree typography.
 - **Sharing** — share songs to other apps and open album/artist pages from the track menu.
+
+## Credits
+
+Built by **Akash** ([@popeye0013](https://github.com/popeye0013)).
+
+- GitHub: https://github.com/popeye0013
+- Instagram: https://instagram.com/cryptx.dev
+- Telegram: https://t.me/popeye0013
+
+Donations are optional and go straight to the developer via UPI: `slalakash123@oksbi`.
 
 Audio is streamed from YouTube Music. The app does not host, download or redistribute audio. It is not affiliated with YouTube or Google.
 

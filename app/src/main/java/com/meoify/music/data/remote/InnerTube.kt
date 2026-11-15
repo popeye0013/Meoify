@@ -87,6 +87,15 @@ class InnerTube(private val client: OkHttpClient) {
         return post("next", buildJsonObject { put("videoId", videoId) })
     }
 
+    /**
+     * The account menu holds the signed-in user's name, email and avatar.
+     * It is only useful when cookies are set; YTMusicParser.parseAccount is
+     * defensive about the many shapes this response takes.
+     */
+    suspend fun accountMenu(): JsonObject {
+        return post("account/account_menu", buildJsonObject { })
+    }
+
     private suspend fun post(endpoint: String, payload: JsonObject): JsonObject = withContext(Dispatchers.IO) {
         val body = buildJsonObject {
             putJsonObject("context") {

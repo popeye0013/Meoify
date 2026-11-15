@@ -21,6 +21,36 @@ import kotlinx.serialization.json.jsonPrimitive
  */
 object YTMusicParser {
 
+    // ---------------------------------------------------------------- account
+
+    /**
+     * Pulls the signed-in account out of an account/account_menu response.
+     * YouTube has shipped at least two layouts for this page, so we look for
+     * both the per-item renderer (new) and the header renderer (old).
+     */
+    fun parseAccount(root: JsonObject): com.meoify.music.data.model.AccountInfo? {
+        val candidates = buildList {
+            addAll(root.findAll("accountItem").mapNotNull { it.asObjectOrNull() })
+            addAll(root.findAll("activeAccountHeaderRenderer").mapNotNull { it.asObjectOrNull() })
+        }
+        val holder = candidates.firstOrNull { it["accountName"]?.readText() != null }
+            ?: return null
+
+        val email = holder["email"]?.readText()
+        val name = holder["accountName"]?.readText()
+        val handle = holder["channelHandle"]?.readText()
+        val avatar = holder["accountPhoto"]?.asObjectOrNull()?.findThumbnail()
+            ?: holder["avatar"]?.asObjectOrNull()?.findThumbnail()
+
+        if (name.isNullOrBlank() && email.isNullOrBlank() && avatar.isNullOrBlank()) return null
+        return com.meoify.music.data.model.AccountInfo(
+            name = name,
+            email = email,
+            handle = handle,
+            avatarUrl = avatar,
+        )
+    }
+
     // ------------------------------------------------------------------ home
 
     fun parseHome(root: JsonObject): Pair<List<Track>, List<MediaCard>> {

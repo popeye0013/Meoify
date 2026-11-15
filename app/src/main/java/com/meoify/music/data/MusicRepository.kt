@@ -37,14 +37,24 @@ class MusicRepository(private val settings: com.meoify.music.data.local.Settings
     private val innerTube = InnerTube(http)
     private val lyricsApi = com.meoify.music.data.remote.LyricsApi(http)
     private val settingsScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    @Volatile
+    private var cookiesPresent = false
+
     init {
         settings?.let { store ->
             settingsScope.launch {
                 store.settings.collectLatest { s ->
-                    innerTube.setCookies(s.ytCookies)
+                    applyCookies(s.ytCookies)
                 }
             }
         }
+    }
+
+    /** Lets the login flow hand fresh cookies over without waiting for DataStore. */
+    fun applyCookies(raw: String?) {
+        cookiesPresent = !raw.isNullOrBlank()
+        innerTube.setCookies(raw)
     }
     private val homeMutex = Mutex()
 
@@ -151,6 +161,17 @@ class MusicRepository(private val settings: com.meoify.music.data.local.Settings
         val results = search("${track.artist} ${track.title}", SearchFilter.SONGS)
         results.tracks.filterNot { it.id == track.id }.take(20)
     }.getOrDefault(emptyList())
+
+    /**
+     * Reads the signed-in account from YouTube Music. Returns null when we
+     * are not signed in or the response did not carry an account section.
+     */
+    suspend fun account(): com.meoify.music.data.model.AccountInfo? {
+        if (!cookiesPresent) return null
+        return runCatching {
+            com.meoify.music.data.remote.YTMusicParser.parseAccount(innerTube.accountMenu())
+        }.getOrNull()
+    }
 
     private val lyricsCache = mutableMapOf<String, String>()
 
