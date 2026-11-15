@@ -5,6 +5,8 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
@@ -24,14 +26,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.QueueMusic
 import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.outlined.Home
-import androidx.compose.material.icons.outlined.LibraryMusic
-import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -64,7 +64,6 @@ import com.meoify.music.ui.screens.library.LibraryScreen
 import com.meoify.music.ui.screens.login.YouTubeLoginScreen
 import com.meoify.music.ui.screens.onboarding.WelcomeScreen
 import com.meoify.music.ui.screens.player.PlayerScreen
-import com.meoify.music.ui.screens.profile.ProfileScreen
 import com.meoify.music.ui.screens.search.SearchScreen
 import com.meoify.music.ui.screens.settings.SettingsScreen
 
@@ -93,16 +92,9 @@ fun MeoifyScaffold(
 ) {
     val actions = LocalAppActions.current
     var loginOpen by remember { mutableStateOf(false) }
-    // Set when the profile is opened from Settings, so Back returns there.
-    var profileFromSettings by remember { mutableStateOf(false) }
 
     fun closeDetail() {
-        val top = detailStack.lastOrNull() ?: return
-        detailStack.removeAt(detailStack.lastIndex)
-        if (top == Destination.Profile && profileFromSettings) {
-            profileFromSettings = false
-            onSettingsOpenChange(true)
-        }
+        if (detailStack.isNotEmpty()) detailStack.removeAt(detailStack.lastIndex)
     }
     val app = androidx.compose.ui.platform.LocalContext.current.applicationContext as com.meoify.music.MeoifyApplication
     val settings by app.container.settings.settings.collectAsStateWithLifecycle()
@@ -192,17 +184,6 @@ fun MeoifyScaffold(
                     settingsOpen -> SettingsScreen(
                         onBack = { onSettingsOpenChange(false) },
                         onOpenLogin = { loginOpen = true },
-                        onOpenProfile = {
-                            onSettingsOpenChange(false)
-                            profileFromSettings = true
-                            detailStack.add(Destination.Profile)
-                        },
-                    )
-
-                    detailStack.lastOrNull() == Destination.Profile -> ProfileScreen(
-                        onBack = { closeDetail() },
-                        onOpenLogin = { loginOpen = true },
-                        onOpenSettings = { onSettingsOpenChange(true) },
                     )
 
                     detailStack.isNotEmpty() -> DetailScreen(
@@ -277,67 +258,84 @@ private fun MeoifyNavigationBar(
     hasDetail: Boolean,
     onSelect: (Tab) -> Unit,
 ) {
-    Surface(
-        color = MaterialTheme.colorScheme.surfaceContainer,
-        shape = RoundedCornerShape(30.dp),
-        tonalElevation = 6.dp,
-        shadowElevation = 8.dp,
+    Box(
         modifier = Modifier
             .fillMaxWidth()
             .navigationBarsPadding()
-            .padding(horizontal = 16.dp)
-            .padding(top = 2.dp, bottom = 8.dp),
+            .padding(horizontal = 28.dp)
+            .padding(top = 6.dp, bottom = 12.dp),
+        contentAlignment = Alignment.Center,
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(6.dp),
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
+        Surface(
+            color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.97f),
+            shape = RoundedCornerShape(34.dp),
+            tonalElevation = 8.dp,
+            shadowElevation = 14.dp,
+            modifier = Modifier.fillMaxWidth(),
         ) {
-            Tab.entries.forEach { item ->
-                val selected = tab == item && !hasDetail
-                val container by animateColorAsState(
-                    targetValue = if (selected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
-                    animationSpec = tween(220),
-                    label = "navContainer",
-                )
-                val contentColor = if (selected) {
-                    MaterialTheme.colorScheme.onPrimaryContainer
-                } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                }
-                Column(
-                    modifier = Modifier
-                        .weight(1f)
-                        .clip(RoundedCornerShape(24.dp))
-                        .background(container)
-                        .clickable { onSelect(item) }
-                        .padding(vertical = 9.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(3.dp),
-                ) {
-                    Icon(
-                        imageVector = when (item) {
-                            Tab.Home -> if (selected) Icons.Filled.Home else Icons.Outlined.Home
-                            Tab.Search -> if (selected) Icons.Filled.Search else Icons.Outlined.Search
-                            Tab.Library -> if (selected) Icons.Filled.LibraryMusic else Icons.Outlined.LibraryMusic
-                        },
-                        contentDescription = item.name,
-                        tint = contentColor,
-                        modifier = Modifier.size(23.dp),
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 10.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Tab.entries.forEach { item ->
+                    val selected = tab == item && !hasDetail
+                    val container by animateColorAsState(
+                        targetValue = if (selected) MaterialTheme.colorScheme.primary else Color.Transparent,
+                        animationSpec = tween(240),
+                        label = "navContainer",
                     )
-                    Text(
-                        text = when (item) {
-                            Tab.Home -> "Home"
-                            Tab.Search -> "Search"
-                            Tab.Library -> "Library"
-                        },
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-                        color = contentColor,
-                    )
+                    val contentColor = if (selected) {
+                        MaterialTheme.colorScheme.onPrimary
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    }
+                    Row(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(28.dp))
+                            .background(container)
+                            .clickable { onSelect(item) }
+                            .padding(horizontal = 18.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center,
+                    ) {
+                        Icon(
+                            imageVector = when (item) {
+                                Tab.Home -> Icons.Filled.Home
+                                Tab.Search -> Icons.Filled.Search
+                                Tab.Library -> Icons.AutoMirrored.Filled.QueueMusic
+                            },
+                            contentDescription = navLabel(item),
+                            tint = contentColor,
+                            modifier = Modifier.size(23.dp),
+                        )
+                        AnimatedVisibility(
+                            visible = selected,
+                            enter = fadeIn(tween(160)) + expandHorizontally(tween(200)),
+                            exit = fadeOut(tween(120)) + shrinkHorizontally(tween(160)),
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Spacer(Modifier.width(8.dp))
+                                Text(
+                                    text = navLabel(item),
+                                    style = MaterialTheme.typography.labelLarge,
+                                    fontWeight = FontWeight.Bold,
+                                    color = contentColor,
+                                    maxLines = 1,
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }
     }
+}
+
+private fun navLabel(tab: Tab): String = when (tab) {
+    Tab.Home -> "Feed"
+    Tab.Search -> "Search"
+    Tab.Library -> "Library"
 }

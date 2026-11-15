@@ -1,10 +1,25 @@
 package com.meoify.music.ui.screens.player
 
 import android.app.Activity
+import android.content.Context
 import android.content.Intent
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -31,7 +46,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.QueueMusic
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.FormatQuote
+import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.MoreVert
@@ -51,8 +68,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.Slider
-import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -66,9 +81,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -91,6 +114,8 @@ import com.meoify.music.ui.theme.ArtworkColorCache
 import com.meoify.music.util.formatDuration
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlin.math.PI
+import kotlin.math.sin
 
 @Composable
 fun PlayerScreen(onClose: () -> Unit) {
@@ -107,6 +132,9 @@ fun PlayerScreen(onClose: () -> Unit) {
 
     var showLyrics by remember { mutableStateOf(false) }
     var showQueue by remember { mutableStateOf(false) }
+    var fullArtwork by remember { mutableStateOf(false) }
+    val onCellular = remember(track?.id, settings.canvasOverCellular) { isCellular(context) }
+    val canvasAnimated = settings.animatedCanvas && (!onCellular || settings.canvasOverCellular)
     var menuOpen by remember { mutableStateOf(false) }
     var lyrics by remember { mutableStateOf<TrackLyrics?>(null) }
     var lyricsLoading by remember { mutableStateOf(false) }
@@ -193,6 +221,7 @@ fun PlayerScreen(onClose: () -> Unit) {
                 onShare = ::shareTrack,
                 onShowQueue = { showQueue = true },
                 onShowLyrics = { showLyrics = true },
+                onFullScreen = { fullArtwork = true },
             )
 
             Crossfade(targetState = showLyrics, label = "playerMode") { inLyrics ->
@@ -202,6 +231,9 @@ fun PlayerScreen(onClose: () -> Unit) {
                         loading = lyricsLoading,
                         positionMs = state.positionMs,
                         isPlaying = state.isPlaying,
+                        artworkUrl = track?.thumbnailUrl,
+                        accent = accent,
+                        animate = canvasAnimated && state.isPlaying,
                         onBack = { showLyrics = false },
                         onSeek = actions.seekTo,
                     )
@@ -211,8 +243,68 @@ fun PlayerScreen(onClose: () -> Unit) {
                         track = track,
                         quality = settings.quality,
                         actions = actions,
+                        accent = accent,
+                        canvasAnimated = canvasAnimated,
+                        onOpenArtwork = { fullArtwork = true },
                         onShowLyrics = { showLyrics = true },
                         onShowQueue = { showQueue = true },
+                    )
+                }
+            }
+        }
+
+        AnimatedVisibility(
+            visible = fullArtwork && track != null,
+            enter = fadeIn(tween(220)),
+            exit = fadeOut(tween(180)),
+        ) {
+            Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
+                MotionCanvas(
+                    url = track?.thumbnailUrl,
+                    accent = accent,
+                    animate = canvasAnimated && state.isPlaying,
+                    modifier = Modifier.fillMaxSize(),
+                    cornerRadius = 0.dp,
+                    showPlaceholder = false,
+                    onClick = { fullArtwork = false },
+                )
+                Surface(
+                    onClick = { fullArtwork = false },
+                    shape = CircleShape,
+                    color = Color.Black.copy(alpha = 0.45f),
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .statusBarsPadding()
+                        .padding(14.dp),
+                ) {
+                    Icon(
+                        Icons.Filled.Close,
+                        contentDescription = "Exit full screen artwork",
+                        tint = Color.White,
+                        modifier = Modifier.padding(10.dp).size(20.dp),
+                    )
+                }
+                Column(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .navigationBarsPadding()
+                        .padding(horizontal = 24.dp, vertical = 22.dp),
+                ) {
+                    Text(
+                        text = track?.title.orEmpty(),
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = Color.White,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        text = track?.artist.orEmpty(),
+                        style = MaterialTheme.typography.titleMedium,
+                        color = Color.White.copy(alpha = 0.72f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
             }
@@ -244,6 +336,7 @@ private fun NowPlayingHeader(
     onShare: () -> Unit,
     onShowQueue: () -> Unit,
     onShowLyrics: () -> Unit,
+    onFullScreen: () -> Unit,
 ) {
     Row(
         modifier = Modifier
@@ -311,6 +404,14 @@ private fun NowPlayingHeader(
                         onShowLyrics()
                     },
                 )
+                DropdownMenuItem(
+                    text = { Text("Full screen artwork") },
+                    leadingIcon = { Icon(Icons.Filled.Fullscreen, contentDescription = null) },
+                    onClick = {
+                        onMenuOpenChange(false)
+                        onFullScreen()
+                    },
+                )
             }
         }
     }
@@ -322,6 +423,9 @@ private fun PlayerMainContent(
     track: Track?,
     quality: AudioQuality,
     actions: AppActions,
+    accent: Color,
+    canvasAnimated: Boolean,
+    onOpenArtwork: () -> Unit,
     onShowLyrics: () -> Unit,
     onShowQueue: () -> Unit,
 ) {
@@ -331,45 +435,18 @@ private fun PlayerMainContent(
             .padding(horizontal = 18.dp)
             .padding(bottom = 10.dp),
     ) {
-        // Big artwork — takes whatever vertical space is left over.
-        Box(
+        // Animated album canvas — takes whatever vertical space is left over.
+        MotionCanvas(
+            url = track?.thumbnailUrl,
+            accent = accent,
+            animate = canvasAnimated && state.isPlaying,
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f)
-                .padding(top = 6.dp, bottom = 12.dp)
-                .clip(RoundedCornerShape(12.dp))
-                .background(Color.White.copy(alpha = 0.07f)),
-        ) {
-            if (track?.thumbnailUrl != null) {
-                AsyncImage(
-                    model = track.thumbnailUrl,
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize(),
-                )
-            } else {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(
-                            Brush.linearGradient(
-                                listOf(
-                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.45f),
-                                    Color.Black,
-                                ),
-                            ),
-                        ),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        Icons.Filled.GraphicEq,
-                        contentDescription = null,
-                        tint = Color.White.copy(alpha = 0.7f),
-                        modifier = Modifier.size(72.dp),
-                    )
-                }
-            }
-        }
+                .padding(top = 6.dp, bottom = 12.dp),
+            cornerRadius = 14.dp,
+            onClick = onOpenArtwork,
+        )
 
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(modifier = Modifier.weight(1f)) {
@@ -408,31 +485,27 @@ private fun PlayerMainContent(
 
         Spacer(Modifier.height(8.dp))
 
-        var dragging by remember { mutableStateOf(false) }
-        var dragValue by remember { mutableStateOf(0f) }
-        val sliderValue = if (dragging) dragValue else state.progress
-        Slider(
-            value = sliderValue,
-            onValueChange = {
-                dragging = true
-                dragValue = it
+        var seeking by remember { mutableStateOf(false) }
+        var seekValue by remember { mutableStateOf(0f) }
+        WavySeekBar(
+            progress = state.progress,
+            activeColor = Color.White,
+            inactiveColor = Color.White.copy(alpha = 0.26f),
+            onProgressChange = { value ->
+                seeking = true
+                seekValue = value
             },
-            onValueChangeFinished = {
-                dragging = false
-                actions.seekTo((dragValue * state.durationMs).toLong())
+            onSeek = { value ->
+                seeking = false
+                actions.seekTo((value * state.durationMs).toLong())
             },
             modifier = Modifier.fillMaxWidth(),
-            colors = SliderDefaults.colors(
-                thumbColor = Color.White,
-                activeTrackColor = Color.White,
-                inactiveTrackColor = Color.White.copy(alpha = 0.28f),
-            ),
         )
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
-            val shownPosition = if (dragging) (dragValue * state.durationMs).toLong() else state.positionMs
+            val shownPosition = if (seeking) (seekValue * state.durationMs).toLong() else state.positionMs
             val shownRemaining = (state.durationMs - shownPosition).coerceAtLeast(0L)
             Text(
                 text = if (state.durationMs > 0) formatDuration(shownPosition) else "--:--",
@@ -603,6 +676,255 @@ private fun PlayerMainContent(
 }
 
 @Composable
+private fun MotionCanvas(
+    url: String?,
+    accent: Color,
+    animate: Boolean,
+    modifier: Modifier = Modifier,
+    cornerRadius: androidx.compose.ui.unit.Dp = 14.dp,
+    showPlaceholder: Boolean = true,
+    onClick: (() -> Unit)? = null,
+) {
+    val transition = rememberInfiniteTransition(label = "albumCanvas")
+    val zoom by transition.animateFloat(
+        initialValue = 1f,
+        targetValue = 1.14f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(18_000, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "canvasZoom",
+    )
+    val drift by transition.animateFloat(
+        initialValue = -1f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(26_000, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "canvasDrift",
+    )
+    val scale = if (animate) zoom else 1f
+    val shift = if (animate) drift else 0f
+
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(cornerRadius))
+            .background(Color.White.copy(alpha = 0.07f))
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
+    ) {
+        if (!url.isNullOrBlank()) {
+            AsyncImage(
+                model = url,
+                contentDescription = "Album artwork",
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer {
+                        scaleX = scale
+                        scaleY = scale
+                        translationX = shift * 16f
+                        translationY = shift * -12f
+                    },
+            )
+        } else if (showPlaceholder) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.linearGradient(
+                            listOf(
+                                MaterialTheme.colorScheme.primary.copy(alpha = 0.45f),
+                                Color.Black,
+                            ),
+                        ),
+                    ),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    Icons.Filled.GraphicEq,
+                    contentDescription = null,
+                    tint = Color.White.copy(alpha = 0.7f),
+                    modifier = Modifier.size(72.dp),
+                )
+            }
+        }
+
+        if (animate) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.linearGradient(
+                            colors = listOf(
+                                Color.Transparent,
+                                Color.White.copy(alpha = 0.10f),
+                                Color.Transparent,
+                            ),
+                            start = Offset(shift * 220f, 0f),
+                            end = Offset(shift * 220f + 420f, 620f),
+                        ),
+                    ),
+            )
+        }
+
+        // Gradient blur that blends the canvas bottom into the ambient background.
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        colorStops = arrayOf(
+                            0f to Color.Transparent,
+                            0.62f to Color.Transparent,
+                            0.86f to accent.copy(alpha = 0.42f),
+                            1f to Color.Black.copy(alpha = 0.72f),
+                        ),
+                    ),
+                ),
+        )
+    }
+}
+
+@Composable
+private fun WavySeekBar(
+    progress: Float,
+    activeColor: Color,
+    inactiveColor: Color,
+    onSeek: (Float) -> Unit,
+    modifier: Modifier = Modifier,
+    onProgressChange: (Float) -> Unit = {},
+) {
+    var dragging by remember { mutableStateOf(false) }
+    var dragProgress by remember { mutableStateOf(0f) }
+    val shown = if (dragging) dragProgress else progress.coerceIn(0f, 1f)
+
+    val transition = rememberInfiniteTransition(label = "waveSeek")
+    val phase by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = (2 * PI).toFloat(),
+        animationSpec = infiniteRepeatable(
+            animation = tween(5_000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart,
+        ),
+        label = "wavePhase",
+    )
+
+    Canvas(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 6.dp)
+            .height(44.dp)
+            .pointerInput(Unit) {
+                detectTapGestures { offset ->
+                    onSeek((offset.x / size.width).coerceIn(0f, 1f))
+                }
+            }
+            .pointerInput(Unit) {
+                detectHorizontalDragGestures(
+                    onDragStart = { offset ->
+                        dragging = true
+                        dragProgress = (offset.x / size.width).coerceIn(0f, 1f)
+                        onProgressChange(dragProgress)
+                    },
+                    onHorizontalDrag = { change, _ ->
+                        dragProgress = (change.position.x / size.width).coerceIn(0f, 1f)
+                        onProgressChange(dragProgress)
+                    },
+                    onDragEnd = {
+                        dragging = false
+                        onSeek(dragProgress)
+                    },
+                    onDragCancel = {
+                        dragging = false
+                        onSeek(dragProgress)
+                    },
+                )
+            },
+    ) {
+        val centerY = size.height / 2f
+        val progressX = size.width * shown
+        val track = 6.dp.toPx()
+
+        drawLine(
+            color = inactiveColor,
+            start = Offset(0f, centerY),
+            end = Offset(size.width, centerY),
+            strokeWidth = track,
+            cap = StrokeCap.Round,
+        )
+
+        if (progressX > 0f) {
+            clipRect(right = progressX) {
+                val amplitude = 5.dp.toPx()
+                val body = Path().apply {
+                    moveTo(0f, centerY)
+                    var x = 0f
+                    while (x <= size.width + 2f) {
+                        val y = centerY + sin((x / size.width) * 6f * PI.toFloat() + phase) * amplitude
+                        lineTo(x, y)
+                        x += 3f
+                    }
+                    lineTo(size.width, size.height)
+                    lineTo(0f, size.height)
+                    close()
+                }
+                drawPath(body, color = activeColor.copy(alpha = 0.20f))
+                drawWave(centerY, amplitude, phase, activeColor.copy(alpha = 0.95f), 2.4f.dp.toPx(), 0f)
+                drawWave(
+                    centerY,
+                    amplitude * 0.62f,
+                    phase + 1.5f,
+                    activeColor.copy(alpha = 0.48f),
+                    1.4f.dp.toPx(),
+                    1.4f.dp.toPx(),
+                )
+            }
+        }
+
+        drawCircle(
+            color = activeColor.copy(alpha = 0.28f),
+            radius = 13.dp.toPx(),
+            center = Offset(progressX, centerY),
+        )
+        drawCircle(
+            color = Color.White,
+            radius = 7.dp.toPx(),
+            center = Offset(progressX, centerY),
+        )
+    }
+}
+
+private fun DrawScope.drawWave(
+    centerY: Float,
+    amplitude: Float,
+    phase: Float,
+    color: Color,
+    strokeWidth: Float,
+    offsetY: Float,
+) {
+    val path = Path()
+    var x = 0f
+    while (x <= size.width + 3f) {
+        val y = centerY + offsetY + sin((x / size.width) * 6f * PI.toFloat() + phase) * amplitude
+        if (x == 0f) path.moveTo(x, y) else path.lineTo(x, y)
+        x += 3f
+    }
+    drawPath(path, color = color, style = Stroke(width = strokeWidth, cap = StrokeCap.Round))
+}
+
+/** True when the active connection is mobile data (and not Wi-Fi, ethernet or VPN). */
+private fun isCellular(context: Context): Boolean {
+    val manager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager ?: return false
+    val capabilities = manager.getNetworkCapabilities(manager.activeNetwork) ?: return false
+    val cellular = capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)
+    val other = capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ||
+        capabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) ||
+        capabilities.hasTransport(NetworkCapabilities.TRANSPORT_VPN)
+    return cellular && !other
+}
+
+@Composable
 private fun CircleAction(
     icon: ImageVector,
     contentDescription: String,
@@ -663,6 +985,9 @@ private fun LyricsView(
     loading: Boolean,
     positionMs: Long,
     isPlaying: Boolean,
+    artworkUrl: String?,
+    accent: Color,
+    animate: Boolean,
     onBack: () -> Unit,
     onSeek: (Long) -> Unit,
 ) {
@@ -675,7 +1000,51 @@ private fun LyricsView(
         }
     }
 
-    Column(modifier = Modifier.fillMaxSize().padding(horizontal = 18.dp)) {
+    val motion = rememberInfiniteTransition(label = "lyricsCanvas")
+    val angle by motion.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(120_000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart,
+        ),
+        label = "lyricsAngle",
+    )
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        if (!artworkUrl.isNullOrBlank()) {
+            AsyncImage(
+                model = artworkUrl,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer {
+                        rotationZ = if (animate) angle else 0f
+                        scaleX = 2.3f
+                        scaleY = 2.3f
+                        alpha = 0.32f
+                    }
+                    .then(
+                        if (android.os.Build.VERSION.SDK_INT >= 31) Modifier.blur(50.dp) else Modifier,
+                    ),
+            )
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(
+                                accent.copy(alpha = 0.22f),
+                                Color.Black.copy(alpha = 0.72f),
+                                Color.Black.copy(alpha = 0.9f),
+                            ),
+                        ),
+                    ),
+            )
+        }
+
+        Column(modifier = Modifier.fillMaxSize().padding(horizontal = 18.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
@@ -752,6 +1121,7 @@ private fun LyricsView(
                     }
                 }
             }
+        }
         }
     }
 }

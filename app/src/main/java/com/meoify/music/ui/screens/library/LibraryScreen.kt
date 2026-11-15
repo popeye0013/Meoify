@@ -1,5 +1,6 @@
 package com.meoify.music.ui.screens.library
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -17,15 +18,18 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PlaylistAdd
+import androidx.compose.material.icons.filled.ViewList
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -42,6 +46,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -71,6 +76,7 @@ import com.meoify.music.ui.theme.ArtworkColorCache
 import com.meoify.music.ui.viewmodel.YtLibraryViewModel
 import com.meoify.music.ui.viewmodel.YtLibraryViewModelFactory
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun LibraryScreen(
     onShowCreatePlaylist: (Boolean) -> Unit,
@@ -91,13 +97,23 @@ fun LibraryScreen(
         if (settings.ytCookies != null) ytViewModel.load(force = true) else ytViewModel.clear()
     }
 
-    var filter by remember { mutableStateOf(LibraryFilter.Playlists) }
+    var filterName by rememberSaveable { mutableStateOf(LibraryFilter.Playlists.name) }
+    val filter = LibraryFilter.valueOf(filterName)
+    var gridView by rememberSaveable { mutableStateOf(false) }
     var menuPlaylist by remember { mutableStateOf<LocalPlaylist?>(null) }
     var renamePlaylist by remember { mutableStateOf<LocalPlaylist?>(null) }
     var deletePlaylist by remember { mutableStateOf<LocalPlaylist?>(null) }
     var renameValue by remember { mutableStateOf("") }
 
-    LazyColumn(modifier = Modifier.fillMaxSize()) {
+    val listState = rememberLazyListState()
+
+    LaunchedEffect(filterName) {
+        if (listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 0) {
+            listState.scrollToItem(0)
+        }
+    }
+
+    LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
         item {
             Row(
                 modifier = Modifier
@@ -112,6 +128,15 @@ fun LibraryScreen(
                     color = MaterialTheme.colorScheme.onBackground,
                     modifier = Modifier.weight(1f),
                 )
+                if (filter == LibraryFilter.Playlists) {
+                    IconButton(onClick = { gridView = !gridView }) {
+                        Icon(
+                            imageVector = if (gridView) Icons.Filled.ViewList else Icons.Filled.GridView,
+                            contentDescription = if (gridView) "Show as list" else "Show as grid",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
                 IconButton(onClick = { onShowCreatePlaylist(true) }) {
                     Icon(
                         Icons.Filled.Add,
@@ -122,28 +147,34 @@ fun LibraryScreen(
             }
         }
 
-        item {
-            LazyRow(
-                contentPadding = PaddingValues(horizontal = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+        stickyHeader {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.background),
             ) {
-                items(LibraryFilter.entries) { f ->
-                    FilterChip(
-                        selected = filter == f,
-                        onClick = { filter = f },
-                        label = {
-                            Text(
-                                when (f) {
-                                    LibraryFilter.Playlists -> "Playlists"
-                                    LibraryFilter.Songs -> "Songs"
-                                    LibraryFilter.Albums -> "Albums"
-                                },
-                            )
-                        },
-                    )
+                LazyRow(
+                    contentPadding = PaddingValues(horizontal = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    items(LibraryFilter.entries, key = { it.name }) { f ->
+                        FilterChip(
+                            selected = filter == f,
+                            onClick = { filterName = f.name },
+                            label = {
+                                Text(
+                                    when (f) {
+                                        LibraryFilter.Playlists -> "Playlists"
+                                        LibraryFilter.Songs -> "Songs"
+                                        LibraryFilter.Albums -> "Albums"
+                                    },
+                                )
+                            },
+                        )
+                    }
                 }
+                Spacer(Modifier.height(8.dp))
             }
-            Spacer(Modifier.height(8.dp))
         }
 
         when (filter) {
@@ -155,8 +186,8 @@ fun LibraryScreen(
                             actionLabel = if (ytLoading) "Loading…" else null,
                         )
                     }
-                    item {
-                        if (ytPlaylists.isEmpty() && ytLoading) {
+                    when {
+                        ytPlaylists.isEmpty() && ytLoading -> item {
                             LazyRow(
                                 contentPadding = PaddingValues(horizontal = 16.dp),
                                 horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -179,14 +210,25 @@ fun LibraryScreen(
                                     }
                                 }
                             }
-                        } else if (ytPlaylists.isEmpty()) {
+                        }
+
+                        ytPlaylists.isEmpty() -> item {
                             Text(
                                 text = "No saved playlists found on this account yet.",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
                             )
-                        } else {
+                        }
+
+                        gridView -> items(
+                            items = ytPlaylists.chunked(2).toList(),
+                            key = { row -> "yt_" + row.joinToString("|") { it.id } },
+                        ) { row ->
+                            PlaylistGridRow(row = row, onOpen = { actions.openPlaylist(it.id) })
+                        }
+
+                        else -> item {
                             LazyRow(
                                 contentPadding = PaddingValues(horizontal = 16.dp),
                                 horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -202,19 +244,14 @@ fun LibraryScreen(
                         }
                     }
                 }
+
                 item {
                     LikedSongsRow(
                         count = library.liked.size,
                         onClick = actions.openLiked,
                     )
                 }
-                items(library.playlists, key = { it.id }) { playlist ->
-                    PlaylistRow(
-                        playlist = playlist,
-                        onClick = { actions.openLocalPlaylist(playlist.id) },
-                        onMenu = { menuPlaylist = playlist },
-                    )
-                }
+
                 if (library.playlists.isEmpty()) {
                     item {
                         EmptyLibrary(
@@ -222,6 +259,36 @@ fun LibraryScreen(
                             message = "Collect the songs you love and keep them in one place.",
                             action = "New playlist",
                             onAction = { onShowCreatePlaylist(true) },
+                        )
+                    }
+                } else if (gridView) {
+                    items(
+                        items = library.playlists.chunked(2).toList(),
+                        key = { row -> "local_" + row.joinToString("|") { it.id } },
+                    ) { row ->
+                        PlaylistGridRow(
+                            row = row.map { playlist ->
+                                MediaCardModel(
+                                    id = playlist.id,
+                                    kind = MediaKind.PLAYLIST,
+                                    title = playlist.name,
+                                    subtitle = when (playlist.tracks.size) {
+                                        0 -> "Playlist"
+                                        1 -> "1 song"
+                                        else -> "${playlist.tracks.size} songs"
+                                    },
+                                    thumbnailUrl = playlist.artworkUrl,
+                                )
+                            },
+                            onOpen = { actions.openLocalPlaylist(it.id) },
+                        )
+                    }
+                } else {
+                    items(library.playlists, key = { it.id }) { playlist ->
+                        PlaylistRow(
+                            playlist = playlist,
+                            onClick = { actions.openLocalPlaylist(playlist.id) },
+                            onMenu = { menuPlaylist = playlist },
                         )
                     }
                 }
@@ -370,6 +437,29 @@ fun LibraryScreen(
 }
 
 enum class LibraryFilter { Playlists, Songs, Albums }
+
+@Composable
+private fun PlaylistGridRow(
+    row: List<MediaCardModel>,
+    onOpen: (MediaCardModel) -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 6.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        row.forEach { card ->
+            MediaCard(
+                card = card,
+                onClick = { onOpen(card) },
+                modifier = Modifier.weight(1f),
+                width = null,
+            )
+        }
+        if (row.size == 1) Spacer(Modifier.weight(1f))
+    }
+}
 
 @Composable
 private fun LikedSongsRow(count: Int, onClick: () -> Unit) {

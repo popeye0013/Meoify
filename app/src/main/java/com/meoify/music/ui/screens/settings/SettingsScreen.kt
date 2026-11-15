@@ -35,7 +35,9 @@ import androidx.compose.material.icons.filled.CurrencyRupee
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Login
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.SignalCellularAlt
 import androidx.compose.material.icons.filled.Verified
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -52,6 +54,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -73,6 +76,8 @@ import com.meoify.music.data.model.DeveloperInfo
 import com.meoify.music.data.model.ThemeMode
 import com.meoify.music.ui.components.ProfileAvatar
 import com.meoify.music.ui.navigation.LocalAppActions
+import com.meoify.music.ui.navigation.LocalLibrary
+import com.meoify.music.ui.theme.ArtworkColorCache
 import com.meoify.music.ui.viewmodel.ProfileViewModel
 import com.meoify.music.ui.viewmodel.ProfileViewModelFactory
 import com.meoify.music.util.copyText
@@ -84,16 +89,21 @@ import com.meoify.music.util.openUrl
 fun SettingsScreen(
     onBack: () -> Unit,
     onOpenLogin: () -> Unit = {},
-    onOpenProfile: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val app = (context.applicationContext as MeoifyApplication)
     val settings by app.container.settings.settings.collectAsStateWithLifecycle()
     val actions = LocalAppActions.current
+    val library = LocalLibrary.current
     val profileViewModel: ProfileViewModel = viewModel(
         factory = ProfileViewModelFactory(app.container.repository),
     )
     val account by profileViewModel.account.collectAsStateWithLifecycle()
+    val profileLoading by profileViewModel.loading.collectAsStateWithLifecycle()
+
+    LaunchedEffect(settings.ytCookies) {
+        if (settings.ytCookies != null) profileViewModel.refresh(force = true)
+    }
 
     Scaffold(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
@@ -122,7 +132,7 @@ fun SettingsScreen(
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             item {
-                ProfileCard(
+                ProfileHeader(
                     name = account?.displayName ?: settings.accountName ?: "Your profile",
                     subtitle = account?.email
                         ?: account?.handle
@@ -130,8 +140,48 @@ fun SettingsScreen(
                     avatarUrl = account?.avatarUrl,
                     initials = account?.initials,
                     signedIn = settings.ytCookies != null,
-                    onClick = onOpenProfile,
+                    loading = profileLoading,
+                    onRefresh = { profileViewModel.refresh(force = true) },
                 )
+            }
+
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    StatCard("Liked", library.liked.size.toString(), Modifier.weight(1f)) {
+                        actions.openLiked()
+                    }
+                    StatCard("Playlists", library.playlists.size.toString(), Modifier.weight(1f)) {
+                        actions.openLibrary()
+                    }
+                    StatCard("Played", library.recent.size.toString(), Modifier.weight(1f)) {
+                        actions.openLibrary()
+                    }
+                }
+            }
+
+            item {
+                SettingsCard {
+                    if (settings.ytCookies != null) {
+                        ActionRow(
+                            icon = Icons.AutoMirrored.Filled.Logout,
+                            title = "Sign out of YouTube Music",
+                            onClick = {
+                                app.container.settings.logoutYouTube()
+                                profileViewModel.clear()
+                                actions.showSnackbar("Signed out of YouTube Music")
+                            },
+                        )
+                    } else {
+                        ActionRow(
+                            icon = Icons.Filled.Login,
+                            title = "Sign in to YouTube Music",
+                            onClick = onOpenLogin,
+                        )
+                    }
+                }
             }
 
             item { SectionLabel("Appearance") }
@@ -235,6 +285,21 @@ fun SettingsScreen(
                         checked = settings.blurPlayerBackground,
                         onCheckedChange = { app.container.settings.setBlur(it) },
                     )
+                    ToggleRow(
+                        icon = Icons.Filled.AutoAwesome,
+                        title = "Animated canvas",
+                        subtitle = "Animate album artwork with a slow motion loop",
+                        checked = settings.animatedCanvas,
+                        onCheckedChange = { app.container.settings.setAnimatedCanvas(it) },
+                    )
+                    ToggleRow(
+                        icon = Icons.Filled.SignalCellularAlt,
+                        title = "Canvas over cellular",
+                        subtitle = "Keep motion artwork running on mobile data",
+                        checked = settings.canvasOverCellular,
+                        enabled = settings.animatedCanvas,
+                        onCheckedChange = { app.container.settings.setCanvasOverCellular(it) },
+                    )
                 }
             }
 
@@ -305,7 +370,7 @@ fun SettingsScreen(
                                 fontWeight = FontWeight.ExtraBold,
                             )
                             Text(
-                                text = "Version 1.2.0",
+                                text = "Version 1.3.0",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -330,70 +395,167 @@ fun SettingsScreen(
 }
 
 @Composable
-private fun ProfileCard(
+private fun ProfileHeader(
     name: String,
     subtitle: String,
     avatarUrl: String?,
     initials: String?,
     signedIn: Boolean,
+    loading: Boolean,
+    onRefresh: () -> Unit,
+) {
+    val pair = ArtworkColorCache.gradientPair(name)
+    Surface(
+        shape = RoundedCornerShape(28.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(
+                    Brush.verticalGradient(
+                        listOf(
+                            pair.first.copy(alpha = 0.32f),
+                            MaterialTheme.colorScheme.surfaceContainerLow,
+                        ),
+                    ),
+                )
+                .padding(horizontal = 20.dp, vertical = 22.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Box(contentAlignment = Alignment.BottomEnd) {
+                ProfileAvatar(
+                    name = name,
+                    url = avatarUrl,
+                    initials = initials ?: name.take(1).uppercase(),
+                    size = 88.dp,
+                    ring = signedIn,
+                )
+                if (loading) {
+                    Surface(
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        modifier = Modifier.size(30.dp),
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            androidx.compose.material3.CircularProgressIndicator(
+                                modifier = Modifier.size(16.dp),
+                                strokeWidth = 2.dp,
+                            )
+                        }
+                    }
+                }
+            }
+            Spacer(Modifier.height(12.dp))
+            Text(
+                text = name,
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.ExtraBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Spacer(Modifier.height(2.dp))
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Spacer(Modifier.height(10.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Surface(
+                    shape = RoundedCornerShape(50),
+                    color = if (signedIn) {
+                        MaterialTheme.colorScheme.primaryContainer
+                    } else {
+                        MaterialTheme.colorScheme.surfaceContainerHigh
+                    },
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(
+                            Icons.Filled.Verified,
+                            contentDescription = null,
+                            tint = if (signedIn) {
+                                MaterialTheme.colorScheme.onPrimaryContainer
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            },
+                            modifier = Modifier.size(15.dp),
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            text = if (signedIn) "YouTube Music" else "Local profile",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = if (signedIn) {
+                                MaterialTheme.colorScheme.onPrimaryContainer
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            },
+                        )
+                    }
+                }
+                Surface(
+                    onClick = onRefresh,
+                    shape = RoundedCornerShape(50),
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(
+                            Icons.Filled.Refresh,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(15.dp),
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            text = "Refresh",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun StatCard(
+    label: String,
+    value: String,
+    modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
     Surface(
         onClick = onClick,
-        shape = RoundedCornerShape(26.dp),
-        color = MaterialTheme.colorScheme.primaryContainer,
-        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        modifier = modifier,
     ) {
-        Row(
-            modifier = Modifier.padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
+        Column(
+            modifier = Modifier.padding(vertical = 14.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            ProfileAvatar(
-                name = name,
-                url = avatarUrl,
-                initials = initials ?: name.take(1).uppercase(),
-                size = 56.dp,
+            Text(
+                text = value,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.ExtraBold,
+                color = MaterialTheme.colorScheme.primary,
             )
-            Spacer(Modifier.width(14.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = name,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    if (signedIn) {
-                        Icon(
-                            Icons.Filled.Verified,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.85f),
-                            modifier = Modifier.size(14.dp),
-                        )
-                        Spacer(Modifier.width(4.dp))
-                    }
-                    Text(
-                        text = subtitle,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    text = "View profile",
-                    style = MaterialTheme.typography.labelSmall,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer,
-                )
-            }
-            Icon(
-                Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }

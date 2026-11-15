@@ -12,7 +12,6 @@ sealed class Destination(val key: String) {
     data class Artist(val id: String) : Destination("artist:$id")
     data object Liked : Destination("liked")
     data class LocalPlaylist(val id: String) : Destination("local:$id")
-    data object Profile : Destination("profile")
 }
 
 data class AppActions(

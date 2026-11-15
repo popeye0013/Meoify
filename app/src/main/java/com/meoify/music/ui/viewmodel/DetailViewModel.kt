@@ -48,12 +48,6 @@ class DetailViewModel(
             title = "Playlist",
             tracks = emptyList(),
         )
-        is Destination.Profile -> DetailPage(
-            id = "profile",
-            kind = com.meoify.music.data.model.MediaKind.PLAYLIST,
-            title = "Profile",
-            tracks = emptyList(),
-        )
     }
 }
 

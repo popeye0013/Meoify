@@ -291,13 +291,13 @@ private fun HomeHeader(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = greetingForHour(hour),
+                    text = "Meoify",
                     style = MaterialTheme.typography.headlineLarge,
                     fontWeight = FontWeight.ExtraBold,
                     color = MaterialTheme.colorScheme.onBackground,
                 )
                 Text(
-                    text = "What do you want to hear today?",
+                    text = "${greetingForHour(hour)} · what do you want to hear today?",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

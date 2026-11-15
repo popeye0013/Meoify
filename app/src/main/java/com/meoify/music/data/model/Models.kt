@@ -124,6 +124,8 @@ data class AppSettings(
     val pureBlack: Boolean = false,
     val quality: AudioQuality = AudioQuality.HIGH,
     val blurPlayerBackground: Boolean = true,
+    val animatedCanvas: Boolean = true,
+    val canvasOverCellular: Boolean = false,
     val ytCookies: String? = null,
     val accountName: String? = null,
     val onboardingCompleted: Boolean = false,

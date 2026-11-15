@@ -31,6 +31,8 @@ class SettingsStore(private val context: Context) {
         val pureBlack = booleanPreferencesKey("pure_black")
         val quality = stringPreferencesKey("quality")
         val blur = booleanPreferencesKey("blur_player")
+        val animatedCanvas = booleanPreferencesKey("animated_canvas")
+        val canvasOverCellular = booleanPreferencesKey("canvas_over_cellular")
         val onboarding = booleanPreferencesKey("onboarding_completed")
         val ytCookies = stringPreferencesKey("yt_cookies")
         val accountName = stringPreferencesKey("yt_account")
@@ -47,6 +49,8 @@ class SettingsStore(private val context: Context) {
                 quality = runCatching { AudioQuality.valueOf(prefs[Keys.quality] ?: "") }
                     .getOrDefault(AudioQuality.HIGH),
                 blurPlayerBackground = prefs[Keys.blur] ?: true,
+                animatedCanvas = prefs[Keys.animatedCanvas] ?: true,
+                canvasOverCellular = prefs[Keys.canvasOverCellular] ?: false,
                 onboardingCompleted = prefs[Keys.onboarding] ?: false,
                 ytCookies = prefs[Keys.ytCookies],
                 accountName = prefs[Keys.accountName],
@@ -72,6 +76,14 @@ class SettingsStore(private val context: Context) {
 
     fun setBlur(enabled: Boolean) = scope.launch {
         context.settingsStore.edit { it[Keys.blur] = enabled }
+    }
+
+    fun setAnimatedCanvas(enabled: Boolean) = scope.launch {
+        context.settingsStore.edit { it[Keys.animatedCanvas] = enabled }
+    }
+
+    fun setCanvasOverCellular(enabled: Boolean) = scope.launch {
+        context.settingsStore.edit { it[Keys.canvasOverCellular] = enabled }
     }
 
     fun setYtCookies(cookies: String?) = scope.launch {

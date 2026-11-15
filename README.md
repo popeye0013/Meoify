@@ -10,19 +10,20 @@ Grab the latest APK from the [Releases page](https://github.com/popeye0013/Meoif
 
 | Version | Package | Min Android |
 |---|---|---|
-| 1.2.0 | `com.meoify.music` | 8.0 (API 26) |
+| 1.3.0 | `com.meoify.music` | 8.0 (API 26) |
 
 ## Features
 
 - **Home feed** — personalised greeting, quick picks, made-for-you mixes, trending songs, new releases, top artists and charts, with pull to refresh.
 - **Search** — songs, albums, artists and playlists, live suggestions, recent searches and genre browsing.
-- **Library** — liked songs, local playlists (create / rename / delete), saved albums and recently played tracks.
+- **Library** — liked songs, local playlists (create / rename / delete) with list or grid layout, saved albums and recently played tracks.
 - **Your YouTube Music playlists** — when signed in, the Library tab lists the playlists saved to your own YouTube Music account and opens them in the player.
-- **Player** — big artwork with a blurred backdrop, centred "Now Playing" header with source and overflow menu, remaining-time seek bar, audio-quality pill, wide play/pause control, bottom shuffle / queue / repeat pills, synced lyrics, queue management and a mini player.
+- **Player** — animated album canvas with gradient blending, tap for full-screen edge-to-edge artwork, fluid multi-layer wavy seek bar, centred "Now Playing" header with source and overflow menu, audio-quality pill, wide play/pause control, bottom shuffle / queue / repeat pills, synced lyrics with a rotating artwork backdrop, queue management and a mini player.
+- **Navigation** — floating pill navigation bar that expands the active tab into a labelled pill.
 - **Synced lyrics** — LRC lyrics from LRCLIB with auto-scroll and tap-to-seek, plus a plain-text fallback.
 - **Playback** — ExoPlayer/Media3 background playback with lockscreen and notification controls.
 - **Accounts** — optional YouTube Music web sign-in for a personalised home feed.
-- **Profile** — your avatar sits in the home header; the profile screen shows your account, name/email, library stats and one-tap access to liked songs, playlists and history.
+- **Profile & settings** — your avatar in the home header opens a single page with your YouTube Music account, name/email, library stats, sign in/out and every setting in one place.
 - **Developer card** — the settings screen credits the developer with a live GitHub avatar and links to Instagram, Telegram and GitHub.
 - **Support** — a donation card with a UPI ID, copy button and a one-tap "Donate with UPI" intent that opens Google Pay, PhonePe, Paytm or any other UPI app.
 - **Material 3** — light/dark/system theme, pure black, dynamic colour on Android 12+, expressive rounded surfaces, Figtree typography.
