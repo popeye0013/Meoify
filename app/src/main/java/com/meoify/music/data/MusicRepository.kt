@@ -5,7 +5,10 @@ import com.meoify.music.data.model.HomeFeed
 import com.meoify.music.data.model.MediaCard
 import com.meoify.music.data.model.SearchResults
 import com.meoify.music.data.model.Track
+import com.meoify.music.data.remote.Artwork
+import com.meoify.music.data.remote.ArtworkCandidate
 import com.meoify.music.data.remote.InnerTube
+import com.meoify.music.data.remote.MusicArtworkMatch
 import com.meoify.music.data.remote.MusicApiException
 import com.meoify.music.data.remote.YTMusicParser
 import com.meoify.music.data.remote.YTMusicParser.SearchFilter
@@ -184,11 +187,95 @@ class MusicRepository(private val settings: com.meoify.music.data.local.Settings
      * Square album artwork for a song from a music catalogue.
      *
      * Spotify is tried first; Apple's public catalogue is the keyless backup
-     * when Spotify search is unavailable or rate limited. Only real album
-     * covers are returned, never a music-video frame.
+     * when Spotify search is unavailable or rate limited. If neither has a
+     * match, YouTube Music itself is searched for the song and only a result
+     * carrying real album art is used. A music-video frame is never returned.
      */
     suspend fun musicArtwork(track: Track): String? =
-        spotifyArtwork.cover(track) ?: appleArtwork.cover(track)
+        spotifyArtwork.cover(track)
+            ?: appleArtwork.cover(track)
+            ?: youTubeArtwork(track)
+
+    /**
+     * Finds album art from a YouTube Music search result.
+     *
+     * Search and library rows can be video uploads whose thumbnail is a video
+     * still. Their title and uploader still name the song and artist, so the
+     * catalogue is searched again and only results with square cover art are
+     * kept. The relaxed match below lets a video title such as
+     * `Kesariya - Arijit Singh Live` use the studio cover, while reaction
+     * videos, podcasts and long compilations are still rejected.
+     */
+    private suspend fun youTubeArtwork(track: Track): String? = runCatching {
+        if (track.durationMs > 20 * 60_000L) return@runCatching null
+        val core = MusicArtworkMatch.coreTitle(track.title)
+            .ifBlank { track.title }
+        if (core.isBlank()) return@runCatching null
+
+        val sameTitle = MusicArtworkMatch.normalize(core) ==
+            MusicArtworkMatch.normalize(track.title)
+        val withArtist = listOf(core, track.artist)
+            .filter { it.isNotBlank() }
+            .joinToString(" ")
+        val queries = buildList {
+            if (!sameTitle) add(core)
+            add(withArtist)
+            if (sameTitle) add(core)
+        }.filter { it.isNotBlank() }
+            .distinctBy { MusicArtworkMatch.normalize(it) }
+
+        val candidates = mutableListOf<ArtworkCandidate>()
+        for (query in queries) {
+            val results = runCatching { search(query, SearchFilter.SONGS) }.getOrNull() ?: continue
+            candidates += results.tracks.mapNotNull { result ->
+                val cover = Artwork.songArt(result.thumbnailUrl)
+                    ?: return@mapNotNull null
+                ArtworkCandidate(
+                    title = result.title,
+                    artist = result.artist,
+                    album = result.album,
+                    durationMs = result.durationMs,
+                    artworkUrl = cover,
+                )
+            }
+            if (candidates.isNotEmpty()) break
+        }
+        if (candidates.isEmpty()) return@runCatching null
+
+        MusicArtworkMatch.best(track, candidates)?.let {
+            return@runCatching it.artworkUrl
+        }
+
+        val titleText = MusicArtworkMatch.words(track.title)
+        val fullText = MusicArtworkMatch.words(
+            track.title + " " + track.artist,
+        )
+        candidates.firstOrNull { candidate ->
+            val candidateTitle = MusicArtworkMatch.normalize(candidate.title)
+            val candidateArtist = MusicArtworkMatch.normalize(candidate.artist)
+            candidateTitle.isNotBlank() &&
+                candidateArtist.isNotBlank() &&
+                titleText.containsPhrase(candidateTitle) &&
+                fullText.containsArtistPhrase(candidateArtist) &&
+                durationsFit(track.durationMs, candidate.durationMs)
+        }?.artworkUrl
+    }.getOrNull()
+
+    private fun String.containsPhrase(phrase: String): Boolean =
+        " $this ".contains(" $phrase ")
+
+    /** True when an artist's name (or a two-word part of it) appears in [text]. */
+    private fun String.containsArtistPhrase(artist: String): Boolean {
+        val tokens = artist.split(' ').filter { it.isNotBlank() }
+        if (tokens.isEmpty()) return false
+        if (tokens.size == 1) return " $this ".contains(" ${tokens[0]} ")
+        return tokens.windowed(2).any { (first, second) ->
+            " $this ".contains(" $first $second ")
+        }
+    }
+
+    private fun durationsFit(first: Long, second: Long): Boolean =
+        first <= 0L || second <= 0L || kotlin.math.abs(first - second) <= 300_000L
 
     /**
      * The playlists saved in the signed-in person's YouTube Music library.

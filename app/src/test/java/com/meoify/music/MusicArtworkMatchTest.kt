@@ -103,4 +103,37 @@ class MusicArtworkMatchTest {
         assertEquals("cafe", MusicArtworkMatch.normalize("Café"))
         assertEquals("song", MusicArtworkMatch.normalize("Song (feat. X) - Remastered 2011"))
     }
+
+    @Test
+    fun videoTitlesBecomeJustTheSongName() {
+        assertEquals(
+            "Kesariya",
+            MusicArtworkMatch.coreTitle(
+                "Kesariya - Arijit Singh Live 😍 | NSCI Dome Mumbai 2022",
+            ),
+        )
+        assertEquals(
+            "Kesariya",
+            MusicArtworkMatch.coreTitle(
+                "Arijit Singh Concert - Kesariya - Manchester COOP LIVE Arena 22nd Sept 2024",
+            ),
+        )
+        assertEquals(
+            "Shape of You",
+            MusicArtworkMatch.coreTitle("Shape of You (Official Music Video)"),
+        )
+        // Real titles that merely contain a word like "Live" are untouched.
+        assertEquals(
+            "Live Forever - Oasis",
+            MusicArtworkMatch.coreTitle("Live Forever - Oasis"),
+        )
+    }
+
+    @Test
+    fun wordsKeepArtistNamesInsideVideoTitles() {
+        assertEquals(
+            "kesariya arijit singh live nsci dome mumbai 2022",
+            MusicArtworkMatch.words("Kesariya - Arijit Singh Live 😍 | NSCI Dome Mumbai 2022"),
+        )
+    }
 }

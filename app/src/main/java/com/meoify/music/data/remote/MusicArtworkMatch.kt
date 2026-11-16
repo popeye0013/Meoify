@@ -36,9 +36,18 @@ object MusicArtworkMatch {
         "karaoke",
         "tribute",
         "cover band",
+        "cover by",
+        "cover version",
         "made famous",
         "originally performed",
         "in the style of",
+    )
+
+    private val VIDEO_DESCRIPTOR = listOf(
+        "official", "lyric", "lyrics", "music video", "video", "audio",
+        "visualizer", "visualiser", "full song", "full video", "jukebox",
+        "live", "performance", "concert", "reaction", "podcast", "interview",
+        "remix", "version", "edit", "slowed", "reverb",
     )
 
     /** The best candidate for [track], or null when nothing matches closely. */
@@ -96,6 +105,47 @@ object MusicArtworkMatch {
             .replace(NON_WORD, " ")
             .trim()
             .replace(SPACES, " ")
+
+    /**
+     * Every word in [value], lower-cased and punctuation-free.
+     *
+     * Unlike [normalize] this keeps version and live descriptors, which makes
+     * it suitable for finding an artist name inside a full video title.
+     */
+    fun words(value: String): String =
+        Normalizer.normalize(value, Normalizer.Form.NFD)
+            .replace(DIACRITICS, "")
+            .lowercase()
+            .replace(NON_WORD, " ")
+            .trim()
+            .replace(SPACES, " ")
+
+    /**
+     * The song name from a YouTube video title, with the video noise removed.
+     *
+     * Search and library rows sometimes carry full video titles such as
+     * `Kesariya - Arijit Singh Live | NSCI Dome`. Catalogue search needs just
+     * `Kesariya`, otherwise no result matches. Only text after a separator is
+     * dropped when it looks like a video descriptor, so real song titles keep
+     * their own words.
+     */
+    fun coreTitle(title: String): String {
+        var value = title.substringBefore('|')
+        value = value.replace(BRACKETED, " ")
+        val parts = value.split(Regex("""\s+[-–—]\s+"""))
+        val noisy = parts.withIndex()
+            .lastOrNull { (index, part) ->
+                index > 0 && VIDEO_DESCRIPTOR.any { part.lowercase().contains(it) }
+            }
+            ?.index ?: -1
+        value = when {
+            // "Kesariya - Arijit Singh Live" and
+            // "Arijit Singh Concert - Kesariya - ... LIVE" both give Kesariya.
+            noisy > 0 -> parts[noisy - 1]
+            else -> value
+        }
+        return value.replace(SPACES, " ").trim().trim('-', '–', '—', '.', ',')
+    }
 
     private fun similarity(a: String, b: String): Float {
         if (a == b) return 1f

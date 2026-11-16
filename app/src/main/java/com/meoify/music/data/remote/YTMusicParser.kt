@@ -440,23 +440,44 @@ object YTMusicParser {
         fun runText(run: JsonObject): String =
             run["text"]?.readText()?.trim().orEmpty()
 
-        val artistRun = subtitleRuns.firstOrNull { run ->
-            run.asObjectOrNull()?.browsePageType() == "MUSIC_PAGE_TYPE_ARTIST"
-        }?.asObjectOrNull()
+        // Search rows put a type label first ("Song", "Video"), then the
+        // artist and album. The label is not an artist, and the actual artist
+        // run lives under navigationEndpoint, not on the run itself.
+        fun runPageType(run: JsonObject): String? =
+            run["navigationEndpoint"]?.asObjectOrNull()?.browsePageType()
+
+        val artistRuns = subtitleRuns.mapNotNull { run ->
+            val obj = run.asObjectOrNull() ?: return@mapNotNull null
+            val type = runPageType(obj)
+            obj.takeIf {
+                type == "MUSIC_PAGE_TYPE_ARTIST" || type == "MUSIC_PAGE_TYPE_USER_CHANNEL"
+            }
+        }
         val albumRun = subtitleRuns.firstOrNull { run ->
-            run.asObjectOrNull()?.browsePageType() == "MUSIC_PAGE_TYPE_ALBUM"
+            val obj = run.asObjectOrNull() ?: return@firstOrNull false
+            runPageType(obj) == "MUSIC_PAGE_TYPE_ALBUM"
         }?.asObjectOrNull()
 
         val subtitleTexts = subtitleRuns.mapNotNull { run ->
             val obj = run.asObjectOrNull() ?: return@mapNotNull null
             runText(obj).takeIf { it.isNotBlank() && it != "•" }
         }
-        val subtitleParts = subtitleTexts.filterNot { DURATION_REGEX.matches(it) }
-        val artist = artistRun?.let(::runText)
-            ?: subtitleParts.firstOrNull()?.takeIf { it.isNotBlank() }
-            ?: ""
-        val album = albumRun?.let(::runText)
-            ?: subtitleParts.getOrNull(1)?.takeIf { it != artist }
+        val subtitleParts = subtitleTexts.filterNot {
+            DURATION_REGEX.matches(it) ||
+                METADATA_REGEX.containsMatchIn(it) ||
+                it.lowercase() in SUBTITLE_LABELS
+        }
+
+        val artistNames = artistRuns.mapNotNull { run ->
+            runText(run).takeIf { it.isNotBlank() }
+        }
+        val artist = artistNames.joinToString(", ").ifBlank {
+            subtitleParts.firstOrNull()?.takeIf { it.isNotBlank() }.orEmpty()
+        }
+        val album = albumRun?.let(::runText)?.takeIf { it.isNotBlank() }
+            ?: subtitleParts.firstOrNull { part ->
+                part != artist && artistNames.none { it == part }
+            }
 
         // Some layouts put the duration in the flex column instead of the
         // fixed one, so check both before giving up on it.
@@ -477,12 +498,13 @@ object YTMusicParser {
 
         val plays = columns.getOrNull(2)?.get("text")?.readText()
             ?.takeIf { it.contains("play", true) || it.contains("view", true) }
+            ?: subtitleTexts.firstOrNull { METADATA_REGEX.containsMatchIn(it) }
 
         return Track(
             id = videoId,
             title = title,
             artist = artist,
-            artistId = artistRun?.findBrowseId(),
+            artistId = artistRuns.firstOrNull()?.findBrowseId(),
             album = album,
             albumId = albumRun?.findBrowseId(),
             durationMs = durationMs,
@@ -542,6 +564,13 @@ object YTMusicParser {
     // ---------------------------------------------------------------- utils
 
     private val DURATION_REGEX = Regex("""^\d{1,2}:\d{2}(:\d{2})?$""")
+    private val METADATA_REGEX = Regex("""\b(plays?|views?|audience|subscribers?)\b""", RegexOption.IGNORE_CASE)
+
+    /** Media-type labels that YouTube Music puts before the artist name. */
+    private val SUBTITLE_LABELS = setOf(
+        "song", "songs", "video", "videos", "single", "ep", "album", "playlist",
+        "artist", "mix", "podcast", "episode", "show", "audiobook", "music video",
+    )
 
     fun parseTimestamp(value: String): Long {
         val parts = value.split(":").mapNotNull { it.toLongOrNull() }

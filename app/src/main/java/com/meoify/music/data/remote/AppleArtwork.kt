@@ -58,10 +58,29 @@ class AppleArtwork(private val client: OkHttpClient) {
     }
 
     private fun search(track: Track): String? {
+        val core = MusicArtworkMatch.coreTitle(track.title)
+        val titles = listOf(track.title, core)
+            .filter { it.isNotBlank() }
+            .distinctBy { MusicArtworkMatch.normalize(it) }
+
+        for (title in titles) {
+            val term = listOf(title, track.artist)
+                .filter { it.isNotBlank() }
+                .joinToString(" ")
+            fetch(term, track)?.let { return it }
+        }
+        // Last chance when the row has no usable artist: search by the song
+        // name alone. The matching rules still reject karaoke and covers.
+        if (core.isNotBlank()) fetch(core, track)?.let { return it }
+        return null
+    }
+
+    private fun fetch(term: String, track: Track): String? {
+        if (term.isBlank()) return null
         val url = "https://itunes.apple.com/search".toHttpUrl().newBuilder()
-            .addQueryParameter("term", listOf(track.title, track.artist).filter { it.isNotBlank() }.joinToString(" "))
+            .addQueryParameter("term", term)
             .addQueryParameter("entity", "song")
-            .addQueryParameter("limit", "10")
+            .addQueryParameter("limit", "15")
             .build()
             .toString()
 
@@ -116,7 +135,7 @@ class AppleArtwork(private val client: OkHttpClient) {
         (this[name] as? JsonPrimitive)?.longOrNull
 
     private companion object {
-        const val USER_AGENT = "Meoify/1.7.3 (Android)"
+        const val USER_AGENT = "Meoify/1.7.4 (Android)"
         const val MISS_TTL_MS = 10 * 60 * 1000L
 
         val ARTWORK_SIZE = Regex("""/\d+x\d+bb\.""")
