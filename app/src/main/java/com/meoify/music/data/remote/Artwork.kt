@@ -13,7 +13,8 @@ object Artwork {
 
     private val GOOGLE_SIZE = Regex("=w\\d+-h\\d+")
     private val GOOGLE_SQUARE = Regex("=s\\d+(-[a-z0-9]+)*$")
-    private val YT_VIDEO_ID = Regex("/vi/([^/]+)/")
+    private val YT_VIDEO_ID = Regex("/vi(?:_webp)?/([^/]+)/")
+    private val BARE_VIDEO_ID = Regex("^[A-Za-z0-9_-]{11}$")
 
     /** True when [url] is a music-video still rather than real cover art. */
     fun isVideoStill(url: String?): Boolean {
@@ -31,6 +32,23 @@ object Artwork {
     fun songArt(url: String?): String? = highRes(url)?.takeUnless { isVideoStill(url) }
 
     /**
+     * The best video frame for [url], used only as a last resort when no album
+     * artwork could be found. Returns null for real covers so callers can keep
+     * the two kinds of artwork separate.
+     */
+    fun still(url: String?): String? = highRes(url)?.takeIf { isVideoStill(it) }
+
+    /**
+     * A video frame for a song that arrived without any thumbnail, so its tile
+     * is not left blank. Only 11-character YouTube ids are accepted.
+     */
+    fun stillForVideo(videoId: String?): String? {
+        val id = videoId?.trim().orEmpty()
+        if (!BARE_VIDEO_ID.matches(id)) return null
+        return "https://i.ytimg.com/vi/$id/hqdefault.jpg"
+    }
+
+    /**
      * URLs for [url], best quality first.
      *
      * Album and artist covers only have one source, but video stills can be
@@ -39,12 +57,19 @@ object Artwork {
      * the image simply falls back when the big one is missing.
      */
     fun candidates(url: String?): List<String> {
-        val high = highRes(url) ?: return emptyList()
-        if (!isVideoStill(high)) return listOf(high)
+        val original = url ?: return emptyList()
+        val high = highRes(original) ?: return emptyList()
+        // Keep the original behind the upscale: an occasional signed or
+        // unusual image URL only serves the exact size it came with.
+        if (!isVideoStill(high)) {
+            return if (high == original) listOf(high) else listOf(high, original)
+        }
         val videoId = YT_VIDEO_ID.find(high)?.groupValues?.getOrNull(1) ?: return listOf(high)
         return listOf(
             "https://i.ytimg.com/vi/$videoId/maxresdefault.jpg",
             "https://i.ytimg.com/vi/$videoId/hqdefault.jpg",
+            // Some networks block i.ytimg.com but not img.youtube.com.
+            "https://img.youtube.com/vi/$videoId/hqdefault.jpg",
         )
     }
 

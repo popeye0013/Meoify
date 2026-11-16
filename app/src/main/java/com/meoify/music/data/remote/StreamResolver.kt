@@ -112,7 +112,13 @@ class StreamResolver(
             AudioQuality.SAVER -> 96_000
         }
         return try {
-            val info = StreamInfo.getInfo(ServiceList.YouTube, "https://music.youtube.com/watch?v=$videoId")
+            // Music pages and regular watch pages can expose different
+            // availability for the same video; try both before giving up.
+            val info = try {
+                StreamInfo.getInfo(ServiceList.YouTube, "https://music.youtube.com/watch?v=$videoId")
+            } catch (e: Exception) {
+                StreamInfo.getInfo(ServiceList.YouTube, "https://www.youtube.com/watch?v=$videoId")
+            }
             val available = info.audioStreams.filter { !it.url.isNullOrBlank() }
             if (available.isEmpty()) {
                 throw StreamUnavailableException("This track can't be streamed right now.")

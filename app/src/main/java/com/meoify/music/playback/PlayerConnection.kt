@@ -92,6 +92,10 @@ class PlayerConnection(
     private var generation = 0
     private var lastVolume: Float = 1f
     private var sleepJob: Job? = null
+    /** Last track whose stream URL was refreshed after a player error. */
+    private var retriedTrackId: String? = null
+    /** Guards against auto-skipping through an entire unavailable queue. */
+    private var consecutiveFailures = 0
 
     private val controllerListener = object : Player.Listener {
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
@@ -114,6 +118,7 @@ class PlayerConnection(
 
         override fun onPlaybackStateChanged(playbackState: Int) {
             if (playbackState == Player.STATE_READY) {
+                consecutiveFailures = 0
                 _state.update { it.copy(isPreparing = false) }
             }
             refresh()
@@ -128,13 +133,80 @@ class PlayerConnection(
         }
 
         override fun onPlayerError(error: PlaybackException) {
+            val failedTrack = _state.value.track
+            val c = controller
             _state.update { it.copy(isPreparing = false, isBuffering = false) }
-            _events.tryEmit(
-                PlaybackEvent.Failure(
-                    error.message?.takeIf { it.isNotBlank() }?.let { "Playback failed: $it" }
-                        ?: "Playback failed. Try another track.",
-                ),
-            )
+
+            if (failedTrack == null || c == null) {
+                _events.tryEmit(
+                    PlaybackEvent.Failure(
+                        error.message?.takeIf { it.isNotBlank() }
+                            ?.let { "Playback failed: $it" }
+                            ?: "Playback failed. Try another track.",
+                    ),
+                )
+                refresh()
+                return
+            }
+
+            // Stream URLs are short lived. Refresh the URL once and resume at
+            // the same position; this recovers from HTTP 403 and expired links.
+            if (retriedTrackId != failedTrack.id) {
+                retriedTrackId = failedTrack.id
+                _events.tryEmit(PlaybackEvent.Message("Reconnecting to “${failedTrack.title}”…"))
+                scope.launch {
+                    val audio = try {
+                        resolver.resolve(failedTrack.id, force = true)
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        null
+                    }
+                    if (audio == null) {
+                        failAndAdvance(failedTrack, c)
+                        return@launch
+                    }
+                    runCatching {
+                        val index = c.currentMediaItemIndex.coerceAtLeast(0)
+                        val position = c.currentPosition.coerceAtLeast(0)
+                        c.replaceMediaItem(index, failedTrack.toMediaItem(audio))
+                        c.seekTo(index, position)
+                        c.prepare()
+                        c.play()
+                    }.onFailure {
+                        failAndAdvance(failedTrack, c)
+                    }
+                }
+            } else {
+                failAndAdvance(failedTrack, c)
+            }
+            refresh()
+        }
+    }
+
+    /**
+     * Reports the failure and moves to the next playable track. Stops after a
+     * few failures so a fully unavailable queue does not spin forever.
+     */
+    private fun failAndAdvance(track: Track, c: MediaController) {
+        consecutiveFailures++
+        val canAdvance = c.hasNextMediaItem() || queueIndex in 0 until queue.lastIndex
+        val skipping = consecutiveFailures <= MAX_CONSECUTIVE_FAILURES && canAdvance
+        _events.tryEmit(
+            PlaybackEvent.Failure(
+                if (skipping) {
+                    "Couldn't play “${track.title}”. Skipping…"
+                } else {
+                    "Couldn't play “${track.title}”."
+                },
+            ),
+        )
+        if (!skipping) return
+        if (c.hasNextMediaItem()) {
+            c.seekToNextMediaItem()
+            c.play()
+        } else {
+            playTracks(queue, queueIndex + 1, sourceTitle)
         }
     }
 
@@ -178,6 +250,7 @@ class PlayerConnection(
         val start = startIndex.coerceIn(0, tracks.lastIndex)
         generation++
         appendJob?.cancel()
+        retriedTrackId = null
 
         queue = tracks.toList()
         queueIndex = start
@@ -205,7 +278,7 @@ class PlayerConnection(
             var attempt = start
             var audio: ResolvedAudio? = null
             var lastError: Exception? = null
-            while (attempt <= minOf(tracks.lastIndex, start + 2) && audio == null) {
+            while (attempt <= minOf(tracks.lastIndex, start + SKIP_WINDOW) && audio == null) {
                 if (generation != myGeneration) return@launch
                 val track = queue.getOrNull(attempt) ?: break
                 try {
@@ -227,9 +300,14 @@ class PlayerConnection(
             }
 
             if (attempt != start) {
+                val skipped = attempt - start
                 queueIndex = attempt
                 _state.update { it.copy(queueIndex = attempt, track = queue.getOrNull(attempt)) }
-                _events.tryEmit(PlaybackEvent.Message("Skipped an unavailable track."))
+                _events.tryEmit(
+                    PlaybackEvent.Message(
+                        "Skipped $skipped unavailable track${if (skipped == 1) "" else "s"}.",
+                    ),
+                )
             }
 
             if (generation != myGeneration) return@launch
@@ -269,6 +347,12 @@ class PlayerConnection(
     fun togglePlayPause() {
         val c = controller ?: return
         if (c.mediaItemCount == 0) return
+        // After a playback error, play() reuses the failed (probably expired)
+        // source. Re-resolve the current track instead.
+        if (c.playerError != null && queue.isNotEmpty()) {
+            playTracks(queue, queueIndex.coerceIn(0, queue.lastIndex), sourceTitle)
+            return
+        }
         if (c.isPlaying) c.pause() else c.play()
         refresh()
     }
@@ -498,7 +582,10 @@ class PlayerConnection(
     }
 
     private suspend fun Track.toMediaItem(audio: ResolvedAudio): MediaItem {
-        val artwork = coverArt?.cached(id) ?: Artwork.songArt(thumbnailUrl)
+        val artwork = coverArt?.cached(id)
+            ?: Artwork.songArt(thumbnailUrl)
+            ?: Artwork.still(thumbnailUrl)
+            ?: Artwork.stillForVideo(id)
         val metadata = MediaMetadata.Builder()
             .setTitle(title)
             .setArtist(artist)
@@ -513,5 +600,13 @@ class PlayerConnection(
             .setUri(audio.url)
             .setMediaMetadata(metadata)
             .build()
+    }
+
+    private companion object {
+        /** How many following tracks are tried when the selected one fails. */
+        const val SKIP_WINDOW = 8
+
+        /** Stop auto-advancing after this many failures in a row. */
+        const val MAX_CONSECUTIVE_FAILURES = 3
     }
 }

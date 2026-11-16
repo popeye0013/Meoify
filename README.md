@@ -81,7 +81,7 @@ Meoify is distributed as a signed APK on GitHub Releases.
 - **Five audio modes** — Auto, Lossless (Hi-Res), Standard (320 kbps), YouTube Music and Data Saver. See [Audio quality](#audio-quality).
 - **Sleep timer** — stop playback after 5, 10, 15, 30, 45 or 60 minutes.
 - **Synced lyrics** — LRC from LRCLIB with auto-scroll and tap-to-seek, plus a plain-text fallback.
-- **Real album artwork** — covers from YouTube Music, Spotify and Apple's catalogue, with a YouTube Music fallback. A video frame is never used as a song cover.
+- **Real album artwork** — covers from YouTube Music, Spotify and Apple's catalogue. Catalogue art is preferred; the video thumbnail is shown only when no album cover can be found, so a row is never left blank.
 
 ### Library & accounts
 

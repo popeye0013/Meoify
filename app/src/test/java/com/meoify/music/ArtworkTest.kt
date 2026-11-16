@@ -59,14 +59,41 @@ class ArtworkTest {
             listOf(
                 "https://i.ytimg.com/vi/abc/maxresdefault.jpg",
                 "https://i.ytimg.com/vi/abc/hqdefault.jpg",
+                "https://img.youtube.com/vi/abc/hqdefault.jpg",
             ),
             Artwork.candidates("https://i.ytimg.com/vi/abc/hqdefault.jpg"),
         )
         assertEquals(
-            listOf("https://lh3.googleusercontent.com/abc=w1200-h1200-l90-rj"),
+            listOf(
+                "https://i.ytimg.com/vi/abc/maxresdefault.jpg",
+                "https://i.ytimg.com/vi/abc/hqdefault.jpg",
+                "https://img.youtube.com/vi/abc/hqdefault.jpg",
+            ),
+            Artwork.candidates("https://i.ytimg.com/vi_webp/abc/hqdefault.webp"),
+        )
+        assertEquals(
+            listOf(
+                "https://lh3.googleusercontent.com/abc=w1200-h1200-l90-rj",
+                "https://lh3.googleusercontent.com/abc=w60-h60-l90-rj",
+            ),
             Artwork.candidates("https://lh3.googleusercontent.com/abc=w60-h60-l90-rj"),
         )
         assertTrue(Artwork.candidates(null).isEmpty())
+    }
+
+    @Test
+    fun videoStillsAreAvailableAsALastResort() {
+        assertEquals(
+            "https://i.ytimg.com/vi/abc/hqdefault.jpg",
+            Artwork.still("https://i.ytimg.com/vi/abc/maxresdefault.jpg"),
+        )
+        assertNull(Artwork.still("https://lh3.googleusercontent.com/abc=w60-h60"))
+        assertEquals(
+            "https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg",
+            Artwork.stillForVideo("dQw4w9WgXcQ"),
+        )
+        assertNull(Artwork.stillForVideo("browse-id"))
+        assertNull(Artwork.stillForVideo(null))
     }
 
     @Test

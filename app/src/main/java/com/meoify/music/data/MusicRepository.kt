@@ -62,8 +62,8 @@ class MusicRepository(private val settings: com.meoify.music.data.local.Settings
         innerTube.setCookies(raw)
     }
     private val homeMutex = Mutex()
-    private val artworkMutex = Mutex()
-    private val albumArtCache = mutableMapOf<String, String>()
+    private val albumArtCache = java.util.concurrent.ConcurrentHashMap<String, String>()
+    private val albumArtLocks = java.util.concurrent.ConcurrentHashMap<String, Mutex>()
 
     @Volatile
     private var cachedHome: Pair<HomeFeed, Long>? = null
@@ -172,15 +172,22 @@ class MusicRepository(private val settings: com.meoify.music.data.local.Settings
     }
 
     /** High-resolution square cover art for an album, or null when unavailable. */
-    suspend fun albumArtwork(albumId: String): String? = artworkMutex.withLock {
-        albumArtCache[albumId]?.let { return@withLock it }
-        val url = runCatching { album(albumId).thumbnailUrl }.getOrNull()
-            ?.let(com.meoify.music.data.remote.Artwork::songArt)
-        if (!url.isNullOrBlank()) {
-            if (albumArtCache.size > 400) albumArtCache.clear()
-            albumArtCache[albumId] = url
+    suspend fun albumArtwork(albumId: String): String? {
+        albumArtCache[albumId]?.let { return it }
+        // Lock per album instead of around the whole cache: resolving covers
+        // for a screen full of tracks then happens in parallel.
+        val mutex = albumArtLocks.getOrPut(albumId) { Mutex() }
+        return mutex.withLock {
+            albumArtCache[albumId]?.let { return@withLock it }
+            val url = runCatching { album(albumId).thumbnailUrl }.getOrNull()
+                ?.let(com.meoify.music.data.remote.Artwork::songArt)
+            if (!url.isNullOrBlank()) {
+                if (albumArtCache.size > 400) albumArtCache.clear()
+                if (albumArtLocks.size > 400) albumArtLocks.clear()
+                albumArtCache[albumId] = url
+            }
+            url
         }
-        url
     }
 
     /**

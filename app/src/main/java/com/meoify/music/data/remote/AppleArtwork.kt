@@ -2,8 +2,8 @@ package com.meoify.music.data.remote
 
 import com.meoify.music.data.model.Track
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -28,7 +28,7 @@ import java.util.concurrent.ConcurrentHashMap
 class AppleArtwork(private val client: OkHttpClient) {
 
     private val json = Json { ignoreUnknownKeys = true; isLenient = true }
-    private val limiter = Mutex()
+    private val limiter = Semaphore(2)
     private val cache = ConcurrentHashMap<String, String>()
     private val misses = ConcurrentHashMap<String, Long>()
 
@@ -43,7 +43,7 @@ class AppleArtwork(private val client: OkHttpClient) {
         }
 
         val artwork = runCatching {
-            limiter.withLock { search(track) }
+            limiter.withPermit { search(track) }
         }.getOrNull()
 
         if (artwork.isNullOrBlank()) {
@@ -135,7 +135,7 @@ class AppleArtwork(private val client: OkHttpClient) {
         (this[name] as? JsonPrimitive)?.longOrNull
 
     private companion object {
-        const val USER_AGENT = "Meoify/1.0.9 (Android)"
+        const val USER_AGENT = "Meoify/1.0.10 (Android)"
         const val MISS_TTL_MS = 10 * 60 * 1000L
 
         val ARTWORK_SIZE = Regex("""/\d+x\d+bb\.""")
