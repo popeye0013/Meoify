@@ -69,8 +69,9 @@ import com.meoify.music.data.remote.YTMusicParser.SearchFilter
 import com.meoify.music.ui.components.ArtistCard
 import com.meoify.music.ui.components.MediaCard
 import com.meoify.music.ui.components.ShimmerBox
-import com.meoify.music.ui.components.TrackRow
+import com.meoify.music.ui.components.TrackCard
 import com.meoify.music.ui.navigation.LocalAppActions
+import com.meoify.music.ui.navigation.LocalPlayerState
 import com.meoify.music.ui.navigation.LocalLibrary
 import com.meoify.music.ui.viewmodel.SearchViewModel
 
@@ -498,6 +499,7 @@ private fun SearchResultsBody(
     onRetry: () -> Unit,
 ) {
     val actions = LocalAppActions.current
+    val currentTrackId = LocalPlayerState.current.track?.id
     Box(modifier = Modifier.fillMaxSize()) {
         when (results) {
             UiState.Loading -> {
@@ -540,8 +542,9 @@ private fun SearchResultsBody(
                     when (filter) {
                         SearchFilter.SONGS -> items(data.tracks, key = { it.id }) { track ->
                             val idx = data.tracks.indexOf(track)
-                            TrackRow(
+                            TrackCard(
                                 track = track,
+                                isCurrent = currentTrackId == track.id,
                                 onClick = { actions.playTracks(data.tracks, idx, "Search") },
                                 onMoreClick = { actions.openTrackMenu(track) },
                             )

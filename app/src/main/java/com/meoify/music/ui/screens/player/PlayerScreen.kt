@@ -69,6 +69,7 @@ import androidx.compose.material.icons.filled.VideoLibrary
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.filled.VolumeOff
 import androidx.compose.material.icons.filled.VolumeUp
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -79,6 +80,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -123,6 +125,7 @@ import com.meoify.music.ui.navigation.LocalPlayerState
 import com.meoify.music.ui.theme.ArtworkColorCache
 import com.meoify.music.util.formatDuration
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import kotlin.math.PI
 import kotlin.math.sin
@@ -144,8 +147,22 @@ fun PlayerScreen(onClose: () -> Unit) {
     var showLyrics by remember { mutableStateOf(false) }
     var showQueue by remember { mutableStateOf(false) }
     var menuOpen by remember { mutableStateOf(false) }
+    var showSleepTimer by remember { mutableStateOf(false) }
     var lyrics by remember { mutableStateOf<TrackLyrics?>(null) }
     var lyricsLoading by remember { mutableStateOf(false) }
+
+    // Keep the remaining sleep time fresh while the timer runs.
+    val sleepEndsAtMs = state.sleepEndsAtMs
+    var nowMs by remember { mutableStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(sleepEndsAtMs) {
+        while (sleepEndsAtMs != null) {
+            nowMs = System.currentTimeMillis()
+            delay(30_000)
+        }
+    }
+    val sleepLeftMinutes = sleepEndsAtMs?.let { end ->
+        (((end - nowMs).coerceAtLeast(0L) + 59_999L) / 60_000L).toInt()
+    }
 
     DisposableEffect(activity) {
         val view = activity?.window?.decorView ?: return@DisposableEffect onDispose { }
@@ -176,6 +193,20 @@ fun PlayerScreen(onClose: () -> Unit) {
     }
 
     BackHandler(enabled = showLyrics) { showLyrics = false }
+
+    if (showSleepTimer) {
+        SleepTimerDialog(
+            sleepLeftMinutes = sleepLeftMinutes,
+            onSelect = { minutes ->
+                actions.sleepTimer(minutes)
+                actions.showSnackbar(
+                    if (minutes > 0) "Sleep timer set for $minutes minutes" else "Sleep timer off",
+                )
+                showSleepTimer = false
+            },
+            onDismiss = { showSleepTimer = false },
+        )
+    }
 
     fun openVideo() {
         val t = track ?: return
@@ -221,6 +252,8 @@ fun PlayerScreen(onClose: () -> Unit) {
                     onShare = ::shareTrack,
                     onShowQueue = { showQueue = true },
                     onOpenVideo = ::openVideo,
+                    sleepLeftMinutes = sleepLeftMinutes,
+                    onSleepTimer = { showSleepTimer = true },
                 )
             }
 
@@ -281,6 +314,8 @@ private fun NowPlayingHeader(
     onShare: () -> Unit,
     onShowQueue: () -> Unit,
     onOpenVideo: () -> Unit,
+    sleepLeftMinutes: Int?,
+    onSleepTimer: () -> Unit,
 ) {
     Row(
         modifier = Modifier
@@ -361,6 +396,19 @@ private fun NowPlayingHeader(
                     onClick = {
                         onMenuOpenChange(false)
                         onOpenVideo()
+                    },
+                )
+                DropdownMenuItem(
+                    text = {
+                        Text(
+                            text = sleepLeftMinutes?.let { "Sleep timer · ${it}m left" }
+                                ?: "Sleep timer",
+                        )
+                    },
+                    leadingIcon = { Icon(Icons.Filled.Timer, contentDescription = null) },
+                    onClick = {
+                        onMenuOpenChange(false)
+                        onSleepTimer()
                     },
                 )
             }
@@ -515,7 +563,6 @@ private fun PlayerControls(
 
         WavySeekBar(
             progress = state.progress,
-            accent = accent,
             durationMs = state.durationMs,
             onSeek = actions.seekTo,
             modifier = Modifier.fillMaxWidth(),
@@ -780,7 +827,6 @@ private fun MotionCanvas(
 @Composable
 private fun WavySeekBar(
     progress: Float,
-    accent: Color,
     durationMs: Long,
     onSeek: (Long) -> Unit,
     modifier: Modifier = Modifier,
@@ -788,6 +834,8 @@ private fun WavySeekBar(
     var dragging by remember { mutableStateOf(false) }
     var dragProgress by remember { mutableStateOf(0f) }
     val shown = (if (dragging) dragProgress else progress).coerceIn(0f, 1f)
+    // Match the play/pause button so the seek bar reads as part of the same control.
+    val progressColor = MaterialTheme.colorScheme.primary
     val wave = rememberInfiniteTransition(label = "seekWave")
     val phase by wave.animateFloat(
         initialValue = 0f,
@@ -852,7 +900,7 @@ private fun WavySeekBar(
                 }
                 drawPath(
                     path = path,
-                    color = Color.White.copy(alpha = 0.95f),
+                    color = progressColor,
                     style = Stroke(width = 4.dp.toPx(), cap = StrokeCap.Round),
                 )
             }
@@ -866,13 +914,13 @@ private fun WavySeekBar(
                         x += 3f
                     }
                 },
-                color = accent.copy(alpha = 0.5f),
+                color = progressColor.copy(alpha = 0.35f),
                 style = Stroke(width = 8.dp.toPx(), cap = StrokeCap.Round),
             )
         }
 
         drawCircle(
-            color = accent.copy(alpha = 0.28f),
+            color = progressColor.copy(alpha = 0.28f),
             radius = 15.dp.toPx(),
             center = Offset(progressX, centerY),
         )
@@ -882,7 +930,7 @@ private fun WavySeekBar(
             center = Offset(progressX, centerY),
         )
         drawCircle(
-            color = accent,
+            color = progressColor,
             radius = 4.6.dp.toPx(),
             center = Offset(progressX, centerY),
         )
@@ -1082,7 +1130,6 @@ private fun LyricsView(
 
         WavySeekBar(
             progress = if (durationMs > 0) (positionMs.toFloat() / durationMs).coerceIn(0f, 1f) else 0f,
-            accent = accent,
             durationMs = durationMs,
             onSeek = onSeek,
             modifier = Modifier.fillMaxWidth(),
@@ -1206,4 +1253,80 @@ private fun QueueSheet(
             }
         }
     }
+}
+
+/**
+ * Sleep timer chooser. Times pause playback from the player service, so the
+ * countdown continues even if this screen is closed.
+ */
+@Composable
+private fun SleepTimerDialog(
+    sleepLeftMinutes: Int?,
+    onSelect: (Int) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Sleep timer") },
+        text = {
+            Column {
+                Text(
+                    text = sleepLeftMinutes?.let { "Playback pauses in about $it min." }
+                        ?: "Pause playback automatically after a while.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(6.dp))
+                listOf(5, 10, 15, 30, 45, 60).forEach { minutes ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(14.dp))
+                            .clickable { onSelect(minutes) }
+                            .padding(horizontal = 8.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(
+                            Icons.Filled.Timer,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(18.dp),
+                        )
+                        Spacer(Modifier.width(12.dp))
+                        Text(
+                            text = "$minutes minutes",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                    }
+                }
+                if (sleepLeftMinutes != null) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(14.dp))
+                            .clickable { onSelect(0) }
+                            .padding(horizontal = 8.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(
+                            Icons.Filled.Close,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(18.dp),
+                        )
+                        Spacer(Modifier.width(12.dp))
+                        Text(
+                            text = "Turn off timer",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("Close") }
+        },
+    )
 }

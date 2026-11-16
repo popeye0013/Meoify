@@ -554,13 +554,13 @@ fun SettingsScreen(
                 SettingsCard {
                     ActionRow(
                         icon = Icons.Filled.Backup,
-                        title = "Back up to .json",
+                        title = "Backup",
                         subtitle = "Save your playlists and local profile",
                         onClick = { backupLauncher.launch(backupManager.suggestedFileName()) },
                     )
                     ActionRow(
                         icon = Icons.Filled.Restore,
-                        title = "Restore from .json",
+                        title = "Restore",
                         subtitle = "Replaces local playlists and profile",
                         onClick = { restoreLauncher.launch("application/json") },
                     )
@@ -965,18 +965,6 @@ private fun ProfileCard(
                             active = signedIn,
                         )
                     }
-                }
-                IconButton(
-                    onClick = onRefresh,
-                    enabled = !loading,
-                    modifier = Modifier.size(40.dp),
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.Refresh,
-                        contentDescription = "Refresh account",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(20.dp),
-                    )
                 }
             }
 

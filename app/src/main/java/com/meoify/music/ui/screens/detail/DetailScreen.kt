@@ -34,13 +34,11 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.LibraryAdd
 import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.MoreHoriz
-import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Shuffle
-import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -84,14 +82,13 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.meoify.music.MeoifyApplication
 import com.meoify.music.data.model.DetailPage
 import com.meoify.music.data.model.MediaKind
-import com.meoify.music.data.model.Track
 import com.meoify.music.data.model.UiState
 import com.meoify.music.playback.PlayerUiState
 import com.meoify.music.ui.components.ArtistCard
 import com.meoify.music.ui.components.MediaCard
 import com.meoify.music.ui.components.ArtworkImage
 import com.meoify.music.ui.components.SectionHeader
-import com.meoify.music.ui.components.rememberTrackCover
+import com.meoify.music.ui.components.TrackCard
 import com.meoify.music.ui.navigation.Destination
 import com.meoify.music.ui.navigation.LocalAppActions
 import com.meoify.music.ui.navigation.LocalLibrary
@@ -99,7 +96,6 @@ import com.meoify.music.ui.navigation.LocalPlayerState
 import com.meoify.music.ui.theme.ArtworkColorCache
 import com.meoify.music.ui.viewmodel.DetailViewModel
 import com.meoify.music.ui.viewmodel.DetailViewModelFactory
-import com.meoify.music.util.formatDuration
 
 @Composable
 fun DetailScreen(destination: Destination, onBack: () -> Unit) {
@@ -789,94 +785,5 @@ private fun durationLabel(ms: Long): String? {
         hours > 0 && minutes > 0 -> "$hours hr $minutes min"
         hours > 0 -> "$hours hr"
         else -> "${minutes.coerceAtLeast(1)} min"
-    }
-}
-
-@Composable
-private fun TrackCard(
-    track: Track,
-    isCurrent: Boolean,
-    onClick: () -> Unit,
-    onMoreClick: () -> Unit,
-) {
-    val cover = rememberTrackCover(track)
-    Surface(
-        onClick = onClick,
-        shape = RoundedCornerShape(18.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 3.dp),
-    ) {
-        Row(
-            modifier = Modifier.padding(start = 10.dp, end = 4.dp, top = 8.dp, bottom = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Box(modifier = Modifier.size(46.dp)) {
-                ArtworkImage(
-                    url = cover,
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier
-                        .size(46.dp)
-                        .clip(RoundedCornerShape(9.dp))
-                        .background(MaterialTheme.colorScheme.surfaceContainerHigh),
-                )
-                if (isCurrent) {
-                    Box(
-                        modifier = Modifier
-                            .size(46.dp)
-                            .clip(RoundedCornerShape(9.dp))
-                            .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.42f)),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Icon(
-                            Icons.Filled.GraphicEq,
-                            contentDescription = "Now playing",
-                            tint = MaterialTheme.colorScheme.primary,
-                        )
-                    }
-                }
-            }
-            Spacer(Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = track.title,
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.SemiBold,
-                    color = if (isCurrent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                val subtitle = listOfNotNull(
-                    track.artist.takeIf { it.isNotBlank() },
-                    track.album?.takeIf { it.isNotBlank() },
-                ).joinToString(" • ")
-                if (subtitle.isNotBlank()) {
-                    Text(
-                        text = subtitle,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-            }
-            if (track.durationMs > 0) {
-                Text(
-                    text = formatDuration(track.durationMs),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 8.dp),
-                )
-            }
-            IconButton(onClick = onMoreClick, modifier = Modifier.size(38.dp)) {
-                Icon(
-                    Icons.Filled.MoreVert,
-                    contentDescription = "More options for ${track.title}",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
     }
 }

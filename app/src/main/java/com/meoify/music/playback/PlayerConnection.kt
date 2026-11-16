@@ -51,6 +51,8 @@ data class PlayerUiState(
     val sourceTitle: String = "YouTube Music",
     val volume: Float = 1f,
     val muted: Boolean = false,
+    /** Epoch millis when the sleep timer pauses playback, or null when off. */
+    val sleepEndsAtMs: Long? = null,
 ) {
     val hasNext: Boolean get() = queueIndex in 0 until queue.lastIndex
     val hasPrevious: Boolean get() = queueIndex > 0
@@ -89,6 +91,7 @@ class PlayerConnection(
     private var appendJob: Job? = null
     private var generation = 0
     private var lastVolume: Float = 1f
+    private var sleepJob: Job? = null
 
     private val controllerListener = object : Player.Listener {
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
@@ -186,6 +189,7 @@ class PlayerConnection(
             queue = queue,
             queueIndex = start,
             sourceTitle = sourceTitle,
+            sleepEndsAtMs = _state.value.sleepEndsAtMs,
         )
 
         val myGeneration = generation
@@ -267,6 +271,34 @@ class PlayerConnection(
         if (c.mediaItemCount == 0) return
         if (c.isPlaying) c.pause() else c.play()
         refresh()
+    }
+
+    fun pause() {
+        val c = controller ?: return
+        if (c.isPlaying) c.pause()
+        refresh()
+    }
+
+    /**
+     * Pauses playback after [minutes]. Passing 0 or less cancels a running
+     * timer. The end time lives in [PlayerUiState] so the UI can count down
+     * even when the player screen is closed.
+     */
+    fun setSleepTimer(minutes: Int) {
+        sleepJob?.cancel()
+        sleepJob = null
+        if (minutes <= 0) {
+            _state.update { it.copy(sleepEndsAtMs = null) }
+            return
+        }
+        val endsAt = System.currentTimeMillis() + minutes * 60_000L
+        _state.update { it.copy(sleepEndsAtMs = endsAt) }
+        sleepJob = scope.launch {
+            delay(minutes * 60_000L)
+            controller?.let { c -> if (c.isPlaying) c.pause() }
+            _state.update { it.copy(sleepEndsAtMs = null, isPlaying = false) }
+            _events.tryEmit(PlaybackEvent.Message("Sleep timer ended — playback paused."))
+        }
     }
 
     fun setVolume(value: Float) {

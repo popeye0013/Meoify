@@ -22,6 +22,8 @@ data class AppActions(
     val addToQueue: (Track) -> Unit,
     val toggleLike: (Track) -> Unit,
     val togglePlayPause: () -> Unit,
+    val pause: () -> Unit,
+    val sleepTimer: (Int) -> Unit,
     val skipNext: () -> Unit,
     val skipPrevious: () -> Unit,
     val toggleShuffle: () -> Unit,

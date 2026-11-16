@@ -31,7 +31,11 @@ import kotlinx.coroutines.launch
 enum class Tab { Home, Search, Library }
 
 @Composable
-fun MeoifyApp(container: AppContainer) {
+fun MeoifyApp(
+    container: AppContainer,
+    initialLink: String? = null,
+    onLinkConsumed: () -> Unit = {},
+) {
     val library by container.library.library.collectAsStateWithLifecycle(initialValue = LibraryData())
     val playerState by container.player.state.collectAsStateWithLifecycle(initialValue = PlayerUiState())
     val settings by container.settings.settings.collectAsStateWithLifecycle()
@@ -70,6 +74,45 @@ fun MeoifyApp(container: AppContainer) {
     var newPlaylistName by remember { mutableStateOf("") }
     var settingsOpen by remember { mutableStateOf(false) }
 
+    // Open music.youtube.com links that Android hands to Meoify. Playlists go
+    // straight to their page, ?q= links start a search, and plain song links
+    // fall back to a hint since Meoify needs a catalogue match first.
+    LaunchedEffect(initialLink) {
+        val link = initialLink ?: return@LaunchedEffect
+        val uri = runCatching { android.net.Uri.parse(link) }.getOrNull()
+        val host = uri?.host.orEmpty()
+        if (host.endsWith("music.youtube.com")) {
+            val listId = uri?.getQueryParameter("list")
+            val query = uri?.getQueryParameter("q")
+            val videoId = uri?.getQueryParameter("v")
+            when {
+                !listId.isNullOrBlank() -> {
+                    settingsOpen = false
+                    detailStack.clear()
+                    detailStack.add(Destination.Playlist(listId))
+                }
+
+                !query.isNullOrBlank() -> {
+                    settingsOpen = false
+                    detailStack.clear()
+                    tab = Tab.Search
+                    pendingSearch = query
+                }
+
+                !videoId.isNullOrBlank() -> {
+                    settingsOpen = false
+                    detailStack.clear()
+                    tab = Tab.Search
+                    pendingSearch = null
+                    snackbarHostState.showSnackbar(
+                        "Song links aren't supported yet — search for it in Meoify.",
+                    )
+                }
+            }
+        }
+        onLinkConsumed()
+    }
+
     val actions = remember(container, library, playerState) {
         AppActions(
             playTracks = { tracks, index, source ->
@@ -104,6 +147,8 @@ fun MeoifyApp(container: AppContainer) {
                 }
             },
             togglePlayPause = { container.player.togglePlayPause() },
+            pause = { container.player.pause() },
+            sleepTimer = { minutes -> container.player.setSleepTimer(minutes) },
             skipNext = { container.player.skipNext() },
             skipPrevious = { container.player.skipPrevious() },
             toggleShuffle = { container.player.toggleShuffle() },

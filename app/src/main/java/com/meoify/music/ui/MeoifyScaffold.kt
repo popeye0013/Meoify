@@ -115,7 +115,13 @@ fun MeoifyScaffold(
         }
     }
 
-    val showChrome = settings.onboardingCompleted && !loginOpen && !showPlayer && !settingsOpen
+    // Chrome is available on the main tabs and in Settings. Opening a
+    // playlist/album/artist keeps the mini player but drops the tab bar so the
+    // detail page owns the bottom of the screen.
+    val chromeAllowed = settings.onboardingCompleted && !loginOpen && !showPlayer
+    val showMiniPlayer = chromeAllowed && playerState.track != null
+    val showNavBar = chromeAllowed && !settingsOpen && detailStack.isEmpty()
+    val showBottomBar = showMiniPlayer || showNavBar
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -128,26 +134,32 @@ fun MeoifyScaffold(
         },
         bottomBar = {
             AnimatedVisibility(
-                visible = showChrome,
+                visible = showBottomBar,
                 enter = fadeIn(tween(180)) + slideInVertically(tween(220)) { it / 2 },
                 exit = fadeOut(tween(140)) + slideOutVertically(tween(180)) { it / 2 },
             ) {
                 Column {
                     AnimatedVisibility(
-                        visible = playerState.track != null,
+                        visible = showMiniPlayer,
                         enter = slideInVertically { it },
                         exit = slideOutVertically { it },
                     ) {
                         MiniPlayer(onOpen = { onShowPlayerChange(true) })
                     }
-                    MeoifyNavigationBar(
-                        tab = tab,
-                        hasDetail = detailStack.isNotEmpty(),
-                        onSelect = {
-                            if (detailStack.isNotEmpty()) detailStack.clear()
-                            onTabChange(it)
-                        },
-                    )
+                    AnimatedVisibility(
+                        visible = showNavBar,
+                        enter = fadeIn(tween(160)),
+                        exit = fadeOut(tween(120)),
+                    ) {
+                        MeoifyNavigationBar(
+                            tab = tab,
+                            hasDetail = detailStack.isNotEmpty(),
+                            onSelect = {
+                                if (detailStack.isNotEmpty()) detailStack.clear()
+                                onTabChange(it)
+                            },
+                        )
+                    }
                 }
             }
         },
