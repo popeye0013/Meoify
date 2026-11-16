@@ -61,6 +61,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
@@ -235,7 +236,8 @@ fun SettingsScreen(
         "colours", "colors", "wallpaper", "pure black", "OLED",
     )
     val playbackKeys = arrayOf(
-        "Playback", "audio", "quality", "high", "normal", "saver", "data",
+        "Playback", "audio", "quality", "auto", "lossless", "hi-res", "hires",
+        "320", "youtube", "saver", "data",
         "kbps", "history", "sync",
     )
     val libraryKeys = arrayOf("Library", "clear", "recent", "searches", "listening", "history")
@@ -488,33 +490,21 @@ fun SettingsScreen(
                             fontWeight = FontWeight.SemiBold,
                         )
                     }
-                    Spacer(Modifier.height(10.dp))
-                    SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                        AudioQuality.entries.forEachIndexed { index, quality ->
-                            SegmentedButton(
-                                selected = settings.quality == quality,
-                                onClick = { app.container.settings.setQuality(quality) },
-                                shape = SegmentedButtonDefaults.itemShape(index, AudioQuality.entries.size),
-                            ) {
-                                Text(
-                                    when (quality) {
-                                        AudioQuality.HIGH -> "High"
-                                        AudioQuality.NORMAL -> "Normal"
-                                        AudioQuality.SAVER -> "Saver"
-                                    },
-                                )
-                            }
-                        }
+                    Spacer(Modifier.height(8.dp))
+                    AudioQuality.entries.forEach { quality ->
+                        QualityRow(
+                            quality = quality,
+                            selected = settings.quality == quality,
+                            onClick = { app.container.settings.setQuality(quality) },
+                        )
                     }
-                    Spacer(Modifier.height(4.dp))
+                    Spacer(Modifier.height(6.dp))
                     Text(
-                        text = when (settings.quality) {
-                            AudioQuality.HIGH -> "Best available AAC stream (up to 256 kbps)."
-                            AudioQuality.NORMAL -> "Balanced quality for everyday listening."
-                            AudioQuality.SAVER -> "Lower bitrate to use less data."
-                        },
+                        text = "Meoify streams from YouTube Music, which tops out at " +
+                            "256 kbps AAC/Opus. The highest tiers use the best available stream.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 6.dp),
                     )
                     ToggleRow(
                         icon = Icons.Filled.History,
@@ -1486,5 +1476,48 @@ private fun ActionRow(
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.size(20.dp),
         )
+    }
+}
+
+@Composable
+private fun QualityRow(
+    quality: AudioQuality,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    val background = if (selected) {
+        MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)
+    } else {
+        Color.Transparent
+    }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(background)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 8.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        RadioButton(selected = selected, onClick = null)
+        Spacer(Modifier.width(6.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = quality.title,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+                color = if (selected) {
+                    MaterialTheme.colorScheme.primary
+                } else {
+                    MaterialTheme.colorScheme.onSurface
+                },
+            )
+            Spacer(Modifier.height(2.dp))
+            Text(
+                text = quality.description,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }

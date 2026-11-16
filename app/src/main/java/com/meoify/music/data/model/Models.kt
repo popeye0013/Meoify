@@ -116,13 +116,43 @@ data class LibraryData(
 
 enum class ThemeMode { SYSTEM, DARK, LIGHT }
 
-enum class AudioQuality { HIGH, NORMAL, SAVER }
+enum class AudioQuality(
+    val title: String,
+    val shortLabel: String,
+    val description: String,
+) {
+    AUTO(
+        title = "Auto",
+        shortLabel = "Auto",
+        description = "Adapts to your connection. Wi-Fi uses Hi-Res; mobile data stays balanced.",
+    ),
+    HI_RES(
+        title = "Lossless (Hi-Res)",
+        shortLabel = "Hi-Res",
+        description = "Up to 24-bit / 192 kHz • Lossless FLAC",
+    ),
+    STANDARD(
+        title = "Standard quality (320 kbps)",
+        shortLabel = "320 kbps",
+        description = "Up to 320 kbps MP3 / AAC",
+    ),
+    YOUTUBE_MUSIC(
+        title = "YouTube Music",
+        shortLabel = "YouTube Music",
+        description = "128–256 kbps • YouTube Music AAC / Opus stream",
+    ),
+    SAVER(
+        title = "Data Saver",
+        shortLabel = "Data Saver",
+        description = "Low-bitrate audio to reduce mobile data use",
+    ),
+}
 
 data class AppSettings(
     val themeMode: ThemeMode = ThemeMode.DARK,
     val dynamicColor: Boolean = false,
     val pureBlack: Boolean = false,
-    val quality: AudioQuality = AudioQuality.HIGH,
+    val quality: AudioQuality = AudioQuality.AUTO,
     val historySync: Boolean = true,
     val ytCookies: String? = null,
     val accountName: String? = null,

@@ -49,8 +49,14 @@ class SettingsStore(private val context: Context) {
                     .getOrDefault(ThemeMode.DARK),
                 dynamicColor = prefs[Keys.dynamic] ?: false,
                 pureBlack = prefs[Keys.pureBlack] ?: true,
-                quality = runCatching { AudioQuality.valueOf(prefs[Keys.quality] ?: "") }
-                    .getOrDefault(AudioQuality.HIGH),
+                quality = when (prefs[Keys.quality]) {
+                    // Legacy names from the three-option picker.
+                    "HIGH" -> AudioQuality.HI_RES
+                    "NORMAL" -> AudioQuality.STANDARD
+                    "SAVER" -> AudioQuality.SAVER
+                    else -> runCatching { AudioQuality.valueOf(prefs[Keys.quality] ?: "") }
+                        .getOrDefault(AudioQuality.AUTO)
+                },
                 historySync = prefs[Keys.historySync] ?: true,
                 onboardingCompleted = prefs[Keys.onboarding] ?: false,
                 ytCookies = prefs[Keys.ytCookies],

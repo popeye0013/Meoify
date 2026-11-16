@@ -1,6 +1,8 @@
 package com.meoify.music.data.remote
 
 import android.content.Context
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import com.meoify.music.data.local.SettingsStore
 import com.meoify.music.data.model.AudioQuality
 import kotlinx.coroutines.Dispatchers
@@ -41,6 +43,8 @@ class StreamResolver(
     private val settings: SettingsStore,
 ) {
 
+    private val appContext = context.applicationContext
+
     private val client = OkHttpClient.Builder()
         .connectTimeout(20, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
@@ -60,28 +64,51 @@ class StreamResolver(
     }
 
     suspend fun resolve(videoId: String, force: Boolean = false): ResolvedAudio = withContext(Dispatchers.IO) {
-        val cached = cache[videoId]
+        val quality = settings.settings.value.quality
+        // The cache key includes the quality so switching it takes effect on
+        // the next track instead of waiting for the 20 minute entry to expire.
+        val key = cacheKey(videoId, quality)
+        val cached = cache[key]
         if (!force && cached != null && System.currentTimeMillis() - cached.createdAt < CACHE_TTL_MS) {
             return@withContext cached.audio
         }
 
-        val mutex = locks.getOrPut(videoId) { Mutex() }
+        val mutex = locks.getOrPut(key) { Mutex() }
         mutex.withLock {
-            val again = cache[videoId]
+            val again = cache[key]
             if (!force && again != null && System.currentTimeMillis() - again.createdAt < CACHE_TTL_MS) {
                 return@withLock again.audio
             }
-            val audio = extract(videoId)
-            cache[videoId] = CachedAudio(audio, System.currentTimeMillis())
+            val audio = extract(videoId, quality)
+            cache[key] = CachedAudio(audio, System.currentTimeMillis())
             audio
         }
     }
 
-    private fun extract(videoId: String): ResolvedAudio {
-        val quality = settings.settings.value.quality
+    private fun cacheKey(videoId: String, quality: AudioQuality): String {
+        val connection = if (quality == AudioQuality.AUTO) {
+            if (isMeteredConnection()) "mobile" else "unmetered"
+        } else {
+            "fixed"
+        }
+        return "$videoId|${quality.name}|$connection"
+    }
+
+    private fun isMeteredConnection(): Boolean {
+        val manager = appContext.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+            ?: return false
+        val capabilities = manager.getNetworkCapabilities(manager.activeNetwork) ?: return false
+        return !capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED)
+    }
+
+    private fun extract(videoId: String, quality: AudioQuality): ResolvedAudio {
         val cap = when (quality) {
-            AudioQuality.HIGH -> 256_000
-            AudioQuality.NORMAL -> 160_000
+            // Auto: Wi-Fi keeps the best stream, mobile data stays balanced.
+            AudioQuality.AUTO -> if (isMeteredConnection()) 160_000 else 256_000
+            AudioQuality.HI_RES -> 256_000
+            // YouTube Music has no 320 kbps stream; use the best it offers.
+            AudioQuality.STANDARD -> 256_000
+            AudioQuality.YOUTUBE_MUSIC -> 256_000
             AudioQuality.SAVER -> 96_000
         }
         return try {

@@ -739,7 +739,7 @@ private fun AudioPill(
                 )
                 Spacer(Modifier.width(7.dp))
                 Text(
-                    text = "Audio",
+                    text = quality.shortLabel,
                     style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.SemiBold,
                     color = Color.White.copy(alpha = 0.92f),
@@ -747,7 +747,7 @@ private fun AudioPill(
                 Spacer(Modifier.width(2.dp))
                 Icon(
                     Icons.Filled.KeyboardArrowRight,
-                    contentDescription = "Audio quality",
+                    contentDescription = "Audio quality: ${quality.title}",
                     tint = Color.White.copy(alpha = 0.55f),
                     modifier = Modifier.size(17.dp),
                 )
@@ -757,13 +757,18 @@ private fun AudioPill(
             AudioQuality.entries.forEach { option ->
                 DropdownMenuItem(
                     text = {
-                        Text(
-                            when (option) {
-                                AudioQuality.HIGH -> "High quality"
-                                AudioQuality.NORMAL -> "Normal quality"
-                                AudioQuality.SAVER -> "Data saver"
-                            },
-                        )
+                        Column {
+                            Text(
+                                text = option.title,
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Medium,
+                            )
+                            Text(
+                                text = option.description,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
                     },
                     leadingIcon = {
                         if (option == quality) {
