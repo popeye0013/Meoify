@@ -19,27 +19,48 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Headphones
 import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.Lyrics
-import androidx.compose.material.icons.filled.PlayCircle
+import androidx.compose.material.icons.filled.PersonAdd
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.meoify.music.ui.components.MeoifyLogo
+import com.meoify.music.ui.components.MeoifyMark
+import com.meoify.music.ui.theme.Crimson
 
+/**
+ * First-run screen.
+ *
+ * Signing in with YouTube Music is optional: a local profile keeps liked songs,
+ * playlists and history on the device without any account. The mark and the
+ * coral glow introduce the app before either choice is made.
+ */
 @Composable
 fun WelcomeScreen(
     onSignIn: () -> Unit,
-    onSkip: () -> Unit,
+    onCreateLocalProfile: (String) -> Unit,
 ) {
+    var showProfileDialog by remember { mutableStateOf(false) }
+    var profileName by remember { mutableStateOf("Music Lover") }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -61,21 +82,31 @@ fun WelcomeScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
         ) {
-            Surface(
-                shape = CircleShape,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(96.dp),
+            Box(
+                modifier = Modifier.size(164.dp),
+                contentAlignment = Alignment.Center,
             ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        Icons.Filled.PlayCircle,
-                        contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(52.dp),
-                    )
-                }
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.radialGradient(
+                                colors = listOf(Crimson.copy(alpha = 0.24f), Color.Transparent),
+                            ),
+                        ),
+                )
+                MeoifyLogo(
+                    size = 104.dp,
+                    modifier = Modifier.shadow(
+                        elevation = 18.dp,
+                        shape = CircleShape,
+                        clip = false,
+                        ambientColor = Crimson,
+                        spotColor = Crimson,
+                    ),
+                )
             }
-            Spacer(Modifier.height(24.dp))
+            Spacer(Modifier.height(10.dp))
             Text(
                 text = "Meoify",
                 style = MaterialTheme.typography.displaySmall,
@@ -122,27 +153,77 @@ fun WelcomeScreen(
             Spacer(Modifier.height(28.dp))
             Button(
                 onClick = onSignIn,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp),
                 shape = RoundedCornerShape(22.dp),
             ) {
+                MeoifyMark(
+                    size = 20.dp,
+                    tint = MaterialTheme.colorScheme.onPrimary,
+                )
+                Spacer(Modifier.size(10.dp))
                 Text("Sign in to YouTube Music", fontWeight = FontWeight.Bold)
             }
             Spacer(Modifier.height(10.dp))
             OutlinedButton(
-                onClick = onSkip,
-                modifier = Modifier.fillMaxWidth(),
+                onClick = { showProfileDialog = true },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp),
                 shape = RoundedCornerShape(22.dp),
             ) {
-                Text("Continue without signing in")
+                Icon(
+                    Icons.Filled.PersonAdd,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp),
+                )
+                Spacer(Modifier.size(10.dp))
+                Text("Create Local Profile", fontWeight = FontWeight.SemiBold)
             }
             Spacer(Modifier.height(18.dp))
             Text(
-                text = "You can sign in later from Settings. Meoify is an unofficial client and isn't affiliated with YouTube.",
+                text = "A local profile keeps everything on this device — no Google account needed. You can sign in later from Settings. Meoify is an unofficial client and isn't affiliated with YouTube.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
             )
         }
+    }
+
+    if (showProfileDialog) {
+        AlertDialog(
+            onDismissRequest = { showProfileDialog = false },
+            title = { Text("Create local profile") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        text = "Give your profile a name. It only lives on this phone.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    OutlinedTextField(
+                        value = profileName,
+                        onValueChange = { profileName = it },
+                        label = { Text("Profile name") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showProfileDialog = false
+                        onCreateLocalProfile(profileName.trim())
+                    },
+                    enabled = profileName.isNotBlank(),
+                ) { Text("Create") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showProfileDialog = false }) { Text("Cancel") }
+            },
+        )
     }
 }
 

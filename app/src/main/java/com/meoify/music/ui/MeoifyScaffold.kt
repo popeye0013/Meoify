@@ -159,10 +159,10 @@ fun MeoifyScaffold(
                 .padding(padding),
         ) {
             AnimatedContent(
-                targetState = if (!settings.onboardingCompleted) {
-                    "onboarding"
-                } else if (loginOpen) {
+                targetState = if (loginOpen) {
                     "login"
+                } else if (!settings.onboardingCompleted) {
+                    "onboarding"
                 } else if (settingsOpen) {
                     "settings"
                 } else if (detailStack.isNotEmpty()) {
@@ -177,16 +177,21 @@ fun MeoifyScaffold(
                 label = "screen",
             ) { target ->
                 when {
-                    !settings.onboardingCompleted -> WelcomeScreen(
-                        onSignIn = { loginOpen = true },
-                        onSkip = { app.container.settings.setOnboardingCompleted(true) },
-                    )
-
+                    // Login wins over onboarding: tapping "Sign in" on the
+                    // welcome screen must actually open the sign-in page.
                     loginOpen -> YouTubeLoginScreen(
                         onBack = { loginOpen = false },
                         onSignedIn = {
                             app.container.settings.setOnboardingCompleted(true)
                             loginOpen = false
+                        },
+                    )
+
+                    !settings.onboardingCompleted -> WelcomeScreen(
+                        onSignIn = { loginOpen = true },
+                        onCreateLocalProfile = { name ->
+                            app.container.settings.setLocalProfileName(name)
+                            app.container.settings.setOnboardingCompleted(true)
                         },
                     )
 
