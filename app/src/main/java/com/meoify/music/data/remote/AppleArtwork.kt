@@ -135,7 +135,7 @@ class AppleArtwork(private val client: OkHttpClient) {
         (this[name] as? JsonPrimitive)?.longOrNull
 
     private companion object {
-        const val USER_AGENT = "Meoify/1.0.4 (Android)"
+        const val USER_AGENT = "Meoify/1.0.3 (Android)"
         const val MISS_TTL_MS = 10 * 60 * 1000L
 
         val ARTWORK_SIZE = Regex("""/\d+x\d+bb\.""")

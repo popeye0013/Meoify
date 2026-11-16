@@ -51,9 +51,7 @@ fun MiniPlayer(onOpen: () -> Unit) {
         shadowElevation = 6.dp,
         modifier = Modifier
             .fillMaxWidth()
-            // The 10dp bottom gap keeps the pill floating above the tab bar
-            // (and, on detail pages, above the system navigation bar).
-            .padding(start = 12.dp, end = 12.dp, top = 6.dp, bottom = 10.dp),
+            .padding(horizontal = 12.dp, vertical = 6.dp),
     ) {
         Column {
             Row(

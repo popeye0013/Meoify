@@ -144,18 +144,7 @@ fun MeoifyScaffold(
                         enter = slideInVertically { it },
                         exit = slideOutVertically { it },
                     ) {
-                        // The tab bar already handles the navigation bar inset.
-                        // When it is hidden (playlist pages, Settings) the mini
-                        // player has to clear the system bar itself.
-                        Box(
-                            modifier = if (showNavBar) {
-                                Modifier
-                            } else {
-                                Modifier.navigationBarsPadding()
-                            },
-                        ) {
-                            MiniPlayer(onOpen = { onShowPlayerChange(true) })
-                        }
+                        MiniPlayer(onOpen = { onShowPlayerChange(true) })
                     }
                     AnimatedVisibility(
                         visible = showNavBar,
@@ -302,7 +291,7 @@ private fun MeoifyNavigationBar(
             .fillMaxWidth()
             .navigationBarsPadding()
             .padding(horizontal = 28.dp)
-            .padding(bottom = 12.dp),
+            .padding(top = 6.dp, bottom = 12.dp),
         contentAlignment = Alignment.Center,
     ) {
         Surface(

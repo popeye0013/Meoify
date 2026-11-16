@@ -15,8 +15,8 @@ android {
         applicationId = "com.meoify.music"
         minSdk = 26
         targetSdk = 36
-        versionCode = 5
-        versionName = "1.0.4"
+        versionCode = 4
+        versionName = "1.0.3"
     }
 
     buildFeatures {
@@ -92,17 +92,7 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.13.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
-    // NewPipeExtractor is patched in tools/patch-newpipe-extractor so it can
-    // run on Android 8-12: upstream calls Java 11/16 APIs that only exist on
-    // Android 13+ and would crash playback with NoSuchMethodError.
-    implementation(files("libs/NewPipeExtractor-v0.27.1-patched.jar"))
-    // NewPipeExtractor runtime dependencies (normally pulled in by its POM).
-    implementation("com.github.TeamNewPipe:nanojson:e9d656ddb49a412a5a0a5d5ef20ca7ef09549996")
-    implementation("org.jsoup:jsoup:1.24.1")
-    implementation("com.google.code.findbugs:jsr305:3.0.2")
-    implementation("com.google.protobuf:protobuf-javalite:4.36.2")
-    implementation("org.mozilla:rhino:1.8.1")
-    implementation("org.mozilla:rhino-engine:1.8.1")
+    implementation("com.github.TeamNewPipe:NewPipeExtractor:v0.27.1")
 
     debugImplementation("androidx.compose.ui:ui-tooling:$composeUi")
 
