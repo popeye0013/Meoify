@@ -95,13 +95,4 @@ Meoify is an **unofficial, independent project**. It is not affiliated with, end
 
 If you are a rights holder and have a concern, please open an issue or contact the developer.
 
-## Credits
-
-Built by **Akash** ([@popeye0013](https://github.com/popeye0013)).
-
-- GitHub: https://github.com/popeye0013
-- Telegram: https://t.me/popeye0013
-
-Inspired by the layout and feature set of [LastWave](https://github.com/Clash-Projects/LastWave-native).
-
 Released under the [GNU General Public License v3.0](LICENSE).
