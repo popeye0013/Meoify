@@ -9,9 +9,12 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -705,16 +708,30 @@ fun SettingsScreen(
             icon = { Icon(Icons.Filled.Refresh, contentDescription = null) },
             title = { Text("Update available") },
             text = {
-                Text(
-                    "Meoify ${pendingUpdate.version} is available. You are on " +
-                        "$versionName. Open the GitHub release to get the new APK.",
-                )
+                Column(
+                    modifier = Modifier
+                        .heightIn(max = 320.dp)
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    Text(
+                        "Meoify ${pendingUpdate.version} is available. You are on " +
+                            "$versionName.",
+                    )
+                    pendingUpdate.notes.forEach { note ->
+                        Text(
+                            text = "•  $note",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
             },
             confirmButton = {
                 TextButton(
                     onClick = {
                         updateRelease = null
-                        context.openUrl(pendingUpdate.url)
+                        context.openUrl(pendingUpdate.apkUrl ?: pendingUpdate.url)
                     },
                 ) { Text("Download") }
             },

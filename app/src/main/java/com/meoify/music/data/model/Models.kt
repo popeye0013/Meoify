@@ -130,6 +130,8 @@ data class AppSettings(
     val localAvatarPath: String? = null,
     val libraryGridView: Boolean = false,
     val onboardingCompleted: Boolean = false,
+    /** Version whose home-screen update popup was skipped; cleared by a newer release. */
+    val skippedUpdateVersion: String? = null,
 )
 
 sealed interface UiState<out T> {

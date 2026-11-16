@@ -4,6 +4,7 @@ import com.meoify.music.data.model.DeveloperInfo
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -25,6 +26,8 @@ object UpdateChecker {
         val version: String,
         val url: String,
         val apkUrl: String? = null,
+        /** Changelog bullets, newest release first. */
+        val notes: List<String> = emptyList(),
     )
 
     private const val MANIFEST_URL =
@@ -61,6 +64,11 @@ object UpdateChecker {
                 version = version,
                 url = root["release_url"]?.jsonPrimitive?.contentOrNull ?: DeveloperInfo.REPO_URL,
                 apkUrl = root["apk_url"]?.jsonPrimitive?.contentOrNull,
+                notes = (root["changelog"] as? JsonArray)
+                    ?.mapNotNull { it.jsonPrimitive.contentOrNull }
+                    ?.map { it.trim() }
+                    ?.filter { it.isNotEmpty() }
+                    .orEmpty(),
             )
         }
     }.getOrNull()
@@ -85,6 +93,7 @@ object UpdateChecker {
                 version = tag.removePrefix("v").removePrefix("V"),
                 url = root["html_url"]?.jsonPrimitive?.contentOrNull ?: DeveloperInfo.REPO_URL,
                 apkUrl = assets?.firstOrNull { it.endsWith(".apk", ignoreCase = true) },
+                notes = parseNotes(root["body"]?.jsonPrimitive?.contentOrNull),
             )
         }
     }.getOrNull()
@@ -99,5 +108,23 @@ object UpdateChecker {
             if (x != y) return x > y
         }
         return false
+    }
+
+    /** Pulls the bullet lines (`- ...` / `* ...`) out of a release body. */
+    internal fun parseNotes(body: String?): List<String> {
+        if (body.isNullOrBlank()) return emptyList()
+        return body.lineSequence()
+            .map { it.trim() }
+            .filter { it.startsWith("- ") || it.startsWith("* ") }
+            .map { line ->
+                line.removePrefix("- ")
+                    .removePrefix("* ")
+                    .replace("**", "")
+                    .replace("`", "")
+                    .trim()
+            }
+            .filter { it.isNotEmpty() }
+            .take(8)
+            .toList()
     }
 }

@@ -38,6 +38,7 @@ class SettingsStore(private val context: Context) {
         val localProfileName = stringPreferencesKey("local_profile_name")
         val localAvatarPath = stringPreferencesKey("local_avatar_path")
         val libraryGrid = booleanPreferencesKey("library_grid")
+        val skippedUpdate = stringPreferencesKey("skipped_update_version")
     }
 
     val settings: StateFlow<AppSettings> = context.settingsStore.data
@@ -57,6 +58,7 @@ class SettingsStore(private val context: Context) {
                 localProfileName = prefs[Keys.localProfileName],
                 localAvatarPath = prefs[Keys.localAvatarPath],
                 libraryGridView = prefs[Keys.libraryGrid] ?: false,
+                skippedUpdateVersion = prefs[Keys.skippedUpdate],
             )
         }
         .stateIn(scope, SharingStarted.Eagerly, AppSettings())
@@ -120,6 +122,13 @@ class SettingsStore(private val context: Context) {
     /** Remembers whether the Library playlists are shown as a grid. */
     fun setLibraryGridView(enabled: Boolean) = scope.launch {
         context.settingsStore.edit { it[Keys.libraryGrid] = enabled }
+    }
+
+    /** Remembers the release version whose home-screen update popup was skipped. */
+    fun setSkippedUpdateVersion(version: String?) = scope.launch {
+        context.settingsStore.edit {
+            if (version == null) it.remove(Keys.skippedUpdate) else it[Keys.skippedUpdate] = version
+        }
     }
 
     suspend fun current(): AppSettings = settings.first()

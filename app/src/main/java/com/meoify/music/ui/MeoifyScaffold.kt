@@ -16,6 +16,8 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -29,6 +31,7 @@ import androidx.compose.foundation.layout.calculateEndPadding
 import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.only
@@ -41,6 +44,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.QueueMusic
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.SystemUpdate
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -49,8 +54,10 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -61,11 +68,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.meoify.music.BuildConfig
+import com.meoify.music.data.UpdateChecker
 import com.meoify.music.data.model.Track
 import com.meoify.music.ui.components.MiniPlayer
 import com.meoify.music.ui.navigation.Destination
@@ -81,6 +91,8 @@ import com.meoify.music.ui.screens.onboarding.WelcomeScreen
 import com.meoify.music.ui.screens.player.PlayerScreen
 import com.meoify.music.ui.screens.search.SearchScreen
 import com.meoify.music.ui.screens.settings.SettingsScreen
+import com.meoify.music.util.openUrl
+import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -135,6 +147,34 @@ fun MeoifyScaffold(
     val showMiniPlayer = chromeAllowed && playerState.track != null
     val showNavBar = chromeAllowed && !settingsOpen && detailStack.isEmpty()
     val showBottomBar = showMiniPlayer || showNavBar
+
+    // Check once per launch; the popup itself only appears after the person has
+    // stayed on the home screen for a few seconds, so it never interrupts the
+    // first tap after opening the app.
+    var latestRelease by remember { mutableStateOf<UpdateChecker.Release?>(null) }
+    var pendingUpdate by remember { mutableStateOf<UpdateChecker.Release?>(null) }
+    var promptShown by remember { mutableStateOf(false) }
+
+    LaunchedEffect(settings.onboardingCompleted) {
+        if (!settings.onboardingCompleted) return@LaunchedEffect
+        val latest = UpdateChecker.latest() ?: return@LaunchedEffect
+        if (UpdateChecker.isNewer(latest.version, BuildConfig.VERSION_NAME) &&
+            latest.version != settings.skippedUpdateVersion
+        ) {
+            latestRelease = latest
+        }
+    }
+
+    val onHome = settings.onboardingCompleted && !loginOpen && !settingsOpen &&
+        !showPlayer && detailStack.isEmpty() && tab == Tab.Home
+
+    LaunchedEffect(onHome, latestRelease?.version) {
+        val release = latestRelease ?: return@LaunchedEffect
+        if (!onHome || promptShown) return@LaunchedEffect
+        delay(3_000)
+        promptShown = true
+        pendingUpdate = release
+    }
 
     val density = LocalDensity.current
     val layoutDirection = LocalLayoutDirection.current
@@ -346,6 +386,53 @@ fun MeoifyScaffold(
             onDismiss = {
                 onShowCreatePlaylist(false)
                 onNewPlaylistNameChange("")
+            },
+        )
+    }
+
+    val pending = pendingUpdate
+    if (pending != null) {
+        val context = LocalContext.current
+        AlertDialog(
+            onDismissRequest = { pendingUpdate = null },
+            icon = { Icon(Icons.Filled.SystemUpdate, contentDescription = null) },
+            title = { Text("Update available") },
+            text = {
+                Column(
+                    modifier = Modifier
+                        .heightIn(max = 320.dp)
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    Text(
+                        text = "Meoify ${pending.version} is ready. You are on " +
+                            "${BuildConfig.VERSION_NAME}.",
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    pending.notes.forEach { note ->
+                        Text(
+                            text = "•  $note",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        pendingUpdate = null
+                        context.openUrl(pending.apkUrl ?: pending.url)
+                    },
+                ) { Text("Download") }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        pendingUpdate = null
+                        app.container.settings.setSkippedUpdateVersion(pending.version)
+                    },
+                ) { Text("Skip") }
             },
         )
     }
