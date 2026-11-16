@@ -49,6 +49,7 @@ fun SongCard(
     onClick: () -> Unit,
     onMoreClick: () -> Unit,
     modifier: Modifier = Modifier,
+    rank: Int? = null,
 ) {
     val cover = rememberTrackCover(track)
     Surface(
@@ -86,6 +87,23 @@ fun SongCard(
                             contentDescription = "Now playing",
                             tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(30.dp),
+                        )
+                    }
+                }
+                if (rank != null) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopStart)
+                            .padding(10.dp)
+                            .clip(RoundedCornerShape(50))
+                            .background(Color.Black.copy(alpha = 0.48f))
+                            .padding(horizontal = 10.dp, vertical = 4.dp),
+                    ) {
+                        Text(
+                            text = "#$rank",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = Color.White,
                         )
                     }
                 }

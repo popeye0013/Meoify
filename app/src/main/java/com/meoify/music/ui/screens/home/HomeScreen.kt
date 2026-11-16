@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -27,6 +28,7 @@ import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.WifiOff
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -161,8 +163,38 @@ fun HomeScreen() {
                 is UiState.Success -> {
                     val feed = s.value
                     val quickTracks = (library.recent + feed.quickPicks).distinctBy { it.id }.take(6)
-
+                    val quickPicks = feed.quickPicks.take(6)
                     val featured = feed.communityPlaylists.firstOrNull()
+                    val madeForYou = feed.communityPlaylists.let { playlists ->
+                        // The first playlist is already the featured card above.
+                        if (featured != null && playlists.size > 1) playlists.drop(1) else playlists
+                    }
+                    val trendingTracks = if (feed.quickPicks.size > quickPicks.size) {
+                        feed.quickPicks.drop(quickPicks.size).take(10)
+                    } else {
+                        feed.quickPicks.take(10)
+                    }
+
+                    if (quickPicks.isNotEmpty()) {
+                        item {
+                            SectionHeader(
+                                title = "Quick picks",
+                                subtitle = "Trending songs worth playing now",
+                                actionLabel = "See all",
+                                onAction = { actions.search("trending music") },
+                            )
+                        }
+                        item {
+                            QuickPicksRail(
+                                tracks = quickPicks,
+                                currentTrackId = currentTrackId,
+                                onPlay = { index ->
+                                    actions.playTracks(quickPicks, index, "Quick picks")
+                                },
+                                onMore = { track -> actions.openTrackMenu(track) },
+                            )
+                        }
+                    }
 
                     if (quickTracks.isNotEmpty()) {
                         item {
@@ -194,35 +226,39 @@ fun HomeScreen() {
                         }
                     }
 
-                    if (feed.communityPlaylists.isNotEmpty()) {
-                        item { SectionHeader(title = "Made for you") }
+                    if (madeForYou.isNotEmpty()) {
+                        item {
+                            SectionHeader(
+                                title = "Made for you",
+                                subtitle = "Playlists picked for your taste",
+                            )
+                        }
                         item {
                             LazyRow(
                                 contentPadding = PaddingValues(horizontal = 16.dp),
                                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                             ) {
-                                items(feed.communityPlaylists, key = { it.id }) { card ->
-                                    MediaCard(
+                                items(madeForYou, key = { "mfy_" + it.id }) { card ->
+                                    MadeForYouCard(
                                         card = card,
                                         onClick = { openCard(card, actions) },
-                                        width = 150.dp,
                                     )
                                 }
                             }
                         }
                     }
 
-                    if (feed.quickPicks.isNotEmpty()) {
+                    if (trendingTracks.isNotEmpty()) {
                         item {
                             SectionHeader(
                                 title = "Trending now",
+                                subtitle = "What everyone is playing",
                                 actionLabel = "See all",
                                 onAction = { actions.search("trending music") },
                             )
                         }
-                        val trending = feed.quickPicks.take(6)
                         items(
-                            items = trending.chunked(2),
+                            items = trendingTracks.chunked(2),
                             key = { row -> "trending_" + row.joinToString("|") { it.id } },
                         ) { row ->
                             Row(
@@ -232,18 +268,16 @@ fun HomeScreen() {
                                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                             ) {
                                 row.forEach { track ->
+                                    val index = trendingTracks.indexOf(track)
                                     SongCard(
                                         track = track,
                                         isCurrent = currentTrackId == track.id,
                                         onClick = {
-                                            actions.playTracks(
-                                                feed.quickPicks,
-                                                feed.quickPicks.indexOf(track),
-                                                "Trending now",
-                                            )
+                                            actions.playTracks(trendingTracks, index, "Trending now")
                                         },
                                         onMoreClick = { actions.openTrackMenu(track) },
                                         modifier = Modifier.weight(1f),
+                                        rank = index + 1,
                                     )
                                 }
                                 if (row.size == 1) Spacer(Modifier.weight(1f))
@@ -327,63 +361,39 @@ private fun HomeHeader(
     onSearch: (String) -> Unit,
 ) {
     val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
-    val greeting = greetingForHour(hour)
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(
-                Brush.verticalGradient(
-                    listOf(
-                        MaterialTheme.colorScheme.primary.copy(alpha = 0.16f),
-                        MaterialTheme.colorScheme.primary.copy(alpha = 0.04f),
-                        Color.Transparent,
-                    ),
-                ),
-            )
-            .padding(top = 14.dp),
-    ) {
+    Column(modifier = Modifier.padding(top = 12.dp, bottom = 4.dp)) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(start = 20.dp, end = 14.dp),
+                .padding(start = 20.dp, end = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "MEOIFY",
-                    style = MaterialTheme.typography.labelSmall,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = MaterialTheme.colorScheme.primary,
-                    letterSpacing = 2.6.sp,
-                )
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    text = greeting,
-                    style = MaterialTheme.typography.headlineMedium,
+                    text = "Meoify",
+                    style = MaterialTheme.typography.headlineLarge,
                     fontWeight = FontWeight.ExtraBold,
                     color = MaterialTheme.colorScheme.onBackground,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    text = "What do you want to hear today?",
+                    text = "${greetingForHour(hour)} · what do you want to hear today?",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            Spacer(Modifier.width(12.dp))
             Box(
                 modifier = Modifier
-                    .clip(CircleShape)
-                    .clickable(onClick = onProfile)
-                    .padding(4.dp),
+                    .padding(start = 2.dp)
+                    .clickable(onClick = onProfile),
             ) {
                 ProfileAvatar(
-                    name = account?.displayName ?: localName ?: if (signedIn) "YouTube Music" else null,
+                    name = account?.displayName
+                        ?: localName
+                        ?: if (signedIn) "YouTube Music" else null,
                     url = account?.avatarUrl ?: localAvatar,
-                    initials = account?.initials ?: localName?.trim()?.take(1)?.uppercase(),
-                    size = 44.dp,
+                    initials = account?.initials
+                        ?: localName?.trim()?.take(1)?.uppercase(),
+                    size = 38.dp,
                     ring = signedIn,
                 )
             }
@@ -391,34 +401,25 @@ private fun HomeHeader(
 
         Surface(
             onClick = { onSearch("") },
-            shape = RoundedCornerShape(24.dp),
+            shape = RoundedCornerShape(28.dp),
             color = MaterialTheme.colorScheme.surfaceContainerHigh,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 14.dp),
         ) {
             Row(
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
+                modifier = Modifier.padding(horizontal = 18.dp, vertical = 14.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(32.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        Icons.Outlined.Search,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(18.dp),
-                    )
-                }
-                Spacer(Modifier.width(10.dp))
+                Icon(
+                    Icons.Outlined.Search,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.width(12.dp))
                 Text(
                     text = "Search songs, albums, artists",
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
@@ -428,23 +429,15 @@ private fun HomeHeader(
             contentPadding = PaddingValues(horizontal = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            val moods = listOf("Explore", "Pop", "Chill", "Workout", "Focus", "Party")
-            items(moods) { mood ->
-                Surface(
-                    onClick = { onSearch(if (mood == "Explore") "" else "$mood music") },
-                    shape = RoundedCornerShape(50),
-                    color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.75f),
-                ) {
-                    Text(
-                        text = mood,
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
-                    )
-                }
+            val chips = listOf("All", "Pop", "Chill", "Workout", "Focus", "Party")
+            items(chips) { chip ->
+                FilterChip(
+                    selected = chip == "All",
+                    onClick = { onSearch(if (chip == "All") "" else "$chip music") },
+                    label = { Text(chip) },
+                )
             }
         }
-        Spacer(Modifier.height(6.dp))
     }
 }
 
@@ -550,6 +543,105 @@ private fun FeaturedCard(card: MediaCardModel, onClick: () -> Unit) {
 }
 
 @Composable
+private fun QuickPicksRail(
+    tracks: List<Track>,
+    currentTrackId: String?,
+    onPlay: (Int) -> Unit,
+    onMore: (Track) -> Unit,
+) {
+    LazyRow(
+        contentPadding = PaddingValues(horizontal = 16.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        itemsIndexed(tracks, key = { _, track -> track.id }) { index, track ->
+            SongCard(
+                track = track,
+                isCurrent = track.id == currentTrackId,
+                onClick = { onPlay(index) },
+                onMoreClick = { onMore(track) },
+                modifier = Modifier.width(152.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun MadeForYouCard(card: MediaCardModel, onClick: () -> Unit) {
+    val pair = ArtworkColorCache.gradientPair(card.id)
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(22.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        border = BorderStroke(
+            1.dp,
+            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f),
+        ),
+        modifier = Modifier
+            .width(240.dp)
+            .height(136.dp),
+    ) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            ArtworkImage(
+                url = card.thumbnailUrl,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(
+                                Color.Transparent,
+                                pair.first.copy(alpha = 0.22f),
+                                Color.Black.copy(alpha = 0.82f),
+                            ),
+                        ),
+                    ),
+            )
+            Column(
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(start = 14.dp, end = 58.dp, bottom = 12.dp),
+            ) {
+                Text(
+                    text = card.title,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = Color.White,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = card.subtitle ?: "Made for you",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.White.copy(alpha = 0.78f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(12.dp)
+                    .size(38.dp)
+                    .clip(CircleShape)
+                    .background(Color.White.copy(alpha = 0.18f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    Icons.Filled.PlayArrow,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(22.dp),
+                )
+            }
+        }
+    }
+}
+
+@Composable
 private fun QuickAccessGrid(
     tracks: List<Track>,
     currentTrackId: String?,
@@ -601,19 +693,7 @@ private fun QuickAccessGrid(
                                 overflow = TextOverflow.Ellipsis,
                                 modifier = Modifier
                                     .weight(1f)
-                                    .padding(horizontal = 10.dp),
-                            )
-                            Icon(
-                                Icons.Filled.PlayArrow,
-                                contentDescription = null,
-                                tint = if (current) {
-                                    MaterialTheme.colorScheme.primary
-                                } else {
-                                    MaterialTheme.colorScheme.onSurfaceVariant
-                                },
-                                modifier = Modifier
-                                    .padding(end = 10.dp)
-                                    .size(18.dp),
+                                    .padding(start = 10.dp, end = 12.dp),
                             )
                         }
                     }
@@ -630,9 +710,27 @@ private fun HomeLoading() {
         modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
+        // Quick picks rail.
         ShimmerBox(
             Modifier
-                .fillMaxWidth(0.4f)
+                .fillMaxWidth(0.42f)
+                .height(24.dp)
+                .clip(RoundedCornerShape(8.dp)),
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            repeat(2) {
+                ShimmerBox(
+                    Modifier
+                        .weight(1f)
+                        .aspectRatio(0.72f)
+                        .clip(RoundedCornerShape(20.dp)),
+                )
+            }
+        }
+        // Jump back in tiles.
+        ShimmerBox(
+            Modifier
+                .fillMaxWidth(0.38f)
                 .height(24.dp)
                 .clip(RoundedCornerShape(8.dp)),
         )
@@ -648,15 +746,30 @@ private fun HomeLoading() {
                 }
             }
         }
+        // Featured card.
         ShimmerBox(
             Modifier
                 .fillMaxWidth()
                 .height(156.dp)
                 .clip(RoundedCornerShape(26.dp)),
         )
+        // Made for you rail.
         ShimmerBox(
             Modifier
-                .fillMaxWidth(0.45f)
+                .fillMaxWidth(0.42f)
+                .height(24.dp)
+                .clip(RoundedCornerShape(8.dp)),
+        )
+        ShimmerBox(
+            Modifier
+                .width(250.dp)
+                .height(136.dp)
+                .clip(RoundedCornerShape(22.dp)),
+        )
+        // Trending grid.
+        ShimmerBox(
+            Modifier
+                .fillMaxWidth(0.42f)
                 .height(24.dp)
                 .clip(RoundedCornerShape(8.dp)),
         )
