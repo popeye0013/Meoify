@@ -19,9 +19,14 @@ fun Context.openUrl(url: String) {
 }
 
 /**
- * Starts a UPI payment. Google Pay, PhonePe, Paytm and friends all register for
- * the upi:// scheme, so the system picker lets the person choose. Returns false
- * when the device has no UPI app at all.
+ * Starts a UPI payment with the system chooser. Google Pay, PhonePe, Paytm and
+ * friends all register for the upi:// scheme, so the chooser lets the person
+ * pick whichever app they actually use. Returns false when no UPI app can
+ * handle the request (the caller then offers the UPI ID to copy).
+ *
+ * Notes on the parameters: `tr` is a unique transaction reference and
+ * `mode=02` marks an intent payment; a few apps (notably Paytm) reject
+ * requests that omit them.
  */
 fun Context.openUpiPayment(
     upiId: String,
@@ -29,32 +34,37 @@ fun Context.openUpiPayment(
     note: String? = null,
     amount: String? = null,
 ): Boolean {
+    val transactionRef = "MEO" + System.currentTimeMillis()
     val uri = Uri.parse("upi://pay").buildUpon()
         .appendQueryParameter("pa", upiId)
         .appendQueryParameter("pn", payeeName)
         .appendQueryParameter("cu", "INR")
+        .appendQueryParameter("tr", transactionRef)
+        .appendQueryParameter("mode", "02")
         .apply {
             if (!note.isNullOrBlank()) appendQueryParameter("tn", note)
             if (!amount.isNullOrBlank()) appendQueryParameter("am", amount)
         }
         .build()
 
-    val candidates = listOf(
-        Intent(Intent.ACTION_VIEW, uri).setPackage("com.google.android.apps.nbu.paisa.user"),
-        Intent(Intent.ACTION_VIEW, uri),
-    )
-    for (intent in candidates) {
-        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        try {
-            startActivity(intent)
-            return true
-        } catch (e: ActivityNotFoundException) {
-            // try the next candidate
-        } catch (e: SecurityException) {
-            // try the next candidate
-        }
+    val payIntent = Intent(Intent.ACTION_VIEW, uri).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    // With the <queries> entry in the manifest this sees every installed UPI
+    // app, so devices without one get the copy fallback instead of an empty
+    // chooser.
+    if (packageManager.queryIntentActivities(payIntent, 0).isEmpty()) return false
+    val chooser = Intent.createChooser(payIntent, "Pay with UPI").apply {
+        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
     }
-    return false
+    return try {
+        startActivity(chooser)
+        true
+    } catch (e: ActivityNotFoundException) {
+        false
+    } catch (e: SecurityException) {
+        false
+    } catch (e: IllegalArgumentException) {
+        false
+    }
 }
 
 fun Context.copyText(label: String, text: String) {

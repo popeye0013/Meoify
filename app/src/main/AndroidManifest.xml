@@ -8,6 +8,20 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
+    <!-- Android 11+ filters package visibility. Declaring both the scheme and
+         the upi://pay host keeps every installed UPI app visible to the
+         donation chooser, including Paytm-style intent filters. -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="upi" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="upi" android:host="pay" />
+        </intent>
+    </queries>
+
     <application
         android:name=".MeoifyApplication"
         android:allowBackup="true"

@@ -48,7 +48,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.QueueMusic
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
@@ -117,6 +116,7 @@ import com.meoify.music.data.model.Track
 import com.meoify.music.data.remote.TrackLyrics
 import com.meoify.music.playback.PlayerUiState
 import com.meoify.music.ui.components.TrackRow
+import com.meoify.music.ui.components.AudioQualitySheet
 import com.meoify.music.ui.components.ArtworkImage
 import com.meoify.music.ui.components.rememberTrackCover
 import com.meoify.music.ui.navigation.AppActions
@@ -721,67 +721,46 @@ private fun AudioPill(
     onQualityChange: (AudioQuality) -> Unit,
 ) {
     var open by remember { mutableStateOf(false) }
-    Box {
-        Surface(
-            onClick = { open = true },
-            shape = RoundedCornerShape(50),
-            color = Color.White.copy(alpha = 0.10f),
+    Surface(
+        onClick = { open = true },
+        shape = RoundedCornerShape(50),
+        color = Color.White.copy(alpha = 0.10f),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 15.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Row(
-                modifier = Modifier.padding(horizontal = 15.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Icon(
-                    Icons.Filled.GraphicEq,
-                    contentDescription = null,
-                    tint = Color.White.copy(alpha = 0.85f),
-                    modifier = Modifier.size(15.dp),
-                )
-                Spacer(Modifier.width(7.dp))
-                Text(
-                    text = quality.shortLabel,
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.SemiBold,
-                    color = Color.White.copy(alpha = 0.92f),
-                )
-                Spacer(Modifier.width(2.dp))
-                Icon(
-                    Icons.Filled.KeyboardArrowRight,
-                    contentDescription = "Audio quality: ${quality.title}",
-                    tint = Color.White.copy(alpha = 0.55f),
-                    modifier = Modifier.size(17.dp),
-                )
-            }
+            Icon(
+                Icons.Filled.GraphicEq,
+                contentDescription = null,
+                tint = Color.White.copy(alpha = 0.85f),
+                modifier = Modifier.size(15.dp),
+            )
+            Spacer(Modifier.width(7.dp))
+            Text(
+                text = quality.shortLabel,
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.SemiBold,
+                color = Color.White.copy(alpha = 0.92f),
+            )
+            Spacer(Modifier.width(2.dp))
+            Icon(
+                Icons.Filled.KeyboardArrowRight,
+                contentDescription = "Audio quality: ${quality.title}",
+                tint = Color.White.copy(alpha = 0.55f),
+                modifier = Modifier.size(17.dp),
+            )
         }
-        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-            AudioQuality.entries.forEach { option ->
-                DropdownMenuItem(
-                    text = {
-                        Column {
-                            Text(
-                                text = option.title,
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.Medium,
-                            )
-                            Text(
-                                text = option.description,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    },
-                    leadingIcon = {
-                        if (option == quality) {
-                            Icon(Icons.Filled.Check, contentDescription = null)
-                        }
-                    },
-                    onClick = {
-                        open = false
-                        onQualityChange(option)
-                    },
-                )
-            }
-        }
+    }
+    if (open) {
+        AudioQualitySheet(
+            quality = quality,
+            onSelect = { option ->
+                open = false
+                onQualityChange(option)
+            },
+            onDismiss = { open = false },
+        )
     }
 }
 

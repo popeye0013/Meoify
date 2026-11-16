@@ -61,7 +61,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
@@ -103,6 +102,7 @@ import com.meoify.music.data.backup.BackupManager
 import com.meoify.music.data.model.AudioQuality
 import com.meoify.music.data.model.DeveloperInfo
 import com.meoify.music.data.model.ThemeMode
+import com.meoify.music.ui.components.AudioQualitySheet
 import com.meoify.music.ui.components.ProfileAvatar
 import com.meoify.music.ui.navigation.LocalAppActions
 import com.meoify.music.ui.navigation.LocalBottomContentInset
@@ -151,6 +151,7 @@ fun SettingsScreen(
     }
 
     var editProfile by remember { mutableStateOf(false) }
+    var showQualitySheet by remember { mutableStateOf(false) }
     var nameDraft by remember { mutableStateOf("") }
     var restoreUri by remember { mutableStateOf<Uri?>(null) }
     var checkingUpdate by remember { mutableStateOf(false) }
@@ -475,37 +476,60 @@ fun SettingsScreen(
             if (matches(*playbackKeys)) {
             item { SectionLabel("Playback") }
             item {
-                SettingsCard {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                Surface(
+                    onClick = { showQualitySheet = true },
+                    shape = RoundedCornerShape(24.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerLow,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Surface(
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.14f),
+                            modifier = Modifier.size(42.dp),
+                        ) {
+                            Icon(
+                                Icons.Filled.GraphicEq,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.padding(10.dp),
+                            )
+                        }
+                        Spacer(Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Audio quality",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            Spacer(Modifier.height(2.dp))
+                            Text(
+                                text = settings.quality.title,
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                            Spacer(Modifier.height(2.dp))
+                            Text(
+                                text = settings.quality.description,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        Spacer(Modifier.width(8.dp))
                         Icon(
-                            Icons.Filled.GraphicEq,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
+                            Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                            contentDescription = "Change audio quality",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.size(20.dp),
                         )
-                        Spacer(Modifier.width(10.dp))
-                        Text(
-                            text = "Audio quality",
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.SemiBold,
-                        )
                     }
-                    Spacer(Modifier.height(8.dp))
-                    AudioQuality.entries.forEach { quality ->
-                        QualityRow(
-                            quality = quality,
-                            selected = settings.quality == quality,
-                            onClick = { app.container.settings.setQuality(quality) },
-                        )
-                    }
-                    Spacer(Modifier.height(6.dp))
-                    Text(
-                        text = "Meoify streams from YouTube Music, which tops out at " +
-                            "256 kbps AAC/Opus. The highest tiers use the best available stream.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(horizontal = 6.dp),
-                    )
+                }
+            }
+            item {
+                SettingsCard {
                     ToggleRow(
                         icon = Icons.Filled.History,
                         title = "Sync to YouTube Music history",
@@ -728,6 +752,17 @@ fun SettingsScreen(
             dismissButton = {
                 TextButton(onClick = { updateRelease = null }) { Text("Later") }
             },
+        )
+    }
+
+    if (showQualitySheet) {
+        AudioQualitySheet(
+            quality = settings.quality,
+            onSelect = { quality ->
+                app.container.settings.setQuality(quality)
+                showQualitySheet = false
+            },
+            onDismiss = { showQualitySheet = false },
         )
     }
 
@@ -1479,45 +1514,3 @@ private fun ActionRow(
     }
 }
 
-@Composable
-private fun QualityRow(
-    quality: AudioQuality,
-    selected: Boolean,
-    onClick: () -> Unit,
-) {
-    val background = if (selected) {
-        MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)
-    } else {
-        Color.Transparent
-    }
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .background(background)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 8.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        RadioButton(selected = selected, onClick = null)
-        Spacer(Modifier.width(6.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = quality.title,
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold,
-                color = if (selected) {
-                    MaterialTheme.colorScheme.primary
-                } else {
-                    MaterialTheme.colorScheme.onSurface
-                },
-            )
-            Spacer(Modifier.height(2.dp))
-            Text(
-                text = quality.description,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
-}
