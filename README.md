@@ -1,40 +1,99 @@
-# Meoify
+<p align="center">
+  <img src="docs/logo.svg" width="128" alt="Meoify logo" />
+</p>
 
-A native, unofficial YouTube Music client for Android with a Material 3 Expressive interface, built with Kotlin and Jetpack Compose.
+<h1 align="center">Meoify</h1>
 
-Inspired by the layout and feature set of [LastWave](https://github.com/Clash-Projects/LastWave-native), focused on a clean phone-sized experience and a small, hackable codebase.
+<p align="center">
+  <strong>A native, unofficial YouTube Music client for Android.</strong><br/>
+  Material 3 Expressive · Background playback · Real album artwork · Open source
+</p>
+
+<p align="center">
+  <a href="https://github.com/popeye0013/Meoify/releases/latest">
+    <img src="https://img.shields.io/github/v/release/popeye0013/Meoify?style=for-the-badge&color=FF4D67&labelColor=0D0D0F" alt="Latest release" />
+  </a>
+  <a href="https://github.com/popeye0013/Meoify/releases">
+    <img src="https://img.shields.io/github/downloads/popeye0013/Meoify/total?style=for-the-badge&color=FF4D67&labelColor=0D0D0F" alt="Total downloads" />
+  </a>
+  <a href="LICENSE">
+    <img src="https://img.shields.io/github/license/popeye0013/Meoify?style=for-the-badge&color=7C3AED&labelColor=0D0D0F" alt="License" />
+  </a>
+  <img src="https://img.shields.io/badge/Android-8.0%2B-3DDC84?style=for-the-badge&logo=android&logoColor=white&labelColor=0D0D0F" alt="Android 8.0+" />
+</p>
+
+---
 
 ## Download
 
-Grab the latest APK from the [Releases page](https://github.com/popeye0013/Meoify/releases/latest). The release build installs like any other app and upgrades in place over older builds.
+Get the latest APK from the [Releases page](https://github.com/popeye0013/Meoify/releases/latest) and install it like any other Android app.
 
-| Version | Package | Min Android |
-|---|---|---|
-| 1.7.4 | `com.meoify.music` | 8.0 (API 26) |
+> Android 8.0 (API 26) or newer is required. Meoify is not on the Play Store.
 
 ## Features
 
-- **Home feed** — personalised greeting, quick picks, made-for-you mixes, trending songs, new releases, top artists and charts, with pull to refresh.
-- **Search** — a back circle and pill search field with voice input, always-visible Tracks / Albums / Artists / Playlists filters, live suggestions, recent searches and an "Explore genres & moods" grid of genre pills.
-- **Library** — liked songs, local playlists (create / rename / delete) with list or grid layout, saved albums and recently played tracks.
-- **Your YouTube Music playlists** — when signed in, the Library tab lists the playlists saved to your own YouTube Music account and opens them in the player.
-- **Player** — square album canvas shown at its natural aspect ratio, circular close/overflow header buttons, heart and lyrics circles, a wavy seek bar with a large tinted thumb, an Audio pill that switches quality, a wide accent play/pause pill, and shuffle / mute / repeat pills, plus queue management and a mini player.
-- **Real album artwork** — song covers are square music artwork from YouTube Music, Spotify's catalogue or Apple's catalogue as a backup; a frame from a music video is never shown as a song's cover.
-- **Lyrics** — a single `LYRICS` header with the track title, a large glowing active line that scrolls itself, a wavy seek bar and previous / play / next circles flanked by the elapsed and remaining times.
-- **Responsive layout** — the player lays out side by side in landscape, artwork stays square, and no screen takes over the display or hides the system bars.
-- **YouTube Music history sync** — songs you actually listen to in Meoify are reported to your signed-in YouTube Music account history, including lossless streams and downloaded files, using the same per-play tracking ping YouTube's own web player sends, with the account's visitor id so YouTube credits the listen. A listen counts after 30 seconds of real playback; pauses, buffering and seeks don't count.
-- **Album & playlist pages** — circular back button, oversized rounded artwork with soft shadow, centred title and "source • N tracks" meta, Play and Shuffle pills, a wide "Save to library" button and rounded track cards with artwork, artist • album, duration and a menu.
-- **Navigation** — floating pill navigation bar that expands the active tab into a labelled pill.
+- **Home** — a personalised greeting, quick picks, made-for-you mixes, trending songs, new releases, top artists and charts, with pull to refresh.
+- **Search** — a clean pill search field with voice input, live suggestions, recent searches, genre shortcuts and always-visible Tracks / Albums / Artists / Playlists filters.
+- **Library** — liked songs, local playlists, saved albums and recently played music, with list and grid layouts.
+- **YouTube Music playlists** — when signed in, your YouTube Music playlists appear in the Library tab and open directly in the player.
+- **Player** — square album artwork, a wavy seek bar, audio-quality switching, shuffle, mute, repeat, queue management and a floating mini player.
+- **Real album artwork** — covers come from YouTube Music, Spotify's catalogue and Apple's catalogue, with a YouTube Music cover fallback. A music-video frame is never shown as a song's cover.
 - **Synced lyrics** — LRC lyrics from LRCLIB with auto-scroll and tap-to-seek, plus a plain-text fallback.
-- **Playback** — ExoPlayer/Media3 background playback with lockscreen and notification controls.
-- **Accounts** — optional YouTube Music web sign-in for a personalised home feed.
-- **Profile & settings** — your avatar in the home header opens a single page with your YouTube Music account, name/email, library stats, search in the top bar, coloured section headings, rounded cards with icon tiles and chevrons, sign in/out and every setting in one place.
-- **Local profile** — people who don't want to sign in can set a name and profile picture that is used across the home header and settings page.
-- **Backup & restore** — export your local playlists and local profile to a human-readable `.json` file and restore them later, with a confirmation before a restore replaces anything.
-- **Developer card** — the settings screen credits the developer with a live GitHub avatar and links to Telegram and GitHub.
-- **Support** — a donation card with a UPI ID, copy button and a one-tap "Donate with UPI" intent that opens Google Pay, PhonePe, Paytm or any other UPI app.
-- **Material 3** — light/dark/system theme, pure black, dynamic colour on Android 12+, expressive rounded surfaces and Google Sans Flex typography.
-- **Sharing** — share songs to other apps and open album/artist pages from the track menu.
+- **Background playback** — ExoPlayer / Media3 playback with lockscreen and notification controls.
+- **YouTube Music accounts** — optional web sign-in for a personalised home feed and account library. Likes and playlists sync back to the account.
+- **YouTube Music history** — real listens are reported to your signed-in account using the same tracking ping as YouTube's web player.
+- **Local profile** — use Meoify without an account and set a name and profile picture that appear across the app.
+- **Backup & restore** — export local playlists and your local profile to a readable `.json` file and restore them later.
+- **In-app updates** — Settings → About checks for a newer release and opens the APK download.
+- **Material 3 Expressive** — light, dark and pure-black themes, dynamic colour on Android 12+, expressive rounded surfaces and Google Sans Flex typography.
+- **Sharing** — share songs and open album or artist pages from the track menu.
+
+## Build
+
+Requirements: **JDK 17** and **Android SDK 36**.
+
+```bash
+git clone https://github.com/popeye0013/Meoify.git
+cd Meoify
+gradle assembleRelease
+```
+
+The APK is written to:
+
+```text
+app/build/outputs/apk/release/app-release.apk
+```
+
+For a debug build:
+
+```bash
+gradle assembleDebug
+```
+
+## Stack
+
+| Layer | Technology |
+|---|---|
+| Language | Kotlin 2.4 |
+| UI | Jetpack Compose, Material 3 |
+| Playback | Media3 / ExoPlayer |
+| Networking | OkHttp, InnerTube (WEB_REMIX) |
+| Streaming | NewPipeExtractor |
+| Images | Coil 3 |
+| Storage | DataStore, kotlinx.serialization |
+| Lyrics | LRCLIB |
+| Artwork | YouTube Music, Spotify, Apple iTunes |
+
+## Legal disclaimer
+
+Meoify is an **unofficial, independent project**. It is not affiliated with, endorsed by, or sponsored by YouTube, Google or any music catalogue provider.
+
+- Meoify does **not** host, store or redistribute audio. Audio is streamed from YouTube Music.
+- All trademarks, logos and content belong to their respective owners.
+- You are responsible for how you use this app and for complying with the terms of service of any service you access.
+- The app is provided **as is**, without warranty of any kind. Use it at your own risk.
+
+If you are a rights holder and have a concern, please open an issue or contact the developer.
 
 ## Credits
 
@@ -43,25 +102,6 @@ Built by **Akash** ([@popeye0013](https://github.com/popeye0013)).
 - GitHub: https://github.com/popeye0013
 - Telegram: https://t.me/popeye0013
 
-Donations are optional and go straight to the developer via UPI: `slalakash123@oksbi`.
+Inspired by the layout and feature set of [LastWave](https://github.com/Clash-Projects/LastWave-native).
 
-Audio is streamed from YouTube Music. The app does not host, download or redistribute audio. It is not affiliated with YouTube or Google.
-
-## Build
-
-Requirements: JDK 17 and Android SDK 36.
-
-```bash
-gradle assembleRelease
-```
-
-The APK is written to `app/build/outputs/apk/release/app-release.apk`.
-
-## Stack
-
-- Kotlin, Jetpack Compose, Material 3
-- Media3 / ExoPlayer
-- OkHttp + InnerTube (WEB_REMIX)
-- NewPipeExtractor for stream resolution
-- Coil, DataStore, kotlinx.serialization
-- LRCLIB for synced lyrics
+Released under the [GNU General Public License v3.0](LICENSE).
