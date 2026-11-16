@@ -177,18 +177,18 @@ fun PlayerScreen(onClose: () -> Unit) {
         }
     }
 
+    // One effect owns both the reset and the fetch. Splitting them left the
+    // view empty after a track change: the load effect saw the previous track's
+    // lyrics and returned early, then the reset effect cleared them.
     LaunchedEffect(track?.id, showLyrics) {
+        lyrics = null
+        lyricsLoading = false
         if (!showLyrics || track == null) return@LaunchedEffect
-        if (lyrics != null) return@LaunchedEffect
         lyricsLoading = true
-        lyrics = withContext(Dispatchers.IO) {
+        val loaded = withContext(Dispatchers.IO) {
             runCatching { app.container.repository.trackLyrics(track) }.getOrNull()
         }
-        lyricsLoading = false
-    }
-
-    LaunchedEffect(track?.id) {
-        lyrics = null
+        lyrics = loaded
         lyricsLoading = false
     }
 
@@ -993,10 +993,19 @@ private fun LyricsView(
 ) {
     val listState = rememberLazyListState()
     val currentIndex = lyrics?.lines?.indexOfLast { it.timeMs <= positionMs } ?: -1
+    // Jump straight to the current line when the view opens (or after a seek);
+    // only later line changes animate. Scrolling must also follow the position
+    // while paused, otherwise a manual seek leaves the old line highlighted.
+    var centered by remember(lyrics) { mutableStateOf(false) }
 
-    LaunchedEffect(currentIndex, isPlaying) {
-        if (currentIndex >= 0 && isPlaying) {
-            listState.animateScrollToItem((currentIndex - 2).coerceAtLeast(0))
+    LaunchedEffect(lyrics, currentIndex) {
+        if (currentIndex < 0) return@LaunchedEffect
+        val target = (currentIndex - 2).coerceAtLeast(0)
+        if (centered) {
+            listState.animateScrollToItem(target)
+        } else {
+            listState.scrollToItem(target)
+            centered = true
         }
     }
 

@@ -240,7 +240,9 @@ class PlayerConnection(
                         )
                     }
                 }
-                delay(500)
+                // Lyrics highlight the line for the current position; 250 ms
+                // keeps it close to the audio without busy-looping.
+                delay(if (c?.isPlaying == true) 250 else 500)
             }
         }
     }
