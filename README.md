@@ -90,9 +90,5 @@ Meoify is an **unofficial, independent project**. It is not affiliated with, end
 
 - Meoify does **not** host, store or redistribute audio. Audio is streamed from YouTube Music.
 - All trademarks, logos and content belong to their respective owners.
-- You are responsible for how you use this app and for complying with the terms of service of any service you access.
-- The app is provided **as is**, without warranty of any kind. Use it at your own risk.
 
-If you are a rights holder and have a concern, please open an issue or contact the developer.
-
-Released under the [GNU General Public License v3.0](LICENSE).
+If you are a rights holder and have a concern, please open an issue or contact me.
