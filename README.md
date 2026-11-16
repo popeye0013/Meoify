@@ -256,9 +256,3 @@ Meoify is an **unofficial, independent project**. It is not affiliated with, end
 - All trademarks, logos and content belong to their respective owners.
 
 If you are a rights holder and have a concern, please open an issue or contact the maintainer.
-
----
-
-<p align="center">
-  <sub>Built with Kotlin and Jetpack Compose · GPL-3.0 · Made for music lovers</sub>
-</p>
