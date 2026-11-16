@@ -1,6 +1,5 @@
 package com.meoify.music.ui.screens.home
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -20,7 +19,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
@@ -28,8 +26,10 @@ import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.WifiOff
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -48,7 +48,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.meoify.music.MeoifyApplication
@@ -68,7 +67,6 @@ import com.meoify.music.ui.navigation.LocalAppActions
 import com.meoify.music.ui.navigation.LocalBottomContentInset
 import com.meoify.music.ui.navigation.LocalLibrary
 import com.meoify.music.ui.navigation.LocalPlayerState
-import com.meoify.music.ui.theme.ArtworkColorCache
 import com.meoify.music.ui.viewmodel.HomeViewModel
 import com.meoify.music.ui.viewmodel.ProfileViewModel
 import com.meoify.music.ui.viewmodel.ProfileViewModelFactory
@@ -163,35 +161,23 @@ fun HomeScreen() {
                 is UiState.Success -> {
                     val feed = s.value
                     val quickTracks = (library.recent + feed.quickPicks).distinctBy { it.id }.take(6)
-                    val quickPicks = feed.quickPicks.take(6)
                     val featured = feed.communityPlaylists.firstOrNull()
                     val madeForYou = feed.communityPlaylists.let { playlists ->
                         // The first playlist is already the featured card above.
                         if (featured != null && playlists.size > 1) playlists.drop(1) else playlists
                     }
+                    val quickPicks = feed.quickPicks.take(6)
                     val trendingTracks = if (feed.quickPicks.size > quickPicks.size) {
                         feed.quickPicks.drop(quickPicks.size).take(10)
                     } else {
                         feed.quickPicks.take(10)
                     }
 
-                    if (quickPicks.isNotEmpty()) {
+                    if (featured != null) {
                         item {
-                            SectionHeader(
-                                title = "Quick picks",
-                                subtitle = "Trending songs worth playing now",
-                                actionLabel = "See all",
-                                onAction = { actions.search("trending music") },
-                            )
-                        }
-                        item {
-                            QuickPicksRail(
-                                tracks = quickPicks,
-                                currentTrackId = currentTrackId,
-                                onPlay = { index ->
-                                    actions.playTracks(quickPicks, index, "Quick picks")
-                                },
-                                onMore = { track -> actions.openTrackMenu(track) },
+                            FeaturedCard(
+                                card = featured,
+                                onClick = { openCard(featured, actions) },
                             )
                         }
                     }
@@ -217,31 +203,39 @@ fun HomeScreen() {
                         }
                     }
 
-                    if (featured != null) {
+                    if (quickPicks.isNotEmpty()) {
                         item {
-                            FeaturedCard(
-                                card = featured,
-                                onClick = { openCard(featured, actions) },
+                            SectionHeader(
+                                title = "Quick picks",
+                                subtitle = "Trending songs worth playing now",
+                                actionLabel = "See all",
+                                onAction = { actions.search("trending music") },
+                            )
+                        }
+                        item {
+                            QuickPicksRail(
+                                tracks = quickPicks,
+                                currentTrackId = currentTrackId,
+                                onPlay = { index ->
+                                    actions.playTracks(quickPicks, index, "Quick picks")
+                                },
+                                onMore = { track -> actions.openTrackMenu(track) },
                             )
                         }
                     }
 
                     if (madeForYou.isNotEmpty()) {
-                        item {
-                            SectionHeader(
-                                title = "Made for you",
-                                subtitle = "Playlists picked for your taste",
-                            )
-                        }
+                        item { SectionHeader(title = "Made for you") }
                         item {
                             LazyRow(
                                 contentPadding = PaddingValues(horizontal = 16.dp),
                                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                             ) {
-                                items(madeForYou, key = { "mfy_" + it.id }) { card ->
-                                    MadeForYouCard(
+                                items(madeForYou, key = { it.id }) { card ->
+                                    MediaCard(
                                         card = card,
                                         onClick = { openCard(card, actions) },
+                                        width = 150.dp,
                                     )
                                 }
                             }
@@ -443,100 +437,70 @@ private fun HomeHeader(
 
 @Composable
 private fun FeaturedCard(card: MediaCardModel, onClick: () -> Unit) {
-    val pair = ArtworkColorCache.gradientPair(card.id)
-    val eyebrow = when (card.kind) {
-        MediaKind.PLAYLIST -> "FEATURED PLAYLIST"
-        MediaKind.MIX -> "FEATURED MIX"
-        else -> "FEATURED"
-    }
-    Surface(
-        onClick = onClick,
-        shape = RoundedCornerShape(26.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
-        border = BorderStroke(
-            1.dp,
-            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f),
-        ),
+    Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
+            .padding(horizontal = 16.dp, vertical = 12.dp)
+            .height(190.dp)
+            .clip(RoundedCornerShape(28.dp))
+            .clickable(onClick = onClick)
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh),
     ) {
-        Row(
-            modifier = Modifier.background(
-                Brush.linearGradient(
-                    listOf(
-                        pair.first.copy(alpha = 0.32f),
-                        pair.second.copy(alpha = 0.10f),
-                        Color.Transparent,
+        ArtworkImage(
+            url = card.thumbnailUrl,
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.fillMaxSize(),
+        )
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        listOf(Color.Transparent, Color.Black.copy(alpha = 0.25f), Color.Black.copy(alpha = 0.86f)),
                     ),
                 ),
-            ),
-            verticalAlignment = Alignment.CenterVertically,
+        )
+        Row(
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .fillMaxWidth()
+                .padding(20.dp),
+            verticalAlignment = Alignment.Bottom,
         ) {
-            Box(modifier = Modifier.padding(12.dp)) {
-                ArtworkImage(
-                    url = card.thumbnailUrl,
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier
-                        .size(132.dp)
-                        .clip(RoundedCornerShape(20.dp))
-                        .background(MaterialTheme.colorScheme.surfaceContainerHighest),
-                )
-            }
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(start = 2.dp, end = 16.dp, top = 16.dp, bottom = 16.dp),
-            ) {
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = eyebrow,
+                    text = "PICKED FOR YOU",
                     style = MaterialTheme.typography.labelSmall,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = MaterialTheme.colorScheme.primary,
-                    letterSpacing = 1.4.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White.copy(alpha = 0.78f),
                 )
-                Spacer(Modifier.height(4.dp))
                 Text(
                     text = card.title,
-                    style = MaterialTheme.typography.titleLarge,
+                    style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.ExtraBold,
-                    color = MaterialTheme.colorScheme.onSurface,
+                    color = Color.White,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
                     text = card.subtitle ?: "Picked from your listening",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = Color.White.copy(alpha = 0.8f),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                Spacer(Modifier.height(12.dp))
-                Surface(
-                    onClick = onClick,
-                    shape = RoundedCornerShape(50),
-                    color = MaterialTheme.colorScheme.primary,
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Icon(
-                            Icons.Filled.PlayArrow,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onPrimary,
-                            modifier = Modifier.size(18.dp),
-                        )
-                        Spacer(Modifier.width(6.dp))
-                        Text(
-                            text = "Play",
-                            style = MaterialTheme.typography.labelLarge,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onPrimary,
-                        )
-                    }
-                }
+            }
+            Spacer(Modifier.width(12.dp))
+            FilledIconButton(
+                onClick = onClick,
+                colors = IconButtonDefaults.filledIconButtonColors(
+                    containerColor = Color.White,
+                    contentColor = Color.Black,
+                ),
+                modifier = Modifier.size(48.dp),
+            ) {
+                Icon(Icons.Filled.PlayArrow, contentDescription = "Play")
             }
         }
     }
@@ -566,82 +530,6 @@ private fun QuickPicksRail(
 }
 
 @Composable
-private fun MadeForYouCard(card: MediaCardModel, onClick: () -> Unit) {
-    val pair = ArtworkColorCache.gradientPair(card.id)
-    Surface(
-        onClick = onClick,
-        shape = RoundedCornerShape(22.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
-        border = BorderStroke(
-            1.dp,
-            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f),
-        ),
-        modifier = Modifier
-            .width(240.dp)
-            .height(136.dp),
-    ) {
-        Box(modifier = Modifier.fillMaxSize()) {
-            ArtworkImage(
-                url = card.thumbnailUrl,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize(),
-            )
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.verticalGradient(
-                            listOf(
-                                Color.Transparent,
-                                pair.first.copy(alpha = 0.22f),
-                                Color.Black.copy(alpha = 0.82f),
-                            ),
-                        ),
-                    ),
-            )
-            Column(
-                modifier = Modifier
-                    .align(Alignment.BottomStart)
-                    .padding(start = 14.dp, end = 58.dp, bottom = 12.dp),
-            ) {
-                Text(
-                    text = card.title,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = Color.White,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    text = card.subtitle ?: "Made for you",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = Color.White.copy(alpha = 0.78f),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-            Box(
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(12.dp)
-                    .size(38.dp)
-                    .clip(CircleShape)
-                    .background(Color.White.copy(alpha = 0.18f)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    Icons.Filled.PlayArrow,
-                    contentDescription = null,
-                    tint = Color.White,
-                    modifier = Modifier.size(22.dp),
-                )
-            }
-        }
-    }
-}
-
-@Composable
 private fun QuickAccessGrid(
     tracks: List<Track>,
     currentTrackId: String?,
@@ -663,10 +551,6 @@ private fun QuickAccessGrid(
                         onClick = { onPlay(track) },
                         shape = RoundedCornerShape(18.dp),
                         color = MaterialTheme.colorScheme.surfaceContainerLow,
-                        border = BorderStroke(
-                            1.dp,
-                            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f),
-                        ),
                         modifier = Modifier
                             .weight(1f)
                             .height(64.dp),
@@ -710,23 +594,14 @@ private fun HomeLoading() {
         modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        // Quick picks rail.
+        // Featured playlist.
         ShimmerBox(
             Modifier
-                .fillMaxWidth(0.42f)
-                .height(24.dp)
-                .clip(RoundedCornerShape(8.dp)),
+                .fillMaxWidth()
+                .padding(vertical = 12.dp)
+                .height(190.dp)
+                .clip(RoundedCornerShape(28.dp)),
         )
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            repeat(2) {
-                ShimmerBox(
-                    Modifier
-                        .weight(1f)
-                        .aspectRatio(0.72f)
-                        .clip(RoundedCornerShape(20.dp)),
-                )
-            }
-        }
         // Jump back in tiles.
         ShimmerBox(
             Modifier
@@ -746,13 +621,23 @@ private fun HomeLoading() {
                 }
             }
         }
-        // Featured card.
+        // Quick picks rail.
         ShimmerBox(
             Modifier
-                .fillMaxWidth()
-                .height(156.dp)
-                .clip(RoundedCornerShape(26.dp)),
+                .fillMaxWidth(0.42f)
+                .height(24.dp)
+                .clip(RoundedCornerShape(8.dp)),
         )
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            repeat(2) {
+                ShimmerBox(
+                    Modifier
+                        .weight(1f)
+                        .aspectRatio(0.72f)
+                        .clip(RoundedCornerShape(20.dp)),
+                )
+            }
+        }
         // Made for you rail.
         ShimmerBox(
             Modifier
@@ -760,12 +645,16 @@ private fun HomeLoading() {
                 .height(24.dp)
                 .clip(RoundedCornerShape(8.dp)),
         )
-        ShimmerBox(
-            Modifier
-                .width(250.dp)
-                .height(136.dp)
-                .clip(RoundedCornerShape(22.dp)),
-        )
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            repeat(2) {
+                ShimmerBox(
+                    Modifier
+                        .weight(1f)
+                        .aspectRatio(1f)
+                        .clip(RoundedCornerShape(16.dp)),
+                )
+            }
+        }
         // Trending grid.
         ShimmerBox(
             Modifier
