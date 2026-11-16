@@ -62,11 +62,12 @@ import com.meoify.music.ui.components.SectionHeader
 import com.meoify.music.ui.components.ProfileAvatar
 import com.meoify.music.ui.components.ShimmerBox
 import com.meoify.music.ui.components.ArtworkImage
-import com.meoify.music.ui.components.TrackRow
+import com.meoify.music.ui.components.SongCard
 import com.meoify.music.ui.components.rememberTrackCover
 import com.meoify.music.ui.navigation.LocalAppActions
 import com.meoify.music.ui.navigation.LocalBottomContentInset
 import com.meoify.music.ui.navigation.LocalLibrary
+import com.meoify.music.ui.navigation.LocalPlayerState
 import com.meoify.music.ui.viewmodel.HomeViewModel
 import com.meoify.music.ui.viewmodel.ProfileViewModel
 import com.meoify.music.ui.viewmodel.ProfileViewModelFactory
@@ -87,6 +88,8 @@ fun HomeScreen() {
     val refreshing by viewModel.refreshing.collectAsStateWithLifecycle()
     val library = LocalLibrary.current
     val actions = LocalAppActions.current
+    val playerState = LocalPlayerState.current
+    val currentTrackId = playerState.track?.id
     val settings by appContainer.settings.settings.collectAsStateWithLifecycle()
     val profileViewModel: ProfileViewModel = viewModel(
         factory = ProfileViewModelFactory(appContainer.repository),
@@ -175,6 +178,7 @@ fun HomeScreen() {
                         item {
                             QuickAccessGrid(
                                 tracks = quickTracks,
+                                currentTrackId = currentTrackId,
                                 onPlay = { track ->
                                     actions.playTracks(quickTracks, quickTracks.indexOf(track), "Jump back in")
                                 },
@@ -208,13 +212,34 @@ fun HomeScreen() {
                                 onAction = { actions.search("trending music") },
                             )
                         }
-                        items(feed.quickPicks.take(10), key = { it.id }) { track ->
-                            val idx = feed.quickPicks.indexOf(track)
-                            TrackRow(
-                                track = track,
-                                onClick = { actions.playTracks(feed.quickPicks, idx, "Trending now") },
-                                onMoreClick = { actions.openTrackMenu(track) },
-                            )
+                        val trending = feed.quickPicks.take(6)
+                        items(
+                            items = trending.chunked(2),
+                            key = { row -> "trending_" + row.joinToString("|") { it.id } },
+                        ) { row ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp, vertical = 5.dp),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            ) {
+                                row.forEach { track ->
+                                    SongCard(
+                                        track = track,
+                                        isCurrent = currentTrackId == track.id,
+                                        onClick = {
+                                            actions.playTracks(
+                                                feed.quickPicks,
+                                                feed.quickPicks.indexOf(track),
+                                                "Trending now",
+                                            )
+                                        },
+                                        onMoreClick = { actions.openTrackMenu(track) },
+                                        modifier = Modifier.weight(1f),
+                                    )
+                                }
+                                if (row.size == 1) Spacer(Modifier.weight(1f))
+                            }
                         }
                     }
 
@@ -446,7 +471,11 @@ private fun FeaturedCard(card: MediaCardModel, onClick: () -> Unit) {
 }
 
 @Composable
-private fun QuickAccessGrid(tracks: List<Track>, onPlay: (Track) -> Unit) {
+private fun QuickAccessGrid(
+    tracks: List<Track>,
+    currentTrackId: String?,
+    onPlay: (Track) -> Unit,
+) {
     Column(
         modifier = Modifier.padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -458,13 +487,14 @@ private fun QuickAccessGrid(tracks: List<Track>, onPlay: (Track) -> Unit) {
             ) {
                 row.forEach { track ->
                     val cover = rememberTrackCover(track)
+                    val current = track.id == currentTrackId
                     Surface(
                         onClick = { onPlay(track) },
-                        shape = RoundedCornerShape(14.dp),
+                        shape = RoundedCornerShape(18.dp),
                         color = MaterialTheme.colorScheme.surfaceContainerLow,
                         modifier = Modifier
                             .weight(1f)
-                            .height(62.dp),
+                            .height(64.dp),
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             ArtworkImage(
@@ -472,17 +502,35 @@ private fun QuickAccessGrid(tracks: List<Track>, onPlay: (Track) -> Unit) {
                                 contentDescription = null,
                                 contentScale = ContentScale.Crop,
                                 modifier = Modifier
-                                    .size(62.dp)
+                                    .size(64.dp)
                                     .background(MaterialTheme.colorScheme.surfaceContainerHighest),
                             )
                             Text(
                                 text = track.title,
                                 style = MaterialTheme.typography.labelLarge,
                                 fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.onSurface,
+                                color = if (current) {
+                                    MaterialTheme.colorScheme.primary
+                                } else {
+                                    MaterialTheme.colorScheme.onSurface
+                                },
                                 maxLines = 2,
                                 overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.padding(horizontal = 10.dp),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .padding(horizontal = 10.dp),
+                            )
+                            Icon(
+                                Icons.Filled.PlayArrow,
+                                contentDescription = null,
+                                tint = if (current) {
+                                    MaterialTheme.colorScheme.primary
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                },
+                                modifier = Modifier
+                                    .padding(end = 10.dp)
+                                    .size(18.dp),
                             )
                         }
                     }
@@ -501,20 +549,25 @@ private fun HomeLoading() {
     ) {
         ShimmerBox(Modifier.fillMaxWidth().height(190.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            ShimmerBox(Modifier.weight(1f).height(62.dp))
-            ShimmerBox(Modifier.weight(1f).height(62.dp))
+            ShimmerBox(Modifier.weight(1f).height(64.dp))
+            ShimmerBox(Modifier.weight(1f).height(64.dp))
         }
-        ShimmerBox(Modifier.fillMaxWidth().height(28.dp).padding(top = 8.dp))
-        repeat(4) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                ShimmerBox(Modifier.size(48.dp))
-                Spacer(Modifier.width(12.dp))
-                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    ShimmerBox(Modifier.fillMaxWidth(0.7f).height(14.dp))
-                    ShimmerBox(Modifier.fillMaxWidth(0.4f).height(10.dp))
+        ShimmerBox(Modifier.fillMaxWidth(0.45f).height(26.dp).padding(top = 8.dp))
+        repeat(2) {
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                repeat(2) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        ShimmerBox(
+                            Modifier
+                                .fillMaxWidth()
+                                .aspectRatio(1f)
+                                .clip(RoundedCornerShape(20.dp)),
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        ShimmerBox(Modifier.fillMaxWidth(0.8f).height(14.dp))
+                        Spacer(Modifier.height(6.dp))
+                        ShimmerBox(Modifier.fillMaxWidth(0.5f).height(10.dp))
+                    }
                 }
             }
         }

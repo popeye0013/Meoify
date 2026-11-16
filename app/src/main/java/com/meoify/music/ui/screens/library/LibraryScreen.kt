@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -21,15 +22,15 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.automirrored.filled.ViewList
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.GridView
-import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PlaylistAdd
-import androidx.compose.material.icons.filled.ViewList
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -64,18 +65,19 @@ import com.meoify.music.data.model.LocalPlaylist
 import com.meoify.music.data.model.MediaCard as MediaCardModel
 import com.meoify.music.data.model.MediaKind
 import com.meoify.music.data.model.Track
-import com.meoify.music.ui.components.ArtworkImage
 import com.meoify.music.ui.components.MediaCard
+import com.meoify.music.ui.components.PlaylistCard
+import com.meoify.music.ui.components.PlaylistListCard
 import com.meoify.music.ui.components.SectionHeader
 import com.meoify.music.ui.components.ShimmerBox
-import com.meoify.music.ui.components.TrackRow
+import com.meoify.music.ui.components.TrackCard
 import com.meoify.music.ui.navigation.LocalAppActions
 import com.meoify.music.ui.navigation.LocalBottomContentInset
 import com.meoify.music.ui.navigation.LocalLibrary
+import com.meoify.music.ui.navigation.LocalPlayerState
 import com.meoify.music.ui.navigation.LocalSignedIn
 import com.meoify.music.ui.navigation.LocalYtLoading
 import com.meoify.music.ui.navigation.LocalYtPlaylists
-import com.meoify.music.ui.theme.ArtworkColorCache
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -91,6 +93,7 @@ fun LibraryScreen(
     val ytPlaylists = LocalYtPlaylists.current
     val ytLoading = LocalYtLoading.current
     val signedIn = LocalSignedIn.current
+    val currentTrackId = LocalPlayerState.current.track?.id
 
     var filterName by rememberSaveable { mutableStateOf(LibraryFilter.Playlists.name) }
     val filter = LibraryFilter.valueOf(filterName)
@@ -132,7 +135,7 @@ fun LibraryScreen(
                 if (filter == LibraryFilter.Playlists) {
                     IconButton(onClick = { app.container.settings.setLibraryGridView(!gridView) }) {
                         Icon(
-                            imageVector = if (gridView) Icons.Filled.ViewList else Icons.Filled.GridView,
+                            imageVector = if (gridView) Icons.AutoMirrored.Filled.ViewList else Icons.Filled.GridView,
                             contentDescription = if (gridView) "Show as list" else "Show as grid",
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -197,8 +200,12 @@ fun LibraryScreen(
                     }
 
                     when {
-                        ytPlaylists.isEmpty() && ytLoading -> items(3) {
-                            YtPlaylistSkeleton()
+                        ytPlaylists.isEmpty() && ytLoading -> items(if (gridView) 2 else 3) {
+                            if (gridView) {
+                                PlaylistGridSkeleton()
+                            } else {
+                                YtPlaylistSkeleton()
+                            }
                         }
 
                         ytPlaylists.isEmpty() -> item {
@@ -214,11 +221,22 @@ fun LibraryScreen(
                             items = ytPlaylists.chunked(2).toList(),
                             key = { row -> "yt_" + row.joinToString("|") { it.id } },
                         ) { row ->
-                            PlaylistGridRow(row = row, onOpen = { actions.openPlaylist(it.id) })
+                            PlaylistGridRow(
+                                row = row,
+                                onOpen = { actions.openPlaylist(it.id) },
+                                onMenu = { card ->
+                                    menuTarget = PlaylistTarget(
+                                        id = card.id,
+                                        title = card.title,
+                                        songCount = null,
+                                        fromYouTube = true,
+                                    )
+                                },
+                            )
                         }
 
                         else -> items(ytPlaylists, key = { it.id }) { card ->
-                            YtPlaylistRow(
+                            PlaylistListCard(
                                 card = card,
                                 onClick = { actions.openPlaylist(card.id) },
                                 onMenu = {
@@ -243,31 +261,31 @@ fun LibraryScreen(
                             )
                         }
                     } else if (gridView) {
+                        val cards = library.playlists.map { it.toCard() }
                         items(
-                            items = library.playlists.chunked(2).toList(),
+                            items = cards.chunked(2).toList(),
                             key = { row -> "local_" + row.joinToString("|") { it.id } },
                         ) { row ->
                             PlaylistGridRow(
-                                row = row.map { playlist ->
-                                    MediaCardModel(
-                                        id = playlist.id,
-                                        kind = MediaKind.PLAYLIST,
-                                        title = playlist.name,
-                                        subtitle = when (playlist.tracks.size) {
-                                            0 -> "Playlist"
-                                            1 -> "1 song"
-                                            else -> "${playlist.tracks.size} songs"
-                                        },
-                                        thumbnailUrl = playlist.artworkUrl,
+                                row = row,
+                                onOpen = { actions.openLocalPlaylist(it.id) },
+                                onMenu = { card ->
+                                    menuTarget = PlaylistTarget(
+                                        id = card.id,
+                                        title = card.title,
+                                        songCount = library.playlists
+                                            .firstOrNull { it.id == card.id }
+                                            ?.tracks
+                                            ?.size,
+                                        fromYouTube = false,
                                     )
                                 },
-                                onOpen = { actions.openLocalPlaylist(it.id) },
                             )
                         }
                     } else {
                         items(library.playlists, key = { it.id }) { playlist ->
-                            PlaylistRow(
-                                playlist = playlist,
+                            PlaylistListCard(
+                                card = playlist.toCard(),
                                 onClick = { actions.openLocalPlaylist(playlist.id) },
                                 onMenu = {
                                     menuTarget = PlaylistTarget(
@@ -295,8 +313,9 @@ fun LibraryScreen(
                     }
                 } else {
                     items(library.liked, key = { it.id }) { track ->
-                        TrackRow(
+                        TrackCard(
                             track = track,
+                            isCurrent = currentTrackId == track.id,
                             onClick = {
                                 actions.playTracks(library.liked, library.liked.indexOf(track), "Liked Songs")
                             },
@@ -355,8 +374,9 @@ fun LibraryScreen(
         if (filter == LibraryFilter.Playlists && library.recent.isNotEmpty()) {
             item { SectionHeader(title = "Recently played") }
             items(library.recent.take(12), key = { "recent_${it.id}" }) { track ->
-                TrackRow(
+                TrackCard(
                     track = track,
+                    isCurrent = currentTrackId == track.id,
                     onClick = {
                         actions.playTracks(library.recent, library.recent.indexOf(track), "Recently played")
                     },
@@ -446,43 +466,57 @@ enum class LibraryFilter { Playlists, Songs, Albums }
 private fun PlaylistGridRow(
     row: List<MediaCardModel>,
     onOpen: (MediaCardModel) -> Unit,
+    onMenu: (MediaCardModel) -> Unit,
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 6.dp),
+            .padding(horizontal = 16.dp, vertical = 5.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         row.forEach { card ->
-            MediaCard(
+            PlaylistCard(
                 card = card,
                 onClick = { onOpen(card) },
+                onMenu = { onMenu(card) },
                 modifier = Modifier.weight(1f),
-                width = null,
             )
         }
         if (row.size == 1) Spacer(Modifier.weight(1f))
     }
 }
 
+/** A local playlist as the card model the Library renders. */
+private fun LocalPlaylist.toCard(): MediaCardModel = MediaCardModel(
+    id = id,
+    kind = MediaKind.PLAYLIST,
+    title = name,
+    subtitle = when (tracks.size) {
+        0 -> "Playlist"
+        1 -> "1 song"
+        else -> "${tracks.size} songs"
+    },
+    thumbnailUrl = artworkUrl,
+)
+
 @Composable
 private fun LikedSongsRow(count: Int, onClick: () -> Unit) {
     Surface(
         onClick = onClick,
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(20.dp),
         color = MaterialTheme.colorScheme.surfaceContainerLow,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 6.dp),
+            .padding(horizontal = 16.dp, vertical = 5.dp),
     ) {
         Row(
-            modifier = Modifier.padding(8.dp),
+            modifier = Modifier.padding(start = 10.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(
                 modifier = Modifier
-                    .size(58.dp)
-                    .clip(RoundedCornerShape(14.dp))
+                    .size(60.dp)
+                    .clip(RoundedCornerShape(16.dp))
                     .background(
                         Brush.linearGradient(listOf(Color(0xFF7A122A), Color(0xFFFF7A9A))),
                     ),
@@ -495,7 +529,7 @@ private fun LikedSongsRow(count: Int, onClick: () -> Unit) {
                     modifier = Modifier.size(28.dp),
                 )
             }
-            Spacer(Modifier.width(14.dp))
+            Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = "Liked Songs",
@@ -509,154 +543,44 @@ private fun LikedSongsRow(count: Int, onClick: () -> Unit) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
+            Icon(
+                Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }
 
 @Composable
-private fun PlaylistRow(
-    playlist: LocalPlaylist,
-    onClick: () -> Unit,
-    onMenu: () -> Unit,
-) {
-    Surface(
-        onClick = onClick,
-        shape = RoundedCornerShape(18.dp),
-        color = Color.Transparent,
+private fun PlaylistGridSkeleton() {
+    Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 2.dp),
+            .padding(horizontal = 16.dp, vertical = 5.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Row(
-            modifier = Modifier.padding(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(58.dp)
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(MaterialTheme.colorScheme.surfaceContainerHigh),
-            ) {
-                if (!playlist.artworkUrl.isNullOrBlank()) {
-                    ArtworkImage(
-                        url = playlist.artworkUrl,
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                } else {
-                    val pair = ArtworkColorCache.gradientPair(playlist.id)
-                    Box(
-                        Modifier
-                            .fillMaxSize()
-                            .background(Brush.linearGradient(listOf(pair.first, pair.second))),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Icon(
-                            Icons.Filled.LibraryMusic,
-                            contentDescription = null,
-                            tint = Color.White.copy(alpha = 0.9f),
-                        )
-                    }
-                }
-            }
-            Spacer(Modifier.width(14.dp))
+        repeat(2) {
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = playlist.name,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
+                ShimmerBox(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(1f)
+                        .clip(RoundedCornerShape(20.dp)),
                 )
-                Text(
-                    text = "${playlist.tracks.size} ${if (playlist.tracks.size == 1) "song" else "songs"}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                Spacer(Modifier.height(8.dp))
+                ShimmerBox(
+                    modifier = Modifier
+                        .fillMaxWidth(0.75f)
+                        .height(14.dp)
+                        .clip(RoundedCornerShape(7.dp)),
                 )
-            }
-            IconButton(onClick = onMenu) {
-                Icon(
-                    Icons.Filled.MoreVert,
-                    contentDescription = "Playlist options",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun YtPlaylistRow(
-    card: MediaCardModel,
-    onClick: () -> Unit,
-    onMenu: () -> Unit,
-) {
-    Surface(
-        onClick = onClick,
-        shape = RoundedCornerShape(18.dp),
-        color = Color.Transparent,
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 2.dp),
-    ) {
-        Row(
-            modifier = Modifier.padding(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(58.dp)
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(MaterialTheme.colorScheme.surfaceContainerHigh),
-            ) {
-                if (!card.thumbnailUrl.isNullOrBlank()) {
-                    ArtworkImage(
-                        url = card.thumbnailUrl,
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                } else {
-                    val pair = ArtworkColorCache.gradientPair(card.id)
-                    Box(
-                        Modifier
-                            .fillMaxSize()
-                            .background(Brush.linearGradient(listOf(pair.first, pair.second))),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Icon(
-                            Icons.Filled.LibraryMusic,
-                            contentDescription = null,
-                            tint = Color.White.copy(alpha = 0.9f),
-                        )
-                    }
-                }
-            }
-            Spacer(Modifier.width(14.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = card.title,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    text = card.subtitle ?: "Playlist",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-            IconButton(onClick = onMenu) {
-                Icon(
-                    Icons.Filled.MoreVert,
-                    contentDescription = "Playlist options",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                Spacer(Modifier.height(6.dp))
+                ShimmerBox(
+                    modifier = Modifier
+                        .fillMaxWidth(0.4f)
+                        .height(10.dp)
+                        .clip(RoundedCornerShape(5.dp)),
                 )
             }
         }
