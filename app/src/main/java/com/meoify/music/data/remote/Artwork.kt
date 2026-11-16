@@ -1,24 +1,34 @@
 package com.meoify.music.data.remote
 
 /**
- * Upgrades artwork URLs to the best resolution YouTube serves.
+ * Upgrades artwork URLs to the best resolution the source serves.
  *
  * `lh3.googleusercontent.com` / `yt3.ggpht.com` URLs are the square album and
  * artist covers used by YouTube Music; the `=w…-h…` suffix controls the size.
- * `i.ytimg.com/vi/<id>/…default.jpg` URLs are video stills (4:3 video frames)
- * and are only used as a last resort, because a song's original cover art is
- * the album artwork, not a frame from its music video.
+ * `i.ytimg.com/vi/<id>/…default.jpg` URLs are video stills (4:3 frames from a
+ * music video). They are fine for playlist covers, but [songArt] never returns
+ * one for a song: songs use album artwork from the music catalogue instead.
  */
 object Artwork {
 
     private val GOOGLE_SIZE = Regex("=w\\d+-h\\d+")
     private val GOOGLE_SQUARE = Regex("=s\\d+(-[a-z0-9]+)*$")
+    private val YT_VIDEO_ID = Regex("/vi/([^/]+)/")
 
     /** True when [url] is a music-video still rather than real cover art. */
-    fun isVideoStill(url: String?): Boolean =
-        url != null && (url.contains("ytimg.com") || url.contains("img.youtube.com"))
+    fun isVideoStill(url: String?): Boolean {
+        val lower = url?.lowercase() ?: return false
+        return lower.contains("ytimg.com") || lower.contains("img.youtube.com")
+    }
 
-    private val YT_VIDEO_ID = Regex("/vi/([^/]+)/")
+    /**
+     * Cover art for a song, never a video frame.
+     *
+     * Returns null for video stills so [com.meoify.music.data.CoverArtResolver]
+     * can fetch the song's album cover from a music catalogue. General media
+     * such as playlist covers should use [highRes] or [candidates] instead.
+     */
+    fun songArt(url: String?): String? = highRes(url)?.takeUnless { isVideoStill(url) }
 
     /**
      * URLs for [url], best quality first.
@@ -50,8 +60,8 @@ object Artwork {
 
             isVideoStill(url) -> url
                 // maxresdefault is missing for many uploads and leaves a blank
-                // tile, so use the size YouTube always generates. Real cover
-                // art is resolved separately from the album when available.
+                // tile, so use the size YouTube always generates here. Songs
+                // resolve their real album art separately.
                 .replace("maxresdefault", "hqdefault")
                 .replace("sddefault", "hqdefault")
                 .replace("mqdefault", "hqdefault")

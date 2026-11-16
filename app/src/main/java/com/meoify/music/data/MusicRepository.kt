@@ -36,6 +36,8 @@ class MusicRepository(private val settings: com.meoify.music.data.local.Settings
 
     private val innerTube = InnerTube(http)
     private val lyricsApi = com.meoify.music.data.remote.LyricsApi(http)
+    private val spotifyArtwork = com.meoify.music.data.remote.SpotifyArtwork(http)
+    private val appleArtwork = com.meoify.music.data.remote.AppleArtwork(http)
     private val settingsScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     @Volatile
@@ -170,13 +172,23 @@ class MusicRepository(private val settings: com.meoify.music.data.local.Settings
     suspend fun albumArtwork(albumId: String): String? = artworkMutex.withLock {
         albumArtCache[albumId]?.let { return@withLock it }
         val url = runCatching { album(albumId).thumbnailUrl }.getOrNull()
-            ?.let(com.meoify.music.data.remote.Artwork::highRes)
+            ?.let(com.meoify.music.data.remote.Artwork::songArt)
         if (!url.isNullOrBlank()) {
             if (albumArtCache.size > 400) albumArtCache.clear()
             albumArtCache[albumId] = url
         }
         url
     }
+
+    /**
+     * Square album artwork for a song from a music catalogue.
+     *
+     * Spotify is tried first; Apple's public catalogue is the keyless backup
+     * when Spotify search is unavailable or rate limited. Only real album
+     * covers are returned, never a music-video frame.
+     */
+    suspend fun musicArtwork(track: Track): String? =
+        spotifyArtwork.cover(track) ?: appleArtwork.cover(track)
 
     /**
      * The playlists saved in the signed-in person's YouTube Music library.

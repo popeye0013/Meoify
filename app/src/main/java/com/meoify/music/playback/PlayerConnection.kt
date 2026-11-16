@@ -466,7 +466,7 @@ class PlayerConnection(
     }
 
     private suspend fun Track.toMediaItem(audio: ResolvedAudio): MediaItem {
-        val artwork = coverArt?.cached(id) ?: Artwork.highRes(thumbnailUrl)
+        val artwork = coverArt?.cached(id) ?: Artwork.songArt(thumbnailUrl)
         val metadata = MediaMetadata.Builder()
             .setTitle(title)
             .setArtist(artist)

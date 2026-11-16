@@ -3,6 +3,7 @@ package com.meoify.music
 import com.meoify.music.data.remote.Artwork
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -44,6 +45,15 @@ class ArtworkTest {
     }
 
     @Test
+    fun songsNeverUseAVideoStill() {
+        assertNull(Artwork.songArt("https://i.ytimg.com/vi/abc/hqdefault.jpg"))
+        assertEquals(
+            "https://lh3.googleusercontent.com/abc=w1200-h1200",
+            Artwork.songArt("https://lh3.googleusercontent.com/abc=w60-h60"),
+        )
+    }
+
+    @Test
     fun videoStillsOfferALargerFrameFirst() {
         assertEquals(
             listOf(
@@ -63,5 +73,7 @@ class ArtworkTest {
     fun blankUrlsStayNull() {
         assertEquals(null, Artwork.highRes(null))
         assertEquals(null, Artwork.highRes(""))
+        assertEquals(null, Artwork.songArt(null))
+        assertEquals(null, Artwork.songArt(""))
     }
 }

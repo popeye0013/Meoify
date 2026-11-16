@@ -10,7 +10,7 @@ Grab the latest APK from the [Releases page](https://github.com/popeye0013/Meoif
 
 | Version | Package | Min Android |
 |---|---|---|
-| 1.7.2 | `com.meoify.music` | 8.0 (API 26) |
+| 1.7.3 | `com.meoify.music` | 8.0 (API 26) |
 
 ## Features
 
@@ -19,6 +19,7 @@ Grab the latest APK from the [Releases page](https://github.com/popeye0013/Meoif
 - **Library** — liked songs, local playlists (create / rename / delete) with list or grid layout, saved albums and recently played tracks.
 - **Your YouTube Music playlists** — when signed in, the Library tab lists the playlists saved to your own YouTube Music account and opens them in the player.
 - **Player** — square album canvas shown at its natural aspect ratio, circular close/overflow header buttons, heart and lyrics circles, a wavy seek bar with a large tinted thumb, an Audio pill that switches quality, a wide accent play/pause pill, and shuffle / mute / repeat pills, plus queue management and a mini player.
+- **Real album artwork** — song covers are square music artwork from YouTube Music, Spotify's catalogue or Apple's catalogue as a backup; a frame from a music video is never shown as a song's cover.
 - **Lyrics** — a single `LYRICS` header with the track title, a large glowing active line that scrolls itself, a wavy seek bar and previous / play / next circles flanked by the elapsed and remaining times.
 - **Responsive layout** — the player lays out side by side in landscape, artwork stays square, and no screen takes over the display or hides the system bars.
 - **YouTube Music history sync** — songs you actually listen to in Meoify are reported to your signed-in YouTube Music account history, including lossless streams and downloaded files, using the same per-play tracking ping YouTube's own web player sends, with the account's visitor id so YouTube credits the listen. A listen counts after 30 seconds of real playback; pauses, buffering and seeks don't count.
