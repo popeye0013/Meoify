@@ -91,6 +91,7 @@ import com.meoify.music.ui.components.SectionHeader
 import com.meoify.music.ui.components.TrackCard
 import com.meoify.music.ui.navigation.Destination
 import com.meoify.music.ui.navigation.LocalAppActions
+import com.meoify.music.ui.navigation.LocalBottomContentInset
 import com.meoify.music.ui.navigation.LocalLibrary
 import com.meoify.music.ui.navigation.LocalPlayerState
 import com.meoify.music.ui.theme.ArtworkColorCache
@@ -254,6 +255,7 @@ private fun DetailContent(
                     )
                 }
             },
+        contentPadding = PaddingValues(bottom = LocalBottomContentInset.current),
     ) {
         item {
             DetailHeader(

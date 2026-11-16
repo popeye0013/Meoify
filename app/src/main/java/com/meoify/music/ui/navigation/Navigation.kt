@@ -2,6 +2,7 @@ package com.meoify.music.ui.navigation
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.ui.unit.dp
 import com.meoify.music.data.model.LibraryData
 import com.meoify.music.data.model.MediaCard
 import com.meoify.music.data.model.Track
@@ -57,6 +58,14 @@ val LocalAppActions = compositionLocalOf<AppActions> { error("AppActions not pro
 val LocalLibrary = compositionLocalOf<LibraryData> { LibraryData() }
 val LocalPlayerState = compositionLocalOf<PlayerUiState> { PlayerUiState() }
 val LocalLikedIds = compositionLocalOf<Set<String>> { emptySet() }
+
+/**
+ * Extra bottom padding scrollable screens should add to their content, so the
+ * last item can scroll clear of the floating mini player and tab bar. The
+ * content itself is drawn behind that chrome, which is why the bar area shows
+ * the page instead of an opaque strip.
+ */
+val LocalBottomContentInset = compositionLocalOf { 0.dp }
 
 /** Playlists in the signed-in YouTube Music account. Empty when signed out. */
 val LocalYtPlaylists = compositionLocalOf<List<MediaCard>> { emptyList() }

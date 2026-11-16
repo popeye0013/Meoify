@@ -70,6 +70,7 @@ import com.meoify.music.ui.components.SectionHeader
 import com.meoify.music.ui.components.ShimmerBox
 import com.meoify.music.ui.components.TrackRow
 import com.meoify.music.ui.navigation.LocalAppActions
+import com.meoify.music.ui.navigation.LocalBottomContentInset
 import com.meoify.music.ui.navigation.LocalLibrary
 import com.meoify.music.ui.navigation.LocalSignedIn
 import com.meoify.music.ui.navigation.LocalYtLoading
@@ -109,7 +110,11 @@ fun LibraryScreen(
         }
     }
 
-    LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
+    LazyColumn(
+        state = listState,
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(bottom = LocalBottomContentInset.current),
+    ) {
         item {
             Row(
                 modifier = Modifier

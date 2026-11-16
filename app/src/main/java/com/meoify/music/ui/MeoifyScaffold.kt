@@ -19,12 +19,19 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.calculateEndPadding
+import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
@@ -43,7 +50,9 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -51,6 +60,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -58,6 +70,7 @@ import com.meoify.music.data.model.Track
 import com.meoify.music.ui.components.MiniPlayer
 import com.meoify.music.ui.navigation.Destination
 import com.meoify.music.ui.navigation.LocalAppActions
+import com.meoify.music.ui.navigation.LocalBottomContentInset
 import com.meoify.music.ui.navigation.LocalLibrary
 import com.meoify.music.ui.navigation.LocalPlayerState
 import com.meoify.music.ui.screens.detail.DetailScreen
@@ -123,16 +136,131 @@ fun MeoifyScaffold(
     val showNavBar = chromeAllowed && !settingsOpen && detailStack.isEmpty()
     val showBottomBar = showMiniPlayer || showNavBar
 
-    Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
-        // Detail pages draw their own header behind the status bar so the
-        // artwork colour reaches the top edge instead of leaving a strip.
-        contentWindowInsets = if (detailStack.isNotEmpty()) {
-            WindowInsets(0, 0, 0, 0)
-        } else {
-            WindowInsets.systemBars
-        },
-        bottomBar = {
+    val density = LocalDensity.current
+    val layoutDirection = LocalLayoutDirection.current
+    val navigationBarInset = with(density) {
+        WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    }
+    var chromeHeightPx by remember { mutableIntStateOf(0) }
+    val chromeHeight = with(density) { chromeHeightPx.toDp() }
+    // The chrome floats over the page instead of reserving an opaque strip:
+    // lists add this inset to their own content so the last row can still
+    // scroll clear of the pills, while everything else stays visible behind
+    // them (and behind the transparent system navigation bar).
+    val contentBottomInset = if (showBottomBar) chromeHeight else 0.dp
+    val outerBottomPadding = when {
+        showBottomBar -> 0.dp
+        detailStack.isNotEmpty() -> 0.dp
+        else -> navigationBarInset
+    }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        Scaffold(
+            containerColor = MaterialTheme.colorScheme.background,
+            // Detail pages draw their own header behind the status bar so the
+            // artwork colour reaches the top edge instead of leaving a strip.
+            // The bottom inset is left out on purpose: pages continue behind
+            // the system navigation bar, which stays transparent.
+            contentWindowInsets = if (detailStack.isNotEmpty()) {
+                WindowInsets(0, 0, 0, 0)
+            } else {
+                WindowInsets.systemBars.only(
+                    WindowInsetsSides.Horizontal + WindowInsetsSides.Top,
+                )
+            },
+            snackbarHost = {
+                SnackbarHost(
+                    snackbarHostState,
+                    modifier = Modifier.padding(
+                        bottom = if (showBottomBar) chromeHeight else outerBottomPadding,
+                    ),
+                )
+            },
+        ) { padding ->
+            val contentPadding = PaddingValues(
+                start = padding.calculateStartPadding(layoutDirection),
+                top = padding.calculateTopPadding(),
+                end = padding.calculateEndPadding(layoutDirection),
+                bottom = outerBottomPadding,
+            )
+            CompositionLocalProvider(LocalBottomContentInset provides contentBottomInset) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(contentPadding),
+                ) {
+                    AnimatedContent(
+                        targetState = if (loginOpen) {
+                            "login"
+                        } else if (!settings.onboardingCompleted) {
+                            "onboarding"
+                        } else if (settingsOpen) {
+                            "settings"
+                        } else if (detailStack.isNotEmpty()) {
+                            detailStack.last().key
+                        } else {
+                            "tab:${tab.name}"
+                        },
+                        transitionSpec = {
+                            (fadeIn(tween(220)) + slideInHorizontally(tween(260)) { it / 10 })
+                                .togetherWith(fadeOut(tween(180)) + slideOutHorizontally(tween(240)) { -it / 12 })
+                        },
+                        label = "screen",
+                    ) { target ->
+                        when {
+                            // Login wins over onboarding: tapping "Sign in" on the
+                            // welcome screen must actually open the sign-in page.
+                            loginOpen -> YouTubeLoginScreen(
+                                onBack = { loginOpen = false },
+                                onSignedIn = {
+                                    app.container.settings.setOnboardingCompleted(true)
+                                    loginOpen = false
+                                },
+                            )
+
+                            !settings.onboardingCompleted -> WelcomeScreen(
+                                onSignIn = { loginOpen = true },
+                                onCreateLocalProfile = { name ->
+                                    app.container.settings.setLocalProfileName(name)
+                                    app.container.settings.setOnboardingCompleted(true)
+                                },
+                            )
+
+                            settingsOpen -> SettingsScreen(
+                                onBack = { onSettingsOpenChange(false) },
+                                onOpenLogin = { loginOpen = true },
+                            )
+
+                            detailStack.isNotEmpty() -> DetailScreen(
+                                destination = detailStack.last(),
+                                onBack = { closeDetail() },
+                            )
+                            target == "tab:${Tab.Home.name}" -> HomeScreen()
+
+                            target == "tab:${Tab.Search.name}" -> SearchScreen(
+                                pendingSearch = pendingSearch,
+                                onConsumedPending = onConsumedPending,
+                                onBack = { onTabChange(Tab.Home) },
+                            )
+
+                            target == "tab:${Tab.Library.name}" -> LibraryScreen(
+                                onShowCreatePlaylist = onShowCreatePlaylist,
+                                onAddToPlaylist = onAddToPlaylist,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // Only the pills paint; the column behind them is fully transparent so
+        // the page shows through the gaps and the navigation bar area.
+        Column(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .onSizeChanged { chromeHeightPx = it.height },
+        ) {
             AnimatedVisibility(
                 visible = showBottomBar,
                 enter = fadeIn(tween(180)) + slideInVertically(tween(220)) { it / 2 },
@@ -171,74 +299,6 @@ fun MeoifyScaffold(
                             },
                         )
                     }
-                }
-            }
-        },
-        snackbarHost = { SnackbarHost(snackbarHostState) },
-    ) { padding ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding),
-        ) {
-            AnimatedContent(
-                targetState = if (loginOpen) {
-                    "login"
-                } else if (!settings.onboardingCompleted) {
-                    "onboarding"
-                } else if (settingsOpen) {
-                    "settings"
-                } else if (detailStack.isNotEmpty()) {
-                    detailStack.last().key
-                } else {
-                    "tab:${tab.name}"
-                },
-                transitionSpec = {
-                    (fadeIn(tween(220)) + slideInHorizontally(tween(260)) { it / 10 })
-                        .togetherWith(fadeOut(tween(180)) + slideOutHorizontally(tween(240)) { -it / 12 })
-                },
-                label = "screen",
-            ) { target ->
-                when {
-                    // Login wins over onboarding: tapping "Sign in" on the
-                    // welcome screen must actually open the sign-in page.
-                    loginOpen -> YouTubeLoginScreen(
-                        onBack = { loginOpen = false },
-                        onSignedIn = {
-                            app.container.settings.setOnboardingCompleted(true)
-                            loginOpen = false
-                        },
-                    )
-
-                    !settings.onboardingCompleted -> WelcomeScreen(
-                        onSignIn = { loginOpen = true },
-                        onCreateLocalProfile = { name ->
-                            app.container.settings.setLocalProfileName(name)
-                            app.container.settings.setOnboardingCompleted(true)
-                        },
-                    )
-
-                    settingsOpen -> SettingsScreen(
-                        onBack = { onSettingsOpenChange(false) },
-                        onOpenLogin = { loginOpen = true },
-                    )
-
-                    detailStack.isNotEmpty() -> DetailScreen(
-                        destination = detailStack.last(),
-                        onBack = { closeDetail() },
-                    )
-                    target == "tab:${Tab.Home.name}" -> HomeScreen()
-
-                    target == "tab:${Tab.Search.name}" -> SearchScreen(
-                        pendingSearch = pendingSearch,
-                        onConsumedPending = onConsumedPending,
-                        onBack = { onTabChange(Tab.Home) },
-                    )
-
-                    target == "tab:${Tab.Library.name}" -> LibraryScreen(
-                        onShowCreatePlaylist = onShowCreatePlaylist,
-                        onAddToPlaylist = onAddToPlaylist,
-                    )
                 }
             }
         }

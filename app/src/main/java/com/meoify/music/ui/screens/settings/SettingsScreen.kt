@@ -101,6 +101,7 @@ import com.meoify.music.data.model.DeveloperInfo
 import com.meoify.music.data.model.ThemeMode
 import com.meoify.music.ui.components.ProfileAvatar
 import com.meoify.music.ui.navigation.LocalAppActions
+import com.meoify.music.ui.navigation.LocalBottomContentInset
 import com.meoify.music.ui.navigation.LocalLibrary
 import com.meoify.music.ui.theme.ArtworkColorCache
 import com.meoify.music.ui.viewmodel.ProfileViewModel
@@ -327,7 +328,7 @@ fun SettingsScreen(
                 start = 16.dp,
                 end = 16.dp,
                 top = 4.dp,
-                bottom = 32.dp,
+                bottom = 32.dp + LocalBottomContentInset.current,
             ),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {

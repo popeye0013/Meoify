@@ -65,6 +65,7 @@ import com.meoify.music.ui.components.ArtworkImage
 import com.meoify.music.ui.components.TrackRow
 import com.meoify.music.ui.components.rememberTrackCover
 import com.meoify.music.ui.navigation.LocalAppActions
+import com.meoify.music.ui.navigation.LocalBottomContentInset
 import com.meoify.music.ui.navigation.LocalLibrary
 import com.meoify.music.ui.viewmodel.HomeViewModel
 import com.meoify.music.ui.viewmodel.ProfileViewModel
@@ -101,7 +102,12 @@ fun HomeScreen() {
         onRefresh = viewModel::refresh,
         modifier = Modifier.fillMaxSize(),
     ) {
-        LazyColumn(modifier = Modifier.fillMaxSize()) {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            // Keep the last row scrollable above the floating mini player and
+            // tab bar; the content itself draws behind them.
+            contentPadding = PaddingValues(bottom = LocalBottomContentInset.current),
+        ) {
             item {
                 HomeHeader(
                     account = account,

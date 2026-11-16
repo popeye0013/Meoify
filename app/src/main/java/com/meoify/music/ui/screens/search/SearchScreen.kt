@@ -71,6 +71,7 @@ import com.meoify.music.ui.components.MediaCard
 import com.meoify.music.ui.components.ShimmerBox
 import com.meoify.music.ui.components.TrackCard
 import com.meoify.music.ui.navigation.LocalAppActions
+import com.meoify.music.ui.navigation.LocalBottomContentInset
 import com.meoify.music.ui.navigation.LocalPlayerState
 import com.meoify.music.ui.navigation.LocalLibrary
 import com.meoify.music.ui.viewmodel.SearchViewModel
@@ -334,7 +335,12 @@ private fun BrowseAll(
     )
 
     LazyColumn(
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 28.dp),
+        contentPadding = PaddingValues(
+            start = 16.dp,
+            end = 16.dp,
+            top = 8.dp,
+            bottom = 28.dp + LocalBottomContentInset.current,
+        ),
         modifier = Modifier.fillMaxSize(),
     ) {
         if (recentSearches.isNotEmpty()) {
@@ -441,7 +447,12 @@ private fun GenreChip(label: String, onClick: () -> Unit) {
 @Composable
 private fun Suggestions(query: String, suggestions: List<String>, onPick: (String) -> Unit) {
     LazyColumn(
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+        contentPadding = PaddingValues(
+            start = 16.dp,
+            end = 16.dp,
+            top = 8.dp,
+            bottom = 8.dp + LocalBottomContentInset.current,
+        ),
         modifier = Modifier.fillMaxSize(),
     ) {
         item {
@@ -538,7 +549,10 @@ private fun SearchResultsBody(
                     return@Box
                 }
 
-                LazyColumn(modifier = Modifier.fillMaxSize()) {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(bottom = LocalBottomContentInset.current),
+                ) {
                     when (filter) {
                         SearchFilter.SONGS -> items(data.tracks, key = { it.id }) { track ->
                             val idx = data.tracks.indexOf(track)
