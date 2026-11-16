@@ -1,5 +1,6 @@
 package com.meoify.music.ui.screens.home
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -26,11 +27,7 @@ import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.WifiOff
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledIconButton
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -49,6 +46,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.meoify.music.MeoifyApplication
@@ -68,6 +66,7 @@ import com.meoify.music.ui.navigation.LocalAppActions
 import com.meoify.music.ui.navigation.LocalBottomContentInset
 import com.meoify.music.ui.navigation.LocalLibrary
 import com.meoify.music.ui.navigation.LocalPlayerState
+import com.meoify.music.ui.theme.ArtworkColorCache
 import com.meoify.music.ui.viewmodel.HomeViewModel
 import com.meoify.music.ui.viewmodel.ProfileViewModel
 import com.meoify.music.ui.viewmodel.ProfileViewModelFactory
@@ -164,17 +163,17 @@ fun HomeScreen() {
                     val quickTracks = (library.recent + feed.quickPicks).distinctBy { it.id }.take(6)
 
                     val featured = feed.communityPlaylists.firstOrNull()
-                    if (featured != null) {
-                        item {
-                            FeaturedCard(
-                                card = featured,
-                                onClick = { openCard(featured, actions) },
-                            )
-                        }
-                    }
 
                     if (quickTracks.isNotEmpty()) {
-                        item { SectionHeader(title = "Jump back in") }
+                        item {
+                            SectionHeader(
+                                title = "Jump back in",
+                                actionLabel = "Play all",
+                                onAction = {
+                                    actions.playTracks(quickTracks, 0, "Jump back in")
+                                },
+                            )
+                        }
                         item {
                             QuickAccessGrid(
                                 tracks = quickTracks,
@@ -182,6 +181,15 @@ fun HomeScreen() {
                                 onPlay = { track ->
                                     actions.playTracks(quickTracks, quickTracks.indexOf(track), "Jump back in")
                                 },
+                            )
+                        }
+                    }
+
+                    if (featured != null) {
+                        item {
+                            FeaturedCard(
+                                card = featured,
+                                onClick = { openCard(featured, actions) },
                             )
                         }
                     }
@@ -319,39 +327,63 @@ private fun HomeHeader(
     onSearch: (String) -> Unit,
 ) {
     val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
-    Column(modifier = Modifier.padding(top = 12.dp, bottom = 4.dp)) {
+    val greeting = greetingForHour(hour)
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(
+                Brush.verticalGradient(
+                    listOf(
+                        MaterialTheme.colorScheme.primary.copy(alpha = 0.16f),
+                        MaterialTheme.colorScheme.primary.copy(alpha = 0.04f),
+                        Color.Transparent,
+                    ),
+                ),
+            )
+            .padding(top = 14.dp),
+    ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(start = 20.dp, end = 8.dp),
+                .padding(start = 20.dp, end = 14.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "Meoify",
-                    style = MaterialTheme.typography.headlineLarge,
+                    text = "MEOIFY",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = MaterialTheme.colorScheme.primary,
+                    letterSpacing = 2.6.sp,
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = greeting,
+                    style = MaterialTheme.typography.headlineMedium,
                     fontWeight = FontWeight.ExtraBold,
                     color = MaterialTheme.colorScheme.onBackground,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    text = "${greetingForHour(hour)} · what do you want to hear today?",
+                    text = "What do you want to hear today?",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
+            Spacer(Modifier.width(12.dp))
             Box(
                 modifier = Modifier
-                    .padding(start = 2.dp)
-                    .clickable(onClick = onProfile),
+                    .clip(CircleShape)
+                    .clickable(onClick = onProfile)
+                    .padding(4.dp),
             ) {
                 ProfileAvatar(
-                    name = account?.displayName
-                        ?: localName
-                        ?: if (signedIn) "YouTube Music" else null,
+                    name = account?.displayName ?: localName ?: if (signedIn) "YouTube Music" else null,
                     url = account?.avatarUrl ?: localAvatar,
-                    initials = account?.initials
-                        ?: localName?.trim()?.take(1)?.uppercase(),
-                    size = 38.dp,
+                    initials = account?.initials ?: localName?.trim()?.take(1)?.uppercase(),
+                    size = 44.dp,
                     ring = signedIn,
                 )
             }
@@ -359,25 +391,34 @@ private fun HomeHeader(
 
         Surface(
             onClick = { onSearch("") },
-            shape = RoundedCornerShape(28.dp),
+            shape = RoundedCornerShape(24.dp),
             color = MaterialTheme.colorScheme.surfaceContainerHigh,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 14.dp),
         ) {
             Row(
-                modifier = Modifier.padding(horizontal = 18.dp, vertical = 14.dp),
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(
-                    Icons.Outlined.Search,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Spacer(Modifier.width(12.dp))
+                Box(
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        Icons.Outlined.Search,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
+                Spacer(Modifier.width(10.dp))
                 Text(
                     text = "Search songs, albums, artists",
-                    style = MaterialTheme.typography.bodyLarge,
+                    style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
@@ -387,84 +428,122 @@ private fun HomeHeader(
             contentPadding = PaddingValues(horizontal = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            val chips = listOf("All", "Pop", "Chill", "Workout", "Focus", "Party")
-            items(chips) { chip ->
-                FilterChip(
-                    selected = chip == "All",
-                    onClick = { onSearch(if (chip == "All") "" else "$chip music") },
-                    label = { Text(chip) },
-                )
+            val moods = listOf("Explore", "Pop", "Chill", "Workout", "Focus", "Party")
+            items(moods) { mood ->
+                Surface(
+                    onClick = { onSearch(if (mood == "Explore") "" else "$mood music") },
+                    shape = RoundedCornerShape(50),
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.75f),
+                ) {
+                    Text(
+                        text = mood,
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                    )
+                }
             }
         }
+        Spacer(Modifier.height(6.dp))
     }
 }
 
 @Composable
 private fun FeaturedCard(card: MediaCardModel, onClick: () -> Unit) {
-    Box(
+    val pair = ArtworkColorCache.gradientPair(card.id)
+    val eyebrow = when (card.kind) {
+        MediaKind.PLAYLIST -> "FEATURED PLAYLIST"
+        MediaKind.MIX -> "FEATURED MIX"
+        else -> "FEATURED"
+    }
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(26.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        border = BorderStroke(
+            1.dp,
+            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f),
+        ),
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 12.dp)
-            .height(190.dp)
-            .clip(RoundedCornerShape(28.dp))
-            .clickable(onClick = onClick)
-            .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+            .padding(horizontal = 16.dp, vertical = 8.dp),
     ) {
-        ArtworkImage(
-            url = card.thumbnailUrl,
-            contentDescription = null,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier.fillMaxSize(),
-        )
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        listOf(Color.Transparent, Color.Black.copy(alpha = 0.25f), Color.Black.copy(alpha = 0.86f)),
+        Row(
+            modifier = Modifier.background(
+                Brush.linearGradient(
+                    listOf(
+                        pair.first.copy(alpha = 0.32f),
+                        pair.second.copy(alpha = 0.10f),
+                        Color.Transparent,
                     ),
                 ),
-        )
-        Row(
-            modifier = Modifier
-                .align(Alignment.BottomStart)
-                .fillMaxWidth()
-                .padding(20.dp),
-            verticalAlignment = Alignment.Bottom,
+            ),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "PICKED FOR YOU",
-                    style = MaterialTheme.typography.labelSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White.copy(alpha = 0.78f),
+            Box(modifier = Modifier.padding(12.dp)) {
+                ArtworkImage(
+                    url = card.thumbnailUrl,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .size(132.dp)
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(MaterialTheme.colorScheme.surfaceContainerHighest),
                 )
+            }
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(start = 2.dp, end = 16.dp, top = 16.dp, bottom = 16.dp),
+            ) {
+                Text(
+                    text = eyebrow,
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = MaterialTheme.colorScheme.primary,
+                    letterSpacing = 1.4.sp,
+                )
+                Spacer(Modifier.height(4.dp))
                 Text(
                     text = card.title,
-                    style = MaterialTheme.typography.headlineSmall,
+                    style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.ExtraBold,
-                    color = Color.White,
+                    color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
                     text = card.subtitle ?: "Picked from your listening",
                     style = MaterialTheme.typography.bodySmall,
-                    color = Color.White.copy(alpha = 0.8f),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-            }
-            Spacer(Modifier.width(12.dp))
-            FilledIconButton(
-                onClick = onClick,
-                colors = IconButtonDefaults.filledIconButtonColors(
-                    containerColor = Color.White,
-                    contentColor = Color.Black,
-                ),
-                modifier = Modifier.size(48.dp),
-            ) {
-                Icon(Icons.Filled.PlayArrow, contentDescription = "Play")
+                Spacer(Modifier.height(12.dp))
+                Surface(
+                    onClick = onClick,
+                    shape = RoundedCornerShape(50),
+                    color = MaterialTheme.colorScheme.primary,
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(
+                            Icons.Filled.PlayArrow,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onPrimary,
+                            modifier = Modifier.size(18.dp),
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            text = "Play",
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onPrimary,
+                        )
+                    }
+                }
             }
         }
     }
@@ -492,6 +571,10 @@ private fun QuickAccessGrid(
                         onClick = { onPlay(track) },
                         shape = RoundedCornerShape(18.dp),
                         color = MaterialTheme.colorScheme.surfaceContainerLow,
+                        border = BorderStroke(
+                            1.dp,
+                            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f),
+                        ),
                         modifier = Modifier
                             .weight(1f)
                             .height(64.dp),
@@ -544,15 +627,39 @@ private fun QuickAccessGrid(
 @Composable
 private fun HomeLoading() {
     Column(
-        modifier = Modifier.padding(horizontal = 16.dp),
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        ShimmerBox(Modifier.fillMaxWidth().height(190.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            ShimmerBox(Modifier.weight(1f).height(64.dp))
-            ShimmerBox(Modifier.weight(1f).height(64.dp))
+        ShimmerBox(
+            Modifier
+                .fillMaxWidth(0.4f)
+                .height(24.dp)
+                .clip(RoundedCornerShape(8.dp)),
+        )
+        repeat(2) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                repeat(2) {
+                    ShimmerBox(
+                        Modifier
+                            .weight(1f)
+                            .height(64.dp)
+                            .clip(RoundedCornerShape(18.dp)),
+                    )
+                }
+            }
         }
-        ShimmerBox(Modifier.fillMaxWidth(0.45f).height(26.dp).padding(top = 8.dp))
+        ShimmerBox(
+            Modifier
+                .fillMaxWidth()
+                .height(156.dp)
+                .clip(RoundedCornerShape(26.dp)),
+        )
+        ShimmerBox(
+            Modifier
+                .fillMaxWidth(0.45f)
+                .height(24.dp)
+                .clip(RoundedCornerShape(8.dp)),
+        )
         repeat(2) {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 repeat(2) {
