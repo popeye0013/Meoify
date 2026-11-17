@@ -38,9 +38,9 @@ data class ShareCardOptions(
 )
 
 /**
- * Renders a 9:16 card (full-bleed artwork, readable text, Meoify footer) and
- * shares it as an image. Preview and export use the same renderer so what the
- * user sees is exactly what gets shared.
+ * Renders a 9:16 card with a bounded square artwork (matching the now-playing
+ * player), readable text below it, and a Meoify footer. Preview and export use
+ * the same renderer so what the user sees is exactly what gets shared.
  */
 object LyricShare {
 
@@ -76,12 +76,13 @@ object LyricShare {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) brandPaint.letterSpacing = 4f
         canvas.drawText("MEOIFY", width / 2f, height * 0.072f, brandPaint)
 
-        // Square artwork, the same shape as the now-playing player.
+        // Square artwork filling the card width, like the now-playing player:
+        // a bounded square rather than a full-screen background image.
         val pad = (width * 0.066f).toInt()
-        val artSize = width - pad * 2
-        val artLeft = pad.toFloat()
+        val artSize = width
+        val artLeft = 0f
         val artTop = height * 0.125f
-        val radius = width * 0.055f
+        val radius = width * 0.08f
         val artRect = RectF(artLeft, artTop, artLeft + artSize, artTop + artSize)
 
         canvas.drawRoundRect(
