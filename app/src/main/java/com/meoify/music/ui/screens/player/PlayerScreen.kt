@@ -100,6 +100,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
@@ -141,6 +142,10 @@ fun PlayerScreen(onClose: () -> Unit) {
     val context = LocalContext.current
     val track = state.track
     val cover = rememberTrackCover(track)
+    val scheme = MaterialTheme.colorScheme
+    // The player is drawn over its own artwork-tinted backdrop, so it follows
+    // the active light/dark/dynamic scheme instead of always being dark.
+    val darkPlayer = scheme.background.luminance() < 0.5f
 
     var accent by remember(track?.id) { mutableStateOf(ArtworkColorCache.fallbackColor(track?.title ?: "meoify")) }
     LaunchedEffect(cover, track?.title) { accent = ArtworkColorCache.extract(cover, track?.title ?: "meoify") }
@@ -165,13 +170,13 @@ fun PlayerScreen(onClose: () -> Unit) {
         (((end - nowMs).coerceAtLeast(0L) + 59_999L) / 60_000L).toInt()
     }
 
-    DisposableEffect(activity) {
+    DisposableEffect(activity, darkPlayer) {
         val view = activity?.window?.decorView ?: return@DisposableEffect onDispose { }
         val controller = WindowCompat.getInsetsController(activity.window, view)
         val oldStatus = controller.isAppearanceLightStatusBars
         val oldNav = controller.isAppearanceLightNavigationBars
-        controller.isAppearanceLightStatusBars = false
-        controller.isAppearanceLightNavigationBars = false
+        controller.isAppearanceLightStatusBars = !darkPlayer
+        controller.isAppearanceLightNavigationBars = !darkPlayer
         onDispose {
             controller.isAppearanceLightStatusBars = oldStatus
             controller.isAppearanceLightNavigationBars = oldNav
@@ -228,12 +233,13 @@ fun PlayerScreen(onClose: () -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxSize()
+            .background(scheme.background)
             .background(
                 Brush.verticalGradient(
                     listOf(
-                        accent.copy(alpha = 0.50f),
-                        Color.Black.copy(alpha = 0.88f),
-                        Color.Black,
+                        accent.copy(alpha = if (darkPlayer) 0.50f else 0.20f),
+                        scheme.background.copy(alpha = 0.92f),
+                        scheme.background,
                     ),
                 ),
             ),
@@ -329,14 +335,14 @@ private fun NowPlayingHeader(
         Surface(
             onClick = onClose,
             shape = CircleShape,
-            color = Color.White.copy(alpha = 0.10f),
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
             modifier = Modifier.size(42.dp),
         ) {
             Box(contentAlignment = Alignment.Center) {
                 Icon(
                     Icons.Filled.KeyboardArrowDown,
                     contentDescription = "Close player",
-                    tint = Color.White,
+                    tint = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.size(26.dp),
                 )
             }
@@ -350,12 +356,12 @@ private fun NowPlayingHeader(
                 style = MaterialTheme.typography.labelSmall,
                 fontWeight = FontWeight.ExtraBold,
                 letterSpacing = 1.8.sp,
-                color = Color.White.copy(alpha = 0.78f),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Text(
                 text = source,
                 style = MaterialTheme.typography.bodySmall,
-                color = Color.White.copy(alpha = 0.52f),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -364,14 +370,14 @@ private fun NowPlayingHeader(
             Surface(
                 onClick = { onMenuOpenChange(true) },
                 shape = CircleShape,
-                color = Color.White.copy(alpha = 0.10f),
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
                 modifier = Modifier.size(42.dp),
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Icon(
                         Icons.Filled.MoreVert,
                         contentDescription = "More options",
-                        tint = Color.White.copy(alpha = 0.92f),
+                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.92f),
                         modifier = Modifier.size(22.dp),
                     )
                 }
@@ -651,7 +657,7 @@ private fun PlayerControls(
                     text = track?.title ?: "Nothing playing",
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.ExtraBold,
-                    color = Color.White,
+                    color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -659,7 +665,7 @@ private fun PlayerControls(
                 Text(
                     text = track?.artist.orEmpty(),
                     style = MaterialTheme.typography.titleMedium,
-                    color = Color.White.copy(alpha = 0.66f),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -668,18 +674,18 @@ private fun PlayerControls(
             CircleAction(
                 icon = if (liked) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
                 contentDescription = if (liked) "Remove from liked songs" else "Like",
-                tint = if (liked) MaterialTheme.colorScheme.primary else Color.White,
+                tint = if (liked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
                 size = 46.dp,
-                background = Color.White.copy(alpha = 0.10f),
+                background = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
                 onClick = { track?.let { actions.toggleLike(it) } },
             )
             Spacer(Modifier.width(10.dp))
             CircleAction(
                 icon = Icons.Filled.FormatQuote,
                 contentDescription = "Lyrics",
-                tint = Color.White,
+                tint = MaterialTheme.colorScheme.onSurface,
                 size = 46.dp,
-                background = Color.White.copy(alpha = 0.10f),
+                background = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
                 onClick = onShowLyrics,
             )
         }
@@ -691,6 +697,7 @@ private fun PlayerControls(
             durationMs = state.durationMs,
             onSeek = actions.seekTo,
             modifier = Modifier.fillMaxWidth(),
+            playing = state.isPlaying,
         )
 
         Row(
@@ -701,7 +708,7 @@ private fun PlayerControls(
                 text = if (state.durationMs > 0) formatDuration(state.positionMs) else "--:--",
                 style = MaterialTheme.typography.labelSmall,
                 fontWeight = FontWeight.Medium,
-                color = Color.White.copy(alpha = 0.60f),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Text(
                 text = if (state.durationMs > 0) {
@@ -711,7 +718,7 @@ private fun PlayerControls(
                 },
                 style = MaterialTheme.typography.labelSmall,
                 fontWeight = FontWeight.Medium,
-                color = Color.White.copy(alpha = 0.60f),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
 
@@ -729,9 +736,9 @@ private fun PlayerControls(
             CircleAction(
                 icon = Icons.Filled.SkipPrevious,
                 contentDescription = "Previous",
-                tint = Color.White,
+                tint = MaterialTheme.colorScheme.onSurface,
                 size = 54.dp,
-                background = Color.White.copy(alpha = 0.10f),
+                background = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
                 onClick = actions.skipPrevious,
             )
             Surface(
@@ -774,9 +781,9 @@ private fun PlayerControls(
             CircleAction(
                 icon = Icons.Filled.SkipNext,
                 contentDescription = "Next",
-                tint = Color.White,
+                tint = MaterialTheme.colorScheme.onSurface,
                 size = 54.dp,
-                background = Color.White.copy(alpha = 0.10f),
+                background = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
                 onClick = actions.skipNext,
             )
         }
@@ -796,7 +803,7 @@ private fun PlayerControls(
                 Icon(
                     Icons.Filled.Shuffle,
                     contentDescription = null,
-                    tint = if (state.shuffle) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.86f),
+                    tint = if (state.shuffle) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.86f),
                     modifier = Modifier.size(22.dp),
                 )
             }
@@ -810,7 +817,7 @@ private fun PlayerControls(
                 Icon(
                     imageVector = if (state.muted) Icons.Filled.VolumeOff else Icons.Filled.VolumeUp,
                     contentDescription = null,
-                    tint = if (state.muted) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.86f),
+                    tint = if (state.muted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.86f),
                     modifier = Modifier.size(22.dp),
                 )
             }
@@ -831,7 +838,7 @@ private fun PlayerControls(
                     tint = if (state.repeatMode != androidx.media3.common.Player.REPEAT_MODE_OFF) {
                         MaterialTheme.colorScheme.primary
                     } else {
-                        Color.White.copy(alpha = 0.86f)
+                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.86f)
                     },
                     modifier = Modifier.size(22.dp),
                 )
@@ -849,7 +856,7 @@ private fun AudioPill(
     Surface(
         onClick = { open = true },
         shape = RoundedCornerShape(50),
-        color = Color.White.copy(alpha = 0.10f),
+        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 15.dp, vertical = 8.dp),
@@ -858,7 +865,7 @@ private fun AudioPill(
             Icon(
                 Icons.Filled.GraphicEq,
                 contentDescription = null,
-                tint = Color.White.copy(alpha = 0.85f),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(15.dp),
             )
             Spacer(Modifier.width(7.dp))
@@ -866,13 +873,13 @@ private fun AudioPill(
                 text = quality.shortLabel,
                 style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.SemiBold,
-                color = Color.White.copy(alpha = 0.92f),
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.92f),
             )
             Spacer(Modifier.width(2.dp))
             Icon(
                 Icons.Filled.KeyboardArrowRight,
                 contentDescription = "Audio quality: ${quality.title}",
-                tint = Color.White.copy(alpha = 0.55f),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(17.dp),
             )
         }
@@ -899,7 +906,7 @@ private fun MotionCanvas(
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(cornerRadius))
-            .background(Color.White.copy(alpha = 0.07f)),
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)),
     ) {
         if (!url.isNullOrBlank()) {
             ArtworkImage(
@@ -916,7 +923,7 @@ private fun MotionCanvas(
                         Brush.linearGradient(
                             listOf(
                                 accent.copy(alpha = 0.5f),
-                                Color.Black,
+                                MaterialTheme.colorScheme.surfaceContainerHighest,
                             ),
                         ),
                     ),
@@ -925,7 +932,7 @@ private fun MotionCanvas(
                 Icon(
                     Icons.Filled.GraphicEq,
                     contentDescription = null,
-                    tint = Color.White.copy(alpha = 0.7f),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(72.dp),
                 )
             }
@@ -939,12 +946,15 @@ private fun WavySeekBar(
     durationMs: Long,
     onSeek: (Long) -> Unit,
     modifier: Modifier = Modifier,
+    playing: Boolean = true,
 ) {
     var dragging by remember { mutableStateOf(false) }
     var dragProgress by remember { mutableStateOf(0f) }
     val shown = (if (dragging) dragProgress else progress).coerceIn(0f, 1f)
     // Match the play/pause button so the seek bar reads as part of the same control.
     val progressColor = MaterialTheme.colorScheme.primary
+    val trackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.20f)
+    val knobColor = MaterialTheme.colorScheme.onSurface
     val wave = rememberInfiniteTransition(label = "seekWave")
     val phase by wave.animateFloat(
         initialValue = 0f,
@@ -955,6 +965,8 @@ private fun WavySeekBar(
         ),
         label = "seekWavePhase",
     )
+    // Freeze the wave while paused: the shape stays but nothing moves.
+    val wavePhase = if (playing || dragging) phase else 0f
 
     Canvas(
         modifier = modifier
@@ -986,11 +998,11 @@ private fun WavySeekBar(
     ) {
         val centerY = size.height / 2f
         val progressX = size.width * shown
-        val amplitude = 3.2.dp.toPx()
+        val amplitude = 4.2.dp.toPx()
         val wavelength = size.width / 7.5f
 
         drawLine(
-            color = Color.White.copy(alpha = 0.22f),
+            color = trackColor,
             start = Offset(0f, centerY),
             end = Offset(size.width, centerY),
             strokeWidth = 4.dp.toPx(),
@@ -1003,7 +1015,7 @@ private fun WavySeekBar(
                 path.moveTo(0f, centerY)
                 var x = 0f
                 while (x <= size.width) {
-                    val y = centerY + sin((x / wavelength) * 2f * PI + phase).toFloat() * amplitude
+                    val y = centerY + sin((x / wavelength) * 2f * PI + wavePhase).toFloat() * amplitude
                     path.lineTo(x, y)
                     x += 3f
                 }
@@ -1018,7 +1030,7 @@ private fun WavySeekBar(
                     moveTo(0f, centerY)
                     var x = 0f
                     while (x <= progressX) {
-                        val y = centerY + sin((x / wavelength) * 2f * PI + phase).toFloat() * amplitude
+                        val y = centerY + sin((x / wavelength) * 2f * PI + wavePhase).toFloat() * amplitude
                         lineTo(x, y)
                         x += 3f
                     }
@@ -1034,7 +1046,7 @@ private fun WavySeekBar(
             center = Offset(progressX, centerY),
         )
         drawCircle(
-            color = Color.White,
+            color = knobColor,
             radius = 8.5.dp.toPx(),
             center = Offset(progressX, centerY),
         )
@@ -1053,7 +1065,7 @@ private fun CircleAction(
     tint: Color,
     onClick: () -> Unit,
     size: androidx.compose.ui.unit.Dp = 48.dp,
-    background: Color = Color.White.copy(alpha = 0.14f),
+    background: Color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
 ) {
     Surface(
         onClick = onClick,
@@ -1086,7 +1098,7 @@ private fun PillButton(
         color = if (active) {
             MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
         } else {
-            Color.White.copy(alpha = 0.12f)
+            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f)
         },
         modifier = modifier.height(52.dp),
     ) {
@@ -1148,14 +1160,14 @@ private fun LyricsView(
             Surface(
                 onClick = onBack,
                 shape = CircleShape,
-                color = Color.White.copy(alpha = 0.12f),
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
                 modifier = Modifier.size(44.dp),
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Icon(
                         Icons.Filled.KeyboardArrowDown,
                         contentDescription = "Back to player",
-                        tint = Color.White,
+                        tint = MaterialTheme.colorScheme.onSurface,
                         modifier = Modifier.size(22.dp),
                     )
                 }
@@ -1166,14 +1178,14 @@ private fun LyricsView(
                     text = "LYRICS",
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.ExtraBold,
-                    color = Color.White.copy(alpha = 0.55f),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     letterSpacing = 1.6.sp,
                 )
                 Text(
                     text = trackTitle.ifBlank { "Now playing" },
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    color = Color.White,
+                    color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -1183,7 +1195,7 @@ private fun LyricsView(
         Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
             when {
                 loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = Color.White)
+                    CircularProgressIndicator(color = MaterialTheme.colorScheme.onSurface)
                 }
 
                 lyrics == null || lyrics.isEmpty -> Box(
@@ -1193,7 +1205,7 @@ private fun LyricsView(
                     Text(
                         text = "Lyrics aren't available for this track.",
                         style = MaterialTheme.typography.bodyLarge,
-                        color = Color.White.copy(alpha = 0.72f),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center,
                     )
                 }
@@ -1219,7 +1231,7 @@ private fun LyricsView(
                                 MaterialTheme.typography.titleMedium
                             },
                             fontWeight = if (active) FontWeight.ExtraBold else FontWeight.Medium,
-                            color = if (active) Color.White else Color.White.copy(alpha = 0.38f),
+                            color = if (active) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clickable { onSeek(line.timeMs) }
@@ -1236,7 +1248,7 @@ private fun LyricsView(
                         Text(
                             text = lyrics.plain.orEmpty(),
                             style = MaterialTheme.typography.titleMedium,
-                            color = Color.White.copy(alpha = 0.9f),
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.9f),
                             lineHeight = MaterialTheme.typography.titleMedium.lineHeight * 1.5f,
                         )
                     }
@@ -1251,6 +1263,7 @@ private fun LyricsView(
             durationMs = durationMs,
             onSeek = onSeek,
             modifier = Modifier.fillMaxWidth(),
+            playing = isPlaying,
         )
 
         Row(
@@ -1261,7 +1274,7 @@ private fun LyricsView(
                 text = formatDuration(positionMs),
                 style = MaterialTheme.typography.labelMedium,
                 fontWeight = FontWeight.SemiBold,
-                color = Color.White.copy(alpha = 0.7f),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.width(56.dp),
             )
 
@@ -1273,9 +1286,9 @@ private fun LyricsView(
                 CircleAction(
                     icon = Icons.Filled.SkipPrevious,
                     contentDescription = "Previous",
-                    tint = Color.White,
+                    tint = MaterialTheme.colorScheme.onSurface,
                     size = 48.dp,
-                    background = Color.White.copy(alpha = 0.10f),
+                    background = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
                     onClick = onPrevious,
                 )
                 Spacer(Modifier.width(14.dp))
@@ -1298,9 +1311,9 @@ private fun LyricsView(
                 CircleAction(
                     icon = Icons.Filled.SkipNext,
                     contentDescription = "Next",
-                    tint = Color.White,
+                    tint = MaterialTheme.colorScheme.onSurface,
                     size = 48.dp,
-                    background = Color.White.copy(alpha = 0.10f),
+                    background = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
                     onClick = onNext,
                 )
             }
@@ -1309,7 +1322,7 @@ private fun LyricsView(
                 text = if (durationMs > 0) "-${formatDuration((durationMs - positionMs).coerceAtLeast(0L))}" else "--:--",
                 style = MaterialTheme.typography.labelMedium,
                 fontWeight = FontWeight.SemiBold,
-                color = Color.White.copy(alpha = 0.7f),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.End,
                 modifier = Modifier.width(56.dp),
             )
