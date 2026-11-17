@@ -85,9 +85,17 @@ class MusicRepository(private val settings: com.meoify.music.data.local.Settings
             val homeRoot = homeDeferred.await()
             val (quickPicks, communityPlaylists) = YTMusicParser.parseHome(homeRoot)
             val newReleases = extras.getOrNull(0)?.let { YTMusicParser.parseNewReleases(it) }.orEmpty()
-            val charts = extras.getOrNull(1)?.let { YTMusicParser.parseCharts(it) }
+            val chartRoot = extras.getOrNull(1)
+            val charts = chartRoot?.let { YTMusicParser.parseCharts(it) }
+            // Some accounts never receive YouTube Music's Quick picks shelf.
+            // The charts page always has its top songs, so top the list up
+            // with those rather than hiding Quick picks and Trending now.
+            val chartTracks = chartRoot?.let { YTMusicParser.parseTracks(it) }.orEmpty()
+            val resolvedQuickPicks = (quickPicks + chartTracks)
+                .distinctBy { it.id }
+                .take(30)
             HomeFeed(
-                quickPicks = quickPicks,
+                quickPicks = resolvedQuickPicks,
                 communityPlaylists = communityPlaylists,
                 newReleases = newReleases,
                 topArtists = charts?.first.orEmpty(),

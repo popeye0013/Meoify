@@ -4,6 +4,7 @@ import com.meoify.music.data.remote.YTMusicParser
 import com.meoify.music.data.remote.YTMusicParser.SearchFilter
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -21,6 +22,77 @@ class HomeParserTest {
         assertTrue("playlist cards should be parsed", playlists.isNotEmpty())
         assertTrue(quickPicks.first().id.isNotBlank())
         assertTrue(quickPicks.first().title.isNotBlank())
+    }
+
+    @Test
+    fun parsesQuickPicksFromPlainShelf() {
+        val root = Json.parseToJsonElement(
+            """
+            {
+              "contents": [
+                {
+                  "musicShelfRenderer": {
+                    "title": { "runs": [ { "text": "Quick picks" } ] },
+                    "contents": [
+                      {
+                        "musicResponsiveListItemRenderer": {
+                          "flexColumns": [
+                            { "musicResponsiveListItemFlexColumnRenderer": { "text": { "runs": [ { "text": "Shelf Song" } ] } } },
+                            { "musicResponsiveListItemFlexColumnRenderer": { "text": { "runs": [ { "text": "Shelf Artist" } ] } } }
+                          ],
+                          "playlistItemData": { "videoId": "shelf1" }
+                        }
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+            """.trimIndent(),
+        ).jsonObject
+
+        val (quickPicks, _) = YTMusicParser.parseHome(root)
+        assertEquals(1, quickPicks.size)
+        assertEquals("shelf1", quickPicks.first().id)
+        assertEquals("Shelf Song", quickPicks.first().title)
+    }
+
+    @Test
+    fun chartTrackFallbackSkipsArtistRows() {
+        val root = Json.parseToJsonElement(
+            """
+            {
+              "contents": [
+                {
+                  "musicCarouselShelfRenderer": {
+                    "contents": [
+                      {
+                        "musicResponsiveListItemRenderer": {
+                          "flexColumns": [
+                            { "musicResponsiveListItemFlexColumnRenderer": { "text": { "runs": [ { "text": "Artist Only" } ] } } }
+                          ]
+                        }
+                      },
+                      {
+                        "musicResponsiveListItemRenderer": {
+                          "flexColumns": [
+                            { "musicResponsiveListItemFlexColumnRenderer": { "text": { "runs": [ { "text": "Chart Song" } ] } } },
+                            { "musicResponsiveListItemFlexColumnRenderer": { "text": { "runs": [ { "text": "Chart Artist" } ] } } }
+                          ],
+                          "playlistItemData": { "videoId": "chart1" }
+                        }
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+            """.trimIndent(),
+        ).jsonObject
+
+        val tracks = YTMusicParser.parseTracks(root)
+        assertEquals(listOf("chart1"), tracks.map { it.id })
+        assertEquals("Chart Song", tracks.first().title)
     }
 
     @Test

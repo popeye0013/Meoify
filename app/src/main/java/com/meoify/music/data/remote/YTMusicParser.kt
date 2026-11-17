@@ -54,7 +54,12 @@ object YTMusicParser {
     // ------------------------------------------------------------------ home
 
     fun parseHome(root: JsonObject): Pair<List<Track>, List<MediaCard>> {
-        val carousels = root.findAll("musicCarouselShelfRenderer").mapNotNull { it.asObjectOrNull() }.toList()
+        // Home has shipped Quick picks both as a carousel and as a plain
+        // musicShelfRenderer, depending on account and region, so read both.
+        val carousels = buildList {
+            addAll(root.findAll("musicCarouselShelfRenderer").mapNotNull { it.asObjectOrNull() })
+            addAll(root.findAll("musicShelfRenderer").mapNotNull { it.asObjectOrNull() })
+        }
         val quickPicks = mutableListOf<Track>()
         val cards = mutableListOf<MediaCard>()
 
