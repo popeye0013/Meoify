@@ -12,13 +12,10 @@
          the upi://pay host keeps every installed UPI app visible to the
          donation chooser, including Paytm-style intent filters. -->
     <queries>
-        <!-- Needed so Instagram Stories can be resolved on Android 11+. -->
-        <intent>
-            <action android:name="com.instagram.share.ADD_TO_STORY" />
-        </intent>
+        <!-- Keeps text share targets visible on Android 11+. -->
         <intent>
             <action android:name="android.intent.action.SEND" />
-            <data android:mimeType="image/*" />
+            <data android:mimeType="text/plain" />
         </intent>
         <intent>
             <action android:name="android.intent.action.VIEW" />
@@ -48,6 +45,9 @@
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
+                <!-- Groups Meoify under Entertainment in drawers that sort by
+                     app category (e.g. Nothing's Smart beta layout). -->
+                <category android:name="android.intent.category.APP_MUSIC" />
             </intent-filter>
             <!-- Lets Meoify appear under "Open supported links" for
                  YouTube Music pages (playlists, search, songs). -->
@@ -67,15 +67,6 @@
                 <action android:name="androidx.media3.session.MediaSessionService" />
             </intent-filter>
         </service>
-        <provider
-            android:name="androidx.core.content.FileProvider"
-            android:authorities="${applicationId}.fileprovider"
-            android:exported="false"
-            android:grantUriPermissions="true">
-            <meta-data
-                android:name="android.support.FILE_PROVIDER_PATHS"
-                android:resource="@xml/file_paths" />
-        </provider>
     </application>
 
 </manifest>

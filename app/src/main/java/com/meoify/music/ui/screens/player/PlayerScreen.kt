@@ -114,9 +114,11 @@ import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -132,7 +134,6 @@ import com.meoify.music.playback.PlayerUiState
 import com.meoify.music.ui.components.TrackRow
 import com.meoify.music.ui.components.AudioQualitySheet
 import com.meoify.music.ui.components.ArtworkImage
-import com.meoify.music.ui.components.ShareCardSheet
 import com.meoify.music.ui.components.rememberTrackCover
 import com.meoify.music.ui.navigation.AppActions
 import com.meoify.music.ui.navigation.LocalAppActions
@@ -171,10 +172,6 @@ fun PlayerScreen(onClose: () -> Unit) {
     var showSleepTimer by remember { mutableStateOf(false) }
     var lyrics by remember { mutableStateOf<TrackLyrics?>(null) }
     var lyricsLoading by remember { mutableStateOf(false) }
-    var shareSong by remember { mutableStateOf(false) }
-    var shareLyrics by remember { mutableStateOf(false) }
-    var shareLines by remember { mutableStateOf<List<String>>(emptyList()) }
-    var shareInitialLine by remember { mutableStateOf(0) }
 
     // Swipe down on the artwork to return to the mini player. An Animatable
     // keeps the content glued to the finger while dragging and gives a soft
@@ -257,7 +254,16 @@ fun PlayerScreen(onClose: () -> Unit) {
     }
 
     fun shareTrack() {
-        if (track != null) shareSong = true
+        val t = track ?: return
+        val send = Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(
+                Intent.EXTRA_TEXT,
+                "https://music.youtube.com/watch?v=${t.id}\n\n${t.title} — ${t.artist}",
+            )
+        }
+        runCatching { context.startActivity(Intent.createChooser(send, "Share song")) }
+            .onFailure { actions.showSnackbar("No app available to share") }
     }
 
     Box(
@@ -315,11 +321,6 @@ fun PlayerScreen(onClose: () -> Unit) {
                         artworkUrl = cover,
                         accent = accent,
                         onBack = { showLyrics = false },
-                        onShare = { lines, initial ->
-                            shareLines = lines
-                            shareInitialLine = initial
-                            shareLyrics = true
-                        },
                         onSeek = actions.seekTo,
                         onTogglePlay = actions.togglePlayPause,
                         onNext = actions.skipNext,
@@ -384,27 +385,6 @@ fun PlayerScreen(onClose: () -> Unit) {
         )
     }
 
-    if (shareSong) {
-        ShareCardSheet(
-            title = track?.title.orEmpty(),
-            artist = track?.artist.orEmpty(),
-            artworkUrl = cover,
-            songMode = true,
-            accent = accent,
-            onDismiss = { shareSong = false },
-        )
-    }
-    if (shareLyrics) {
-        ShareCardSheet(
-            title = track?.title.orEmpty(),
-            artist = track?.artist.orEmpty(),
-            artworkUrl = cover,
-            lines = shareLines,
-            initialSelected = setOf(shareInitialLine),
-            accent = accent,
-            onDismiss = { shareLyrics = false },
-        )
-    }
 }
 
 @Composable
@@ -420,6 +400,7 @@ private fun NowPlayingHeader(
     sleepLeftMinutes: Int?,
     onSleepTimer: () -> Unit,
 ) {
+    val haptic = LocalHapticFeedback.current
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -427,7 +408,10 @@ private fun NowPlayingHeader(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Surface(
-            onClick = onClose,
+            onClick = {
+                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                onClose()
+            },
             shape = CircleShape,
             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
             modifier = Modifier.size(42.dp),
@@ -462,7 +446,10 @@ private fun NowPlayingHeader(
         }
         Box {
             Surface(
-                onClick = { onMenuOpenChange(true) },
+                onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    onMenuOpenChange(true)
+                },
                 shape = CircleShape,
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
                 modifier = Modifier.size(42.dp),
@@ -592,12 +579,16 @@ private fun PlayerMenuItem(
     tint: Color = MaterialTheme.colorScheme.onSurface,
     onClick: () -> Unit,
 ) {
+    val haptic = LocalHapticFeedback.current
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 8.dp, vertical = 2.dp)
             .clip(RoundedCornerShape(14.dp))
-            .clickable(onClick = onClick)
+            .clickable {
+                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                onClick()
+            }
             .padding(horizontal = 8.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -747,6 +738,7 @@ private fun PlayerControls(
     modifier: Modifier = Modifier,
 ) {
     val liked = track != null && actions.isLiked(track.id)
+    val haptic = LocalHapticFeedback.current
     Column(modifier = modifier.fillMaxWidth()) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(modifier = Modifier.weight(1f)) {
@@ -839,7 +831,10 @@ private fun PlayerControls(
                 onClick = actions.skipPrevious,
             )
             Surface(
-                onClick = actions.togglePlayPause,
+                onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    actions.togglePlayPause()
+                },
                 shape = RoundedCornerShape(50),
                 color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier
@@ -950,8 +945,12 @@ private fun AudioPill(
     onQualityChange: (AudioQuality) -> Unit,
 ) {
     var open by remember { mutableStateOf(false) }
+    val haptic = LocalHapticFeedback.current
     Surface(
-        onClick = { open = true },
+        onClick = {
+            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+            open = true
+        },
         shape = RoundedCornerShape(50),
         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
     ) {
@@ -1047,6 +1046,8 @@ private fun WavySeekBar(
 ) {
     var dragging by remember { mutableStateOf(false) }
     var dragProgress by remember { mutableStateOf(0f) }
+    var lastTickBucket by remember { mutableStateOf(-1) }
+    val haptic = LocalHapticFeedback.current
     val shown = (if (dragging) dragProgress else progress).coerceIn(0f, 1f)
     // Match the play/pause button so the seek bar reads as part of the same control.
     val progressColor = MaterialTheme.colorScheme.primary
@@ -1070,6 +1071,7 @@ private fun WavySeekBar(
             .height(44.dp)
             .pointerInput(Unit) {
                 detectTapGestures { offset ->
+                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                     onSeek(((offset.x / size.width).coerceIn(0f, 1f) * durationMs).toLong())
                 }
             }
@@ -1078,16 +1080,26 @@ private fun WavySeekBar(
                     onDragStart = { offset ->
                         dragging = true
                         dragProgress = (offset.x / size.width).coerceIn(0f, 1f)
+                        lastTickBucket = -1
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                     },
                     onHorizontalDrag = { change, _ ->
                         dragProgress = (change.position.x / size.width).coerceIn(0f, 1f)
+                        // One light tick per 5% of the track while scrubbing.
+                        val bucket = (dragProgress * 20f).toInt()
+                        if (bucket != lastTickBucket) {
+                            lastTickBucket = bucket
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        }
                     },
                     onDragEnd = {
                         dragging = false
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                         onSeek((dragProgress * durationMs).toLong())
                     },
                     onDragCancel = {
                         dragging = false
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                         onSeek((dragProgress * durationMs).toLong())
                     },
                 )
@@ -1164,8 +1176,12 @@ private fun CircleAction(
     size: androidx.compose.ui.unit.Dp = 48.dp,
     background: Color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
 ) {
+    val haptic = LocalHapticFeedback.current
     Surface(
-        onClick = onClick,
+        onClick = {
+            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+            onClick()
+        },
         shape = CircleShape,
         color = background,
         modifier = Modifier.size(size),
@@ -1189,8 +1205,12 @@ private fun PillButton(
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit,
 ) {
+    val haptic = LocalHapticFeedback.current
     Surface(
-        onClick = onClick,
+        onClick = {
+            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+            onClick()
+        },
         shape = RoundedCornerShape(50),
         color = if (active) {
             MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
@@ -1222,13 +1242,13 @@ private fun LyricsView(
     artworkUrl: String?,
     accent: Color,
     onBack: () -> Unit,
-    onShare: (List<String>, Int) -> Unit,
     onSeek: (Long) -> Unit,
     onTogglePlay: () -> Unit,
     onNext: () -> Unit,
     onPrevious: () -> Unit,
 ) {
     val listState = rememberLazyListState()
+    val haptic = LocalHapticFeedback.current
     // Tapping a line seeks; it must not paint the rectangular ripple that a
     // full-width text row would show.
     val tapInteraction = remember { MutableInteractionSource() }
@@ -1293,33 +1313,6 @@ private fun LyricsView(
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-            Spacer(Modifier.width(8.dp))
-            Surface(
-                onClick = {
-                    val lines = lyrics?.lines?.map { it.text }
-                        ?.filter { it.isNotBlank() }
-                        ?.takeIf { it.isNotEmpty() }
-                        ?: lyrics?.plain?.lines()
-                            ?.map { it.trim() }
-                            ?.filter { it.isNotBlank() }
-                            .orEmpty()
-                    if (lines.isNotEmpty()) {
-                        onShare(lines, currentIndex.coerceAtLeast(0).coerceAtMost(lines.lastIndex))
-                    }
-                },
-                shape = CircleShape,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
-                modifier = Modifier.size(44.dp),
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        Icons.Filled.Share,
-                        contentDescription = "Share lyric",
-                        tint = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.size(20.dp),
-                    )
-                }
-            }
         }
 
         Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
@@ -1367,7 +1360,10 @@ private fun LyricsView(
                                 .clickable(
                                     interactionSource = tapInteraction,
                                     indication = null,
-                                ) { onSeek(line.timeMs) }
+                                ) {
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    onSeek(line.timeMs)
+                                }
                                 .padding(vertical = 9.dp),
                         )
                     }
@@ -1426,7 +1422,10 @@ private fun LyricsView(
                 )
                 Spacer(Modifier.width(14.dp))
                 Surface(
-                    onClick = onTogglePlay,
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        onTogglePlay()
+                    },
                     shape = CircleShape,
                     color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(64.dp),

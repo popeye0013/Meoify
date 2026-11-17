@@ -39,9 +39,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -56,6 +58,7 @@ fun MiniPlayer(onOpen: () -> Unit) {
     val track = state.track ?: return
     val cover = rememberTrackCover(track)
     val density = LocalDensity.current
+    val haptic = LocalHapticFeedback.current
     val swipeThreshold = with(density) { 48.dp.toPx() }
     val swipeScope = rememberCoroutineScope()
     val swipeOffset = remember { Animatable(0f) }
@@ -148,14 +151,20 @@ fun MiniPlayer(onOpen: () -> Unit) {
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
-                IconButton(onClick = { actions.toggleLike(track) }) {
+                IconButton(onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    actions.toggleLike(track)
+                }) {
                     Icon(
                         imageVector = if (actions.isLiked(track.id)) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
                         contentDescription = if (actions.isLiked(track.id)) "Remove from liked songs" else "Like",
                         tint = if (actions.isLiked(track.id)) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                IconButton(onClick = { actions.togglePlayPause() }) {
+                IconButton(onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    actions.togglePlayPause()
+                }) {
                     if (state.isPreparing || state.isBuffering) {
                         CircularProgressIndicator(
                             modifier = Modifier.size(22.dp),
@@ -169,7 +178,10 @@ fun MiniPlayer(onOpen: () -> Unit) {
                         )
                     }
                 }
-                IconButton(onClick = { actions.skipNext() }) {
+                IconButton(onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    actions.skipNext()
+                }) {
                     Icon(
                         imageVector = Icons.Filled.SkipNext,
                         contentDescription = "Next",

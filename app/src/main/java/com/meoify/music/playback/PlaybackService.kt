@@ -81,6 +81,8 @@ class PlaybackService : MediaSessionService() {
 
         val player = ExoPlayer.Builder(this)
             .setMediaSourceFactory(DefaultMediaSourceFactory(dataSourceFactory))
+            // handleAudioFocus = true: Media3 ducks on transient focus loss
+            // (calls, notifications) and pauses on permanent loss.
             .setAudioAttributes(
                 AudioAttributes.Builder()
                     .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
@@ -88,6 +90,7 @@ class PlaybackService : MediaSessionService() {
                     .build(),
                 true,
             )
+            // Pauses automatically when headphones/headset are disconnected.
             .setHandleAudioBecomingNoisy(true)
             .setWakeMode(C.WAKE_MODE_NETWORK)
             .build()
