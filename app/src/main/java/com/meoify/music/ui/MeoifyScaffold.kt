@@ -201,7 +201,9 @@ fun MeoifyScaffold(
             // artwork colour reaches the top edge instead of leaving a strip.
             // The bottom inset is left out on purpose: pages continue behind
             // the system navigation bar, which stays transparent.
-            contentWindowInsets = if (detailStack.isNotEmpty()) {
+            contentWindowInsets = if (detailStack.isNotEmpty() || settingsOpen) {
+                // Detail pages and Settings handle the status-bar inset
+                // themselves, so the shell must not apply it again.
                 WindowInsets(0, 0, 0, 0)
             } else {
                 WindowInsets.systemBars.only(
