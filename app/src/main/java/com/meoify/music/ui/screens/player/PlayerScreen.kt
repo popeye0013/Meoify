@@ -169,6 +169,14 @@ fun PlayerScreen(onClose: () -> Unit) {
     var lyrics by remember { mutableStateOf<TrackLyrics?>(null) }
     var lyricsLoading by remember { mutableStateOf(false) }
 
+    // Swipe-down-to-mini is active only on the main player view. Lyrics, queue
+    // and the sleep-timer dialog have their own scrolling/dismiss behaviour.
+    val density = LocalDensity.current
+    val closeSwipeThreshold = with(density) { 120.dp.toPx() }
+    val closeSwipeTopZone = with(density) { 180.dp.toPx() }
+    var closeSwipeFromTop by remember { mutableStateOf(false) }
+    var closeSwipeDistance by remember { mutableStateOf(0f) }
+
     // Keep the remaining sleep time fresh while the timer runs.
     val sleepEndsAtMs = state.sleepEndsAtMs
     var nowMs by remember { mutableStateOf(System.currentTimeMillis()) }
@@ -254,13 +262,48 @@ fun PlayerScreen(onClose: () -> Unit) {
                         scheme.background,
                     ),
                 ),
-            ),
+            )
+            .pointerInput(showLyrics, showQueue, showSleepTimer, onClose) {
+                if (showLyrics || showQueue || showSleepTimer) return@pointerInput
+                detectVerticalDragGestures(
+                    onDragStart = { offset ->
+                        closeSwipeFromTop = offset.y <= closeSwipeTopZone
+                        closeSwipeDistance = 0f
+                    },
+                    onVerticalDrag = { change, delta ->
+                        if (closeSwipeFromTop && delta > 0f) {
+                            closeSwipeDistance += delta
+                            if (closeSwipeDistance >= closeSwipeThreshold) {
+                                change.consume()
+                                closeSwipeDistance = 0f
+                                closeSwipeFromTop = false
+                                onClose()
+                            }
+                        }
+                    },
+                    onDragEnd = {
+                        closeSwipeDistance = 0f
+                        closeSwipeFromTop = false
+                    },
+                    onDragCancel = {
+                        closeSwipeDistance = 0f
+                        closeSwipeFromTop = false
+                    },
+                )
+            },
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .statusBarsPadding()
-                .navigationBarsPadding(),
+                .navigationBarsPadding()
+                .graphicsLayer {
+                    translationY = if (closeSwipeDistance > 0f) {
+                        (closeSwipeDistance * 0.35f).coerceAtMost(closeSwipeThreshold * 0.5f)
+                    } else {
+                        0f
+                    }
+                },
         ) {
             if (!showLyrics) {
                 NowPlayingHeader(

@@ -2,6 +2,7 @@ package com.meoify.music.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -26,10 +27,16 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -42,15 +49,36 @@ fun MiniPlayer(onOpen: () -> Unit) {
     val actions = LocalAppActions.current
     val track = state.track ?: return
     val cover = rememberTrackCover(track)
+    val density = LocalDensity.current
+    val swipeThreshold = with(density) { 48.dp.toPx() }
+    var swipeOpened by remember { mutableStateOf(false) }
+    var swipeUp by remember { mutableStateOf(0f) }
 
     Surface(
-        onClick = onOpen,
+        onClick = { if (!swipeOpened) onOpen() },
         shape = RoundedCornerShape(22.dp),
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         tonalElevation = 3.dp,
         shadowElevation = 6.dp,
         modifier = Modifier
             .fillMaxWidth()
+            .pointerInput(onOpen, swipeThreshold) {
+                detectVerticalDragGestures(
+                    onDragStart = { swipeUp = 0f },
+                    onVerticalDrag = { change, delta ->
+                        if (!swipeOpened && delta < 0f) {
+                            swipeUp += -delta
+                            if (swipeUp >= swipeThreshold) {
+                                swipeOpened = true
+                                change.consume()
+                                onOpen()
+                            }
+                        }
+                    },
+                    onDragEnd = { swipeUp = 0f },
+                    onDragCancel = { swipeUp = 0f },
+                )
+            }
             // The 10dp bottom gap keeps the pill floating above the tab bar
             // (and, on detail pages, above the system navigation bar).
             .padding(start = 12.dp, end = 12.dp, top = 6.dp, bottom = 10.dp),
