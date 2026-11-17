@@ -246,11 +246,29 @@ fun PlayerScreen(onClose: () -> Unit) {
         )
     }
 
+    fun openVideoInBrowser(t: Track) {
+        val view = Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://www.youtube.com/watch?v=${t.id}"))
+        val chooser = Intent.createChooser(view, "Open video")
+        runCatching { context.startActivity(chooser) }
+            .onFailure { actions.showSnackbar("No app available to open the video") }
+    }
+
     fun openVideo() {
         val t = track ?: return
-        val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://music.youtube.com/watch?v=${t.id}"))
-        runCatching { context.startActivity(intent) }
-            .onFailure { actions.showSnackbar("No app available to open the video") }
+        // Meoify itself verifies music.youtube.com links, so a plain ACTION_VIEW
+        // resolves back to us (and only shows "song links aren't supported").
+        // Target the YouTube Music app directly, then fall back to a browser on
+        // www.youtube.com, which Meoify does not handle.
+        val ytMusic = Intent(
+            Intent.ACTION_VIEW,
+            android.net.Uri.parse("https://music.youtube.com/watch?v=${t.id}"),
+        ).apply { setPackage("com.google.android.apps.youtube.music") }
+        if (ytMusic.resolveActivity(context.packageManager) != null) {
+            runCatching { context.startActivity(ytMusic) }
+                .onFailure { openVideoInBrowser(t) }
+        } else {
+            openVideoInBrowser(t)
+        }
     }
 
     fun shareTrack() {

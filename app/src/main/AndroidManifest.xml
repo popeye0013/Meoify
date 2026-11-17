@@ -25,6 +25,13 @@
             <action android:name="android.intent.action.VIEW" />
             <data android:scheme="upi" android:host="pay" />
         </intent>
+        <!-- Keeps YouTube Music visible to the direct "Open video" intent. -->
+        <package android:name="com.google.android.apps.youtube.music" />
+        <!-- Keeps browsers/YouTube visible to the www.youtube.com chooser. -->
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="https" android:host="www.youtube.com" />
+        </intent>
     </queries>
 
     <application

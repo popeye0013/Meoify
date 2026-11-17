@@ -209,6 +209,7 @@ private fun DetailContent(
 
     var showRename by remember { mutableStateOf(false) }
     var showDelete by remember { mutableStateOf(false) }
+    var showSave by remember { mutableStateOf(false) }
     var renameValue by remember(page.title) { mutableStateOf(page.title) }
     val localPlaylistId = (destination as? Destination.LocalPlaylist)?.id
     val canSave = page.tracks.isNotEmpty() &&
@@ -275,10 +276,7 @@ private fun DetailContent(
                     }
                 },
                 onShuffle = { actions.playShuffled(page.tracks, page.title) },
-                onSave = {
-                    actions.savePlaylist(page.title, page.tracks)
-                    actions.showSnackbar("Saved “${page.title}” to your library")
-                },
+                onSave = { showSave = true },
                 onRename = {
                     renameValue = page.title
                     showRename = true
@@ -401,6 +399,27 @@ private fun DetailContent(
                 ) { Text("Save") }
             },
             dismissButton = { TextButton(onClick = { showRename = false }) { Text("Cancel") } },
+        )
+    }
+
+    if (showSave) {
+        AlertDialog(
+            onDismissRequest = { showSave = false },
+            title = { Text("Add to library?") },
+            text = {
+                Text(
+                    "“${page.title}” will be saved to your library with " +
+                        "${page.tracks.size} ${if (page.tracks.size == 1) "song" else "songs"}.",
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    actions.savePlaylist(page.title, page.tracks)
+                    actions.showSnackbar("Saved “${page.title}” to your library")
+                    showSave = false
+                }) { Text("Add") }
+            },
+            dismissButton = { TextButton(onClick = { showSave = false }) { Text("Cancel") } },
         )
     }
 

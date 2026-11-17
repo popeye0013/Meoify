@@ -19,7 +19,6 @@ import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -169,7 +168,6 @@ fun SongCard(
 fun PlaylistCard(
     card: MediaCard,
     onClick: () -> Unit,
-    onMenu: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Surface(
@@ -186,30 +184,6 @@ fun PlaylistCard(
                     .background(MaterialTheme.colorScheme.surfaceContainerHigh),
             ) {
                 PlaylistArtwork(url = card.thumbnailUrl, seed = card.id)
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(4.dp)
-                        .size(48.dp)
-                        .clip(CircleShape)
-                        .clickable(onClick = onMenu),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(32.dp)
-                            .clip(CircleShape)
-                            .background(Color.Black.copy(alpha = 0.34f)),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Icon(
-                            Icons.Filled.MoreVert,
-                            contentDescription = "Playlist options for ${card.title}",
-                            tint = Color.White,
-                            modifier = Modifier.size(18.dp),
-                        )
-                    }
-                }
             }
             Column(
                 modifier = Modifier.padding(start = 11.dp, end = 11.dp, top = 9.dp, bottom = 11.dp),
@@ -239,7 +213,6 @@ fun PlaylistCard(
 fun PlaylistListCard(
     card: MediaCard,
     onClick: () -> Unit,
-    onMenu: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Surface(
@@ -278,13 +251,6 @@ fun PlaylistListCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                )
-            }
-            IconButton(onClick = onMenu, modifier = Modifier.size(40.dp)) {
-                Icon(
-                    Icons.Filled.MoreVert,
-                    contentDescription = "Playlist options for ${card.title}",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }

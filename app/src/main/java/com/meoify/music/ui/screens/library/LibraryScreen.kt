@@ -2,7 +2,6 @@ package com.meoify.music.ui.screens.library
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -25,20 +24,13 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.ViewList
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.GridView
-import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PlaylistAdd
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -46,7 +38,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -54,10 +45,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.meoify.music.MeoifyApplication
@@ -100,11 +89,6 @@ fun LibraryScreen(
     // The layout lives in settings so it survives opening a playlist and
     // coming back to the Library tab.
     val gridView = settings.libraryGridView
-    var menuTarget by remember { mutableStateOf<PlaylistTarget?>(null) }
-    var renameTarget by remember { mutableStateOf<PlaylistTarget?>(null) }
-    var deleteTarget by remember { mutableStateOf<PlaylistTarget?>(null) }
-    var renameValue by remember { mutableStateOf("") }
-
     val listState = rememberLazyListState()
 
     LaunchedEffect(filterName) {
@@ -224,14 +208,6 @@ fun LibraryScreen(
                             PlaylistGridRow(
                                 row = row,
                                 onOpen = { actions.openPlaylist(it.id) },
-                                onMenu = { card ->
-                                    menuTarget = PlaylistTarget(
-                                        id = card.id,
-                                        title = card.title,
-                                        songCount = null,
-                                        fromYouTube = true,
-                                    )
-                                },
                             )
                         }
 
@@ -239,14 +215,6 @@ fun LibraryScreen(
                             PlaylistListCard(
                                 card = card,
                                 onClick = { actions.openPlaylist(card.id) },
-                                onMenu = {
-                                    menuTarget = PlaylistTarget(
-                                        id = card.id,
-                                        title = card.title,
-                                        songCount = null,
-                                        fromYouTube = true,
-                                    )
-                                },
                             )
                         }
                     }
@@ -269,17 +237,6 @@ fun LibraryScreen(
                             PlaylistGridRow(
                                 row = row,
                                 onOpen = { actions.openLocalPlaylist(it.id) },
-                                onMenu = { card ->
-                                    menuTarget = PlaylistTarget(
-                                        id = card.id,
-                                        title = card.title,
-                                        songCount = library.playlists
-                                            .firstOrNull { it.id == card.id }
-                                            ?.tracks
-                                            ?.size,
-                                        fromYouTube = false,
-                                    )
-                                },
                             )
                         }
                     } else {
@@ -287,14 +244,6 @@ fun LibraryScreen(
                             PlaylistListCard(
                                 card = playlist.toCard(),
                                 onClick = { actions.openLocalPlaylist(playlist.id) },
-                                onMenu = {
-                                    menuTarget = PlaylistTarget(
-                                        id = playlist.id,
-                                        title = playlist.name,
-                                        songCount = playlist.tracks.size,
-                                        fromYouTube = false,
-                                    )
-                                },
                             )
                         }
                     }
@@ -387,78 +336,7 @@ fun LibraryScreen(
         item { Spacer(Modifier.height(28.dp)) }
     }
 
-    menuTarget?.let { target ->
-        PlaylistMenu(
-            target = target,
-            onDismiss = { menuTarget = null },
-            onRename = {
-                menuTarget = null
-                renameValue = target.title
-                renameTarget = target
-            },
-            onDelete = {
-                menuTarget = null
-                deleteTarget = target
-            },
-        )
-    }
-
-    renameTarget?.let { target ->
-        AlertDialog(
-            onDismissRequest = { renameTarget = null },
-            title = { Text("Rename playlist") },
-            text = {
-                OutlinedTextField(
-                    value = renameValue,
-                    onValueChange = { renameValue = it },
-                    label = { Text("Playlist name") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        if (renameValue.isNotBlank()) actions.renamePlaylist(target.id, renameValue.trim())
-                        renameTarget = null
-                    },
-                    enabled = renameValue.isNotBlank(),
-                ) { Text("Save") }
-            },
-            dismissButton = { TextButton(onClick = { renameTarget = null }) { Text("Cancel") } },
-        )
-    }
-
-    deleteTarget?.let { target ->
-        AlertDialog(
-            onDismissRequest = { deleteTarget = null },
-            title = { Text("Delete playlist?") },
-            text = {
-                Text(
-                    if (target.fromYouTube) {
-                        "“${target.title}” will be deleted from your YouTube Music account. This can't be undone."
-                    } else {
-                        "“${target.title}” will be removed from your library. This can't be undone."
-                    },
-                )
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    actions.deletePlaylist(target.id)
-                    deleteTarget = null
-                }) { Text("Delete") }
-            },
-            dismissButton = { TextButton(onClick = { deleteTarget = null }) { Text("Cancel") } },
-        )
-    }
 }
-
-private data class PlaylistTarget(
-    val id: String,
-    val title: String,
-    val songCount: Int?,
-    val fromYouTube: Boolean,
-)
 
 enum class LibraryFilter { Playlists, Songs, Albums }
 
@@ -466,7 +344,6 @@ enum class LibraryFilter { Playlists, Songs, Albums }
 private fun PlaylistGridRow(
     row: List<MediaCardModel>,
     onOpen: (MediaCardModel) -> Unit,
-    onMenu: (MediaCardModel) -> Unit,
 ) {
     Row(
         modifier = Modifier
@@ -478,7 +355,6 @@ private fun PlaylistGridRow(
             PlaylistCard(
                 card = card,
                 onClick = { onOpen(card) },
-                onMenu = { onMenu(card) },
                 modifier = Modifier.weight(1f),
             )
         }
@@ -615,68 +491,6 @@ private fun YtPlaylistSkeleton() {
                     .height(10.dp)
                     .clip(RoundedCornerShape(5.dp)),
             )
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun PlaylistMenu(
-    target: PlaylistTarget,
-    onDismiss: () -> Unit,
-    onRename: () -> Unit,
-    onDelete: () -> Unit,
-) {
-    ModalBottomSheet(onDismissRequest = onDismiss) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(start = 20.dp, end = 20.dp, bottom = 28.dp),
-        ) {
-            Text(
-                text = target.title,
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.ExtraBold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Text(
-                text = when {
-                    target.songCount != null ->
-                        "${target.songCount} ${if (target.songCount == 1) "song" else "songs"}"
-                    target.fromYouTube -> "Playlist on YouTube Music"
-                    else -> "Playlist"
-                },
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Spacer(Modifier.height(12.dp))
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable(onClick = onRename)
-                    .padding(vertical = 16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Icon(Icons.Filled.Edit, contentDescription = null)
-                Spacer(Modifier.width(14.dp))
-                Text("Rename playlist", style = MaterialTheme.typography.bodyLarge)
-            }
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable(onClick = onDelete)
-                    .padding(vertical = 16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Icon(Icons.Filled.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error)
-                Spacer(Modifier.width(14.dp))
-                Text(
-                    "Delete playlist",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.error,
-                )
-            }
         }
     }
 }
