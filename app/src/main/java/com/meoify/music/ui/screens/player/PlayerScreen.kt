@@ -88,6 +88,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -127,8 +128,10 @@ import com.meoify.music.ui.navigation.LocalAppActions
 import com.meoify.music.ui.navigation.LocalPlayerState
 import com.meoify.music.ui.theme.ArtworkColorCache
 import com.meoify.music.util.formatDuration
+import com.meoify.music.util.LyricShare
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.math.PI
 import kotlin.math.sin
@@ -275,6 +278,8 @@ fun PlayerScreen(onClose: () -> Unit) {
                         durationMs = state.durationMs,
                         isPlaying = state.isPlaying,
                         trackTitle = track?.title.orEmpty(),
+                        trackArtist = track?.artist.orEmpty(),
+                        artworkUrl = cover,
                         accent = accent,
                         onBack = { showLyrics = false },
                         onSeek = actions.seekTo,
@@ -1122,6 +1127,8 @@ private fun LyricsView(
     durationMs: Long,
     isPlaying: Boolean,
     trackTitle: String,
+    trackArtist: String,
+    artworkUrl: String?,
     accent: Color,
     onBack: () -> Unit,
     onSeek: (Long) -> Unit,
@@ -1129,6 +1136,8 @@ private fun LyricsView(
     onNext: () -> Unit,
     onPrevious: () -> Unit,
 ) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     val listState = rememberLazyListState()
     // Tapping a line seeks; it must not paint the rectangular ripple that a
     // full-width text row would show.
@@ -1193,6 +1202,36 @@ private fun LyricsView(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
+            }
+            Spacer(Modifier.width(8.dp))
+            Surface(
+                onClick = {
+                    val currentLine = lyrics?.lines?.getOrNull(currentIndex)?.text
+                        ?: lyrics?.plain?.lines()?.firstOrNull().orEmpty()
+                    if (currentLine.isNotBlank()) {
+                        scope.launch {
+                            LyricShare.share(
+                                context = context,
+                                title = trackTitle,
+                                artist = trackArtist,
+                                lyric = currentLine,
+                                artworkUrl = artworkUrl,
+                            )
+                        }
+                    }
+                },
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
+                modifier = Modifier.size(44.dp),
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        Icons.Filled.Share,
+                        contentDescription = "Share lyric",
+                        tint = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.size(20.dp),
+                    )
+                }
             }
         }
 
