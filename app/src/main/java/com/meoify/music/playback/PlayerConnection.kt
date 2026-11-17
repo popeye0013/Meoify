@@ -2,6 +2,7 @@ package com.meoify.music.playback
 
 import android.content.ComponentName
 import android.content.Context
+import android.content.Intent
 import android.net.Uri
 import android.os.SystemClock
 import androidx.core.content.ContextCompat
@@ -101,6 +102,12 @@ class PlayerConnection(
     private var lastPersistAt = 0L
     private var persistedTrackId: String? = null
     private var persistedPlaying = false
+    /**
+     * Set when the activity detached from the service. A media controller keeps
+     * the service bound, so it must be released before a paused service can be
+     * destroyed. The next action (or the activity coming back) reconnects.
+     */
+    private var serviceReleased = false
 
     private val controllerListener = object : Player.Listener {
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
@@ -260,7 +267,9 @@ class PlayerConnection(
         future.addListener(
             {
                 runCatching { future.get() }.onSuccess { mediaController ->
-                    if (controllerFuture !== future) {
+                    if (controllerFuture !== future || serviceReleased) {
+                        // A newer connection replaced this one, or the app went
+                        // to the background while it was still connecting.
                         mediaController.release()
                         return@onSuccess
                     }
@@ -278,6 +287,7 @@ class PlayerConnection(
 
     private fun attachController(mediaController: MediaController) {
         controller = mediaController
+        serviceReleased = false
         mediaController.addListener(controllerListener)
         if (mediaController.mediaItemCount > 0) {
             // A live session is always fresher than the last saved snapshot.
@@ -351,9 +361,43 @@ class PlayerConnection(
     /** Saves immediately; the playback service calls this before stopping. */
     fun saveSnapshotNow() = persist(force = true)
 
+    /**
+     * Called when the activity leaves the screen. Background playback is kept
+     * only while audio is actually running. The controller is always released
+     * here: it is what keeps the service bound, and a bound service cannot be
+     * destroyed. With the controller gone, a paused session can be torn down so
+     * Meoify stops appearing in the notification shade's active-app section.
+     */
+    fun onAppBackgrounded() {
+        persist(force = true)
+        val c = controller
+        val keepsPlaying = c != null && c.isConnected &&
+            (c.isPlaying || c.playbackState == Player.STATE_BUFFERING)
+        detachController()
+        if (!keepsPlaying) {
+            runCatching { context.stopService(Intent(context, PlaybackService::class.java)) }
+        }
+    }
+
+    /** Reconnects the UI to a service that kept playing in the background. */
+    fun onAppForegrounded() {
+        if (controller?.isConnected == true) return
+        scope.launch {
+            runCatching { awaitController() }
+        }
+    }
+
+    /** Unbinds this process from the service without touching playback. */
+    private fun detachController() {
+        serviceReleased = true
+        val current = controller
+        controller = null
+        runCatching { current?.release() }
+    }
+
     private fun withController(block: (MediaController) -> Unit) {
         val current = controller
-        if (current != null && current.isConnected) {
+        if (!serviceReleased && current != null && current.isConnected) {
             block(current)
             return
         }
@@ -685,14 +729,15 @@ class PlayerConnection(
     }
 
     private suspend fun awaitController(): MediaController {
-        controller?.takeIf { it.isConnected }?.let { return it }
+        controller?.takeIf { it.isConnected && !serviceReleased }?.let { return it }
         val future = synchronized(this) {
             val stale = controller
-            if (stale != null) {
+            if (stale != null || serviceReleased) {
                 // The service stopped (for example after the task was removed
                 // while paused). Build a fresh connection for the next action.
                 controller = null
                 controllerFuture = buildController()
+                serviceReleased = false
             }
             controllerFuture
         }

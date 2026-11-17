@@ -38,19 +38,21 @@ import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Badge
 import androidx.compose.material.icons.filled.Backup
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.CloudSync
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.ColorLens
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.CurrencyRupee
+import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.HighQuality
-import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Login
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Restore
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.SearchOff
 import androidx.compose.material.icons.filled.Verified
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -406,7 +408,12 @@ fun SettingsScreen(
                         library.playlists.size
                     },
                     played = if (signedIn && ytLibrary.ready) {
-                        ytLibrary.playedCount
+                        // The account History page is the source of truth, but
+                        // it can be empty for accounts with watch history off or
+                        // when the page read fails. Fall back to the songs
+                        // Meoify itself knows were played so the stat is never
+                        // silently stuck at zero.
+                        ytLibrary.playedCount.takeIf { it > 0 } ?: library.recent.size
                     } else {
                         library.recent.size
                     },
@@ -526,7 +533,7 @@ fun SettingsScreen(
             item {
                 SettingsCard {
                     ToggleRow(
-                        icon = Icons.Filled.History,
+                        icon = Icons.Filled.CloudSync,
                         title = "Sync to YouTube Music history",
                         subtitle = when {
                             settings.ytCookies == null ->
@@ -548,12 +555,12 @@ fun SettingsScreen(
             item {
                 SettingsCard {
                     ActionRow(
-                        icon = Icons.Filled.Search,
+                        icon = Icons.Filled.SearchOff,
                         title = "Clear recent searches",
                         onClick = actions.clearRecentSearches,
                     )
                     ActionRow(
-                        icon = Icons.Filled.History,
+                        icon = Icons.Filled.DeleteSweep,
                         title = "Clear listening history",
                         onClick = actions.clearRecent,
                     )

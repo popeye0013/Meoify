@@ -8,6 +8,7 @@ import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
+import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
@@ -27,8 +28,10 @@ import com.meoify.music.data.model.Track
 import com.meoify.music.data.remote.InnerTube
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
@@ -38,6 +41,7 @@ import kotlinx.coroutines.launch
  * controls, so the queue, the Like state and shuffle stay usable without the
  * activity being open.
  */
+@OptIn(UnstableApi::class)
 class PlaybackService : MediaSessionService() {
 
     private var mediaSession: MediaSession? = null
@@ -49,6 +53,9 @@ class PlaybackService : MediaSessionService() {
 
     /** Last button state pushed to the notification, to avoid needless rebuilds. */
     private var lastButtonState: Triple<Boolean, Boolean, Boolean>? = null
+
+    /** Stops the service a moment after playback pauses in the background. */
+    private var idleStopJob: Job? = null
 
     private val likeCommand = SessionCommand(ACTION_TOGGLE_LIKE, Bundle.EMPTY)
     private val shuffleCommand = SessionCommand(ACTION_TOGGLE_SHUFFLE, Bundle.EMPTY)
@@ -89,6 +96,15 @@ class PlaybackService : MediaSessionService() {
             override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
                 // The heart follows the current song.
                 refreshMediaButtons()
+            }
+
+            override fun onIsPlayingChanged(isPlaying: Boolean) {
+                refreshMediaButtons()
+                if (isPlaying) {
+                    idleStopJob?.cancel()
+                } else {
+                    scheduleIdleStop()
+                }
             }
 
             override fun onShuffleModeEnabledChanged(shuffleModeEnabled: Boolean) {
@@ -170,7 +186,29 @@ class PlaybackService : MediaSessionService() {
         // app restores the last song from the saved snapshot.
         if (player == null || player.mediaItemCount == 0 || !player.playWhenReady) {
             container.player.saveSnapshotNow()
-            stopSelf()
+            // pauseAllPlayersAndStopSelf also disables the 10-minute foreground
+            // timeout, so the service disappears from active apps right away.
+            pauseAllPlayersAndStopSelf()
+        }
+    }
+
+    /**
+     * A pause in the background should not leave a foreground service running
+     * (Android lists it under active apps). Give playback a few seconds in case
+     * the pause is just a track change, then stop and keep the snapshot.
+     */
+    private fun scheduleIdleStop() {
+        if (container.inForeground) return
+        idleStopJob?.cancel()
+        idleStopJob = scope.launch {
+            delay(IDLE_STOP_DELAY_MS)
+            val player = mediaSession?.player ?: return@launch
+            if (player.isPlaying || player.playbackState == Player.STATE_BUFFERING) return@launch
+            if (container.inForeground) return@launch
+            container.player.saveSnapshotNow()
+            // This is the supported way to leave the foreground state and end
+            // the service even while Media3's idle timeout is still armed.
+            pauseAllPlayersAndStopSelf()
         }
     }
 
@@ -270,5 +308,8 @@ class PlaybackService : MediaSessionService() {
     private companion object {
         const val ACTION_TOGGLE_LIKE = "com.meoify.music.action.TOGGLE_LIKE"
         const val ACTION_TOGGLE_SHUFFLE = "com.meoify.music.action.TOGGLE_SHUFFLE"
+
+        /** Grace period before a background pause tears the service down. */
+        const val IDLE_STOP_DELAY_MS = 5_000L
     }
 }

@@ -357,20 +357,15 @@ object YTMusicParser {
      */
     fun historyVideoIds(root: JsonObject): List<String> {
         val ids = LinkedHashSet<String>()
-        root.findAll("musicResponsiveListItemRenderer").forEach { element ->
-            val renderer = element.asObjectOrNull() ?: return@forEach
-            val id = renderer["playlistItemData"]?.asObjectOrNull()
-                ?.get("videoId")?.readText()
-                ?: renderer.findAll("watchEndpoint").firstOrNull()
-                    ?.asObjectOrNull()?.get("videoId")?.readText()
-            if (!id.isNullOrBlank()) ids.add(id)
+        // Read the id wherever the current row layout puts it. History has used
+        // several renderers over time, and one odd row must not zero the count.
+        root.findAll("playlistItemData").forEach { element ->
+            element.asObjectOrNull()?.get("videoId")?.readText()
+                ?.takeIf { it.isNotBlank() }?.let(ids::add)
         }
-        // Some account layouts show history videos as two-row cards.
-        root.findAll("musicTwoRowItemRenderer").forEach { element ->
-            val renderer = element.asObjectOrNull() ?: return@forEach
-            val id = renderer.findAll("watchEndpoint").firstOrNull()
-                ?.asObjectOrNull()?.get("videoId")?.readText()
-            if (!id.isNullOrBlank()) ids.add(id)
+        root.findAll("watchEndpoint").forEach { element ->
+            element.asObjectOrNull()?.get("videoId")?.readText()
+                ?.takeIf { it.isNotBlank() }?.let(ids::add)
         }
         return ids.toList()
     }

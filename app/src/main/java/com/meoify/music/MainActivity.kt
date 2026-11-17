@@ -63,4 +63,22 @@ class MainActivity : ComponentActivity() {
         setIntent(intent)
         pendingLink = intent.dataString
     }
+
+    override fun onStart() {
+        super.onStart()
+        val app = application as MeoifyApplication
+        app.container.inForeground = true
+        // The controller was released in onStop so a paused service could shut
+        // down; reconnect if playback kept running in the background.
+        app.container.player.onAppForegrounded()
+    }
+
+    override fun onStop() {
+        val app = application as MeoifyApplication
+        app.container.inForeground = false
+        // A paused player must not keep a background service (and its
+        // "active app" chip) alive once Meoify leaves the screen.
+        app.container.player.onAppBackgrounded()
+        super.onStop()
+    }
 }

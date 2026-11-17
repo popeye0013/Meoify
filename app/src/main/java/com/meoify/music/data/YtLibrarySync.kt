@@ -106,12 +106,30 @@ class YtLibrarySync(
         var playedCount = current.playedCount
         try {
             coroutineScope {
-                val likedJob = async { repository.likedSongs() }
-                val playedJob = async { repository.playedCount() }
-                playlists = repository.libraryPlaylists()
-                    .filterNot { it.id == "LM" || it.id == "SE" }
-                liked = likedJob.await()
-                playedCount = playedJob.await()
+                // Each part of the account is fetched independently: a failing
+                // playlists or likes request must not discard the Played count
+                // (and vice versa).
+                val likedJob = async { runCatching { repository.likedSongs() } }
+                val playedJob = async { runCatching { repository.playedCount() } }
+                val playlistsJob = async { runCatching { repository.libraryPlaylists() } }
+
+                val playlistsResult = playlistsJob.await()
+                playlistsResult.onSuccess { all ->
+                    playlists = all.filterNot { it.id == "LM" || it.id == "SE" }
+                }
+                val likedResult = likedJob.await()
+                likedResult.getOrNull()?.let { liked = it }
+                val playedResult = playedJob.await()
+                playedResult.onSuccess { playedCount = it }
+
+                val failure = listOfNotNull(
+                    playlistsResult.exceptionOrNull(),
+                    likedResult.exceptionOrNull(),
+                    playedResult.exceptionOrNull(),
+                ).firstOrNull()
+                if (failure != null) {
+                    error = failure.message ?: "Couldn't sync your YouTube Music library."
+                }
             }
         } catch (t: Throwable) {
             error = t.message ?: "Couldn't sync your YouTube Music library."

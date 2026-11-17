@@ -18,6 +18,14 @@ import com.meoify.music.playback.PlayerConnection
 
 class AppContainer(context: Context) {
     private val appContext = context.applicationContext
+
+    /**
+     * True while the Meoify activity is visible. The playback service uses it
+     * to decide whether an idle (paused) session should keep running.
+     */
+    @Volatile
+    var inForeground: Boolean = false
+
     val settings = SettingsStore(appContext)
     val library = LibraryStore(appContext)
     val playback = PlaybackStore(appContext)
