@@ -18,6 +18,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -1129,6 +1130,9 @@ private fun LyricsView(
     onPrevious: () -> Unit,
 ) {
     val listState = rememberLazyListState()
+    // Tapping a line seeks; it must not paint the rectangular ripple that a
+    // full-width text row would show.
+    val tapInteraction = remember { MutableInteractionSource() }
     val currentIndex = lyrics?.lines?.indexOfLast { it.timeMs <= positionMs } ?: -1
     // Jump straight to the current line when the view opens (or after a seek);
     // only later line changes animate. Scrolling must also follow the position
@@ -1234,7 +1238,10 @@ private fun LyricsView(
                             color = if (active) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clickable { onSeek(line.timeMs) }
+                                .clickable(
+                                    interactionSource = tapInteraction,
+                                    indication = null,
+                                ) { onSeek(line.timeMs) }
                                 .padding(vertical = 9.dp),
                         )
                     }

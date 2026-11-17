@@ -43,7 +43,7 @@ import androidx.compose.material.icons.filled.ColorLens
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.CurrencyRupee
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.GraphicEq
+import androidx.compose.material.icons.filled.HighQuality
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Login
 import androidx.compose.material.icons.filled.Person
@@ -137,6 +137,12 @@ fun SettingsScreen(
     val account by profileViewModel.account.collectAsStateWithLifecycle()
     val profileLoading by profileViewModel.loading.collectAsStateWithLifecycle()
     val historyStatus by app.container.historySync.status.collectAsStateWithLifecycle()
+
+    // The Played count only changes when the account history does, so read it
+    // again when Settings opens instead of showing the number from startup.
+    LaunchedEffect(signedIn) {
+        if (signedIn) app.container.ytLibrary.refreshPlayedCount()
+    }
 
     // In Settings the search icon searches the settings themselves, not the
     // music catalogue.
@@ -486,18 +492,7 @@ fun SettingsScreen(
                         modifier = Modifier.padding(horizontal = 14.dp, vertical = 14.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Surface(
-                            shape = CircleShape,
-                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.14f),
-                            modifier = Modifier.size(42.dp),
-                        ) {
-                            Icon(
-                                Icons.Filled.GraphicEq,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.padding(10.dp),
-                            )
-                        }
+                        SettingsIconTile(icon = Icons.Filled.HighQuality)
                         Spacer(Modifier.width(12.dp))
                         Column(modifier = Modifier.weight(1f)) {
                             Text(

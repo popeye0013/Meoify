@@ -373,18 +373,17 @@ class MusicRepository(private val settings: com.meoify.music.data.local.Settings
         if (!cookiesPresent) return 0
         return runCatching {
             val root = innerTube.browse("FEmusic_history")
-            val tracks = YTMusicParser.parseTracks(root).toMutableList()
+            val ids = LinkedHashSet(YTMusicParser.historyVideoIds(root))
             var token = YTMusicParser.nextContinuation(root)
             var rounds = 0
-            while (token != null && tracks.size < limit && rounds < 5) {
-                val next = innerTube.browseContinuation(token)
-                val more = YTMusicParser.parseTracks(next)
-                if (more.isEmpty()) break
-                tracks += more
+            while (token != null && ids.size < limit && rounds < 5) {
+                val next = runCatching { innerTube.browseContinuation(token) }.getOrNull()
+                    ?: break
+                ids += YTMusicParser.historyVideoIds(next)
                 token = YTMusicParser.nextContinuation(next)
                 rounds++
             }
-            tracks.distinctBy { it.id }.size
+            ids.size
         }.getOrDefault(0)
     }
 

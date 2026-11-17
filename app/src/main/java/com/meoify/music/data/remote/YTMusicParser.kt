@@ -348,6 +348,33 @@ object YTMusicParser {
         return tracks.distinctBy { it.id }
     }
 
+    /**
+     * Video ids on a History page, in page order.
+     *
+     * History rows are normal song rows, but the page also carries headings and
+     * menu rows, and one malformed row must not zero the whole count. This only
+     * needs the id, so it is deliberately more forgiving than [parseTrack].
+     */
+    fun historyVideoIds(root: JsonObject): List<String> {
+        val ids = LinkedHashSet<String>()
+        root.findAll("musicResponsiveListItemRenderer").forEach { element ->
+            val renderer = element.asObjectOrNull() ?: return@forEach
+            val id = renderer["playlistItemData"]?.asObjectOrNull()
+                ?.get("videoId")?.readText()
+                ?: renderer.findAll("watchEndpoint").firstOrNull()
+                    ?.asObjectOrNull()?.get("videoId")?.readText()
+            if (!id.isNullOrBlank()) ids.add(id)
+        }
+        // Some account layouts show history videos as two-row cards.
+        root.findAll("musicTwoRowItemRenderer").forEach { element ->
+            val renderer = element.asObjectOrNull() ?: return@forEach
+            val id = renderer.findAll("watchEndpoint").firstOrNull()
+                ?.asObjectOrNull()?.get("videoId")?.readText()
+            if (!id.isNullOrBlank()) ids.add(id)
+        }
+        return ids.toList()
+    }
+
     /** Continuation token for the next batch of rows, if the page has one. */
     fun nextContinuation(root: JsonObject): String? {
         root.findAll("continuationItemRenderer").forEach { element ->

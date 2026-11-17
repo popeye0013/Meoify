@@ -164,10 +164,12 @@ class PlaybackService : MediaSessionService() {
 
     override fun onTaskRemoved(rootIntent: Intent?) {
         val player = mediaSession?.player
-        // Keep the session, the queue and the notification alive while a song
-        // is loaded — even when paused — so removing the app from recents
-        // does not stop background playback or lose the controls.
-        if (player == null || player.mediaItemCount == 0) {
+        // Only genuinely playing audio keeps the service alive after the task
+        // is removed. A paused session is saved and then torn down, so Meoify
+        // never lingers in the background draining the battery; reopening the
+        // app restores the last song from the saved snapshot.
+        if (player == null || player.mediaItemCount == 0 || !player.playWhenReady) {
+            container.player.saveSnapshotNow()
             stopSelf()
         }
     }

@@ -42,6 +42,8 @@ class HistorySync(
     private val player: PlayerConnection,
     private val repository: MusicRepository,
     private val settings: SettingsStore,
+    /** Called after YouTube accepts a listen, so the profile's Played count can follow. */
+    private val onRecorded: () -> Unit = {},
 ) {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -138,6 +140,7 @@ class HistorySync(
             when {
                 code in 200..299 -> {
                     _status.value = "Synced “${track.title}” to YouTube Music history"
+                    runCatching { onRecorded() }
                     return
                 }
                 // Bad credentials or invalid tracking URL: retrying can't help.

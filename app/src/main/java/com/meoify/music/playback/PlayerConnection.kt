@@ -3,6 +3,7 @@ package com.meoify.music.playback
 import android.content.ComponentName
 import android.content.Context
 import android.net.Uri
+import android.os.SystemClock
 import androidx.core.content.ContextCompat
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
@@ -14,6 +15,8 @@ import androidx.media3.session.SessionToken
 import com.google.common.util.concurrent.ListenableFuture
 import com.meoify.music.data.CoverArtResolver
 import com.meoify.music.data.local.LibraryStore
+import com.meoify.music.data.local.PlaybackSnapshot
+import com.meoify.music.data.local.PlaybackStore
 import com.meoify.music.data.model.Track
 import com.meoify.music.data.remote.Artwork
 import com.meoify.music.data.remote.ResolvedAudio
@@ -30,6 +33,7 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -70,6 +74,7 @@ class PlayerConnection(
     private val resolver: StreamResolver,
     private val library: LibraryStore,
     private val coverArt: CoverArtResolver? = null,
+    private val playbackStore: PlaybackStore,
 ) {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -78,11 +83,6 @@ class PlayerConnection(
 
     private val _events = MutableSharedFlow<PlaybackEvent>(extraBufferCapacity = 12)
     val events: SharedFlow<PlaybackEvent> = _events.asSharedFlow()
-
-    private val controllerFuture: ListenableFuture<MediaController> = MediaController.Builder(
-        context,
-        SessionToken(context, ComponentName(context, PlaybackService::class.java)),
-    ).buildAsync()
 
     private var controller: MediaController? = null
     private var queue: List<Track> = emptyList()
@@ -96,6 +96,11 @@ class PlayerConnection(
     private var retriedTrackId: String? = null
     /** Guards against auto-skipping through an entire unavailable queue. */
     private var consecutiveFailures = 0
+    /** True while the last saved session is on screen but not loaded in the player. */
+    private var restored = false
+    private var lastPersistAt = 0L
+    private var persistedTrackId: String? = null
+    private var persistedPlaying = false
 
     private val controllerListener = object : Player.Listener {
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
@@ -110,10 +115,12 @@ class PlayerConnection(
                 }
             }
             refresh()
+            persist(force = true)
         }
 
         override fun onIsPlayingChanged(isPlaying: Boolean) {
             refresh()
+            persist(force = true)
         }
 
         override fun onPlaybackStateChanged(playbackState: Int) {
@@ -210,49 +217,172 @@ class PlayerConnection(
         }
     }
 
+    /**
+     * The connection to the playback service. It is rebuilt when the service
+     * was stopped (for example after the task was removed while paused) so the
+     * last song can be resumed without restarting the app.
+     */
+    private var controllerFuture: ListenableFuture<MediaController> = buildController()
+
     init {
-        controllerFuture.addListener(
-            {
-                runCatching { controllerFuture.get() }.onSuccess { mediaController ->
-                    controller = mediaController
-                    mediaController.addListener(controllerListener)
-                    if (mediaController.mediaItemCount > 0) {
-                        adoptControllerQueue(mediaController)
-                    }
-                    refresh()
-                }.onFailure {
-                    _events.tryEmit(PlaybackEvent.Failure("Couldn't start the audio service."))
-                }
-            },
-            ContextCompat.getMainExecutor(context),
-        )
+        scope.launch { restoreLastPlayback() }
 
         scope.launch {
             while (isActive) {
                 val c = controller
-                if (c != null && (c.isPlaying || c.playbackState == Player.STATE_BUFFERING)) {
-                    _state.update {
-                        it.copy(
-                            isPlaying = c.isPlaying,
-                            positionMs = c.currentPosition.coerceAtLeast(0),
-                            durationMs = safeDuration(c),
-                            isBuffering = c.playbackState == Player.STATE_BUFFERING,
-                        )
+                var playing = false
+                if (c != null && c.isConnected) {
+                    playing = c.isPlaying
+                    if (playing || c.playbackState == Player.STATE_BUFFERING) {
+                        _state.update {
+                            it.copy(
+                                isPlaying = playing,
+                                positionMs = c.currentPosition.coerceAtLeast(0),
+                                durationMs = safeDuration(c),
+                                isBuffering = c.playbackState == Player.STATE_BUFFERING,
+                            )
+                        }
                     }
                 }
+                persist()
                 // Lyrics highlight the line for the current position; 250 ms
                 // keeps it close to the audio without busy-looping.
-                delay(if (c?.isPlaying == true) 250 else 500)
+                delay(if (playing) 250 else 500)
             }
         }
     }
 
-    fun playTracks(tracks: List<Track>, startIndex: Int, sourceTitle: String) {
+    private fun buildController(): ListenableFuture<MediaController> {
+        val future = MediaController.Builder(
+            context,
+            SessionToken(context, ComponentName(context, PlaybackService::class.java)),
+        ).buildAsync()
+        future.addListener(
+            {
+                runCatching { future.get() }.onSuccess { mediaController ->
+                    if (controllerFuture !== future) {
+                        mediaController.release()
+                        return@onSuccess
+                    }
+                    attachController(mediaController)
+                }.onFailure {
+                    if (controllerFuture === future) {
+                        _events.tryEmit(PlaybackEvent.Failure("Couldn't start the audio service."))
+                    }
+                }
+            },
+            ContextCompat.getMainExecutor(context),
+        )
+        return future
+    }
+
+    private fun attachController(mediaController: MediaController) {
+        controller = mediaController
+        mediaController.addListener(controllerListener)
+        if (mediaController.mediaItemCount > 0) {
+            // A live session is always fresher than the last saved snapshot.
+            restored = false
+            queue = emptyList()
+            queueIndex = -1
+            adoptControllerQueue(mediaController)
+        } else if (queue.isNotEmpty()) {
+            // The service was stopped with a queue on screen: keep showing the
+            // last song and load it again when the person presses play.
+            restored = true
+        }
+        refresh()
+    }
+
+    private suspend fun restoreLastPlayback() {
+        val snapshot = playbackStore.snapshot.first() ?: return
+        if (queue.isNotEmpty()) return
+        if ((controller?.mediaItemCount ?: 0) > 0) return
+        val index = snapshot.queueIndex
+        if (index !in snapshot.queue.indices) return
+
+        val track = snapshot.queue[index]
+        queue = snapshot.queue
+        queueIndex = index
+        sourceTitle = snapshot.sourceTitle.ifBlank { "YouTube Music" }
+        restored = true
+        _state.value = PlayerUiState(
+            track = track,
+            isPlaying = false,
+            positionMs = snapshot.positionMs.coerceAtLeast(0),
+            durationMs = track.durationMs.coerceAtLeast(0),
+            shuffle = snapshot.shuffle,
+            repeatMode = snapshot.repeatMode,
+            queue = queue,
+            queueIndex = queueIndex,
+            sourceTitle = sourceTitle,
+            sleepEndsAtMs = _state.value.sleepEndsAtMs,
+        )
+    }
+
+    /** Writes the current session to disk, throttled while it is playing. */
+    private fun persist(force: Boolean = false) {
+        if (queue.isEmpty() || queueIndex !in queue.indices) return
+        val state = _state.value
+        val track = state.track ?: queue.getOrNull(queueIndex) ?: return
+        val trackChanged = track.id != persistedTrackId
+        val playChanged = state.isPlaying != persistedPlaying
+        val now = SystemClock.elapsedRealtime()
+        if (!force && !trackChanged && !playChanged &&
+            (!state.isPlaying || now - lastPersistAt < PERSIST_INTERVAL_MS)
+        ) {
+            return
+        }
+        lastPersistAt = now
+        persistedTrackId = track.id
+        persistedPlaying = state.isPlaying
+        playbackStore.save(
+            PlaybackSnapshot(
+                queue = queue,
+                queueIndex = queueIndex,
+                positionMs = state.positionMs.coerceAtLeast(0),
+                sourceTitle = sourceTitle,
+                shuffle = state.shuffle,
+                repeatMode = state.repeatMode,
+                savedAtMs = System.currentTimeMillis(),
+            ),
+        )
+    }
+
+    /** Saves immediately; the playback service calls this before stopping. */
+    fun saveSnapshotNow() = persist(force = true)
+
+    private fun withController(block: (MediaController) -> Unit) {
+        val current = controller
+        if (current != null && current.isConnected) {
+            block(current)
+            return
+        }
+        scope.launch {
+            val fresh = try {
+                awaitController()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _events.tryEmit(PlaybackEvent.Failure("Couldn't connect to playback."))
+                return@launch
+            }
+            block(fresh)
+            refresh()
+        }
+    }
+
+    fun playTracks(
+        tracks: List<Track>,
+        startIndex: Int,
+        sourceTitle: String,
+        startPositionMs: Long = 0L,
+    ) {
         if (tracks.isEmpty()) return
         val start = startIndex.coerceIn(0, tracks.lastIndex)
         generation++
         appendJob?.cancel()
         retriedTrackId = null
+        restored = false
 
         queue = tracks.toList()
         queueIndex = start
@@ -261,6 +391,8 @@ class PlayerConnection(
             track = tracks[start],
             isPlaying = false,
             isPreparing = true,
+            positionMs = startPositionMs.coerceAtLeast(0),
+            durationMs = tracks[start].durationMs.coerceAtLeast(0),
             queue = queue,
             queueIndex = start,
             sourceTitle = sourceTitle,
@@ -314,18 +446,21 @@ class PlayerConnection(
 
             if (generation != myGeneration) return@launch
             val playTrack = queue.getOrNull(attempt) ?: return@launch
-            c.setMediaItems(listOf(playTrack.toMediaItem(audio)))
+            val resumeAt = startPositionMs.coerceAtLeast(0)
+            c.setMediaItems(listOf(playTrack.toMediaItem(audio)), 0, resumeAt)
             c.prepare()
             c.play()
             _state.update {
                 it.copy(
                     track = playTrack,
                     queueIndex = attempt,
+                    positionMs = resumeAt,
                     isPreparing = false,
                 )
             }
             library.addRecent(playTrack)
             refresh()
+            persist(force = true)
 
             // Resolve the rest of the queue in order. The first items are ready
             // long before the current track ends, so transitions stay seamless.
@@ -347,22 +482,43 @@ class PlayerConnection(
     }
 
     fun togglePlayPause() {
-        val c = controller ?: return
-        if (c.mediaItemCount == 0) return
-        // After a playback error, play() reuses the failed (probably expired)
-        // source. Re-resolve the current track instead.
-        if (c.playerError != null && queue.isNotEmpty()) {
-            playTracks(queue, queueIndex.coerceIn(0, queue.lastIndex), sourceTitle)
-            return
+        scope.launch {
+            val c = try {
+                awaitController()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _events.tryEmit(PlaybackEvent.Failure("Couldn't connect to playback."))
+                return@launch
+            }
+            if (c.mediaItemCount == 0) {
+                // Nothing is loaded in the player but a session is on screen:
+                // load the last song again at the position where it stopped.
+                if (queue.isNotEmpty() && queueIndex in queue.indices) {
+                    playTracks(queue, queueIndex, sourceTitle, _state.value.positionMs)
+                }
+                return@launch
+            }
+            // After a playback error, play() reuses the failed (probably
+            // expired) source. Re-resolve the current track instead.
+            if (c.playerError != null && queue.isNotEmpty()) {
+                playTracks(queue, queueIndex.coerceIn(0, queue.lastIndex), sourceTitle)
+                return@launch
+            }
+            if (c.isPlaying) c.pause() else c.play()
+            refresh()
+            persist(force = true)
         }
-        if (c.isPlaying) c.pause() else c.play()
-        refresh()
     }
 
     fun pause() {
-        val c = controller ?: return
-        if (c.isPlaying) c.pause()
+        val c = controller
+        if (c != null && c.isConnected && c.isPlaying) {
+            c.pause()
+        }
+        _state.update { it.copy(isPlaying = false) }
         refresh()
+        persist(force = true)
     }
 
     /**
@@ -381,37 +537,45 @@ class PlayerConnection(
         _state.update { it.copy(sleepEndsAtMs = endsAt) }
         sleepJob = scope.launch {
             delay(minutes * 60_000L)
-            controller?.let { c -> if (c.isPlaying) c.pause() }
+            controller?.takeIf { it.isConnected }?.let { c -> if (c.isPlaying) c.pause() }
             _state.update { it.copy(sleepEndsAtMs = null, isPlaying = false) }
+            persist(force = true)
             _events.tryEmit(PlaybackEvent.Message("Sleep timer ended — playback paused."))
         }
     }
 
     fun setVolume(value: Float) {
-        val c = controller ?: return
         val level = value.coerceIn(0f, 1f)
-        c.volume = level
         if (level > 0f) lastVolume = level
         _state.update { it.copy(volume = level, muted = level == 0f) }
+        withController { it.volume = level }
     }
 
     fun toggleMute() {
-        val c = controller ?: return
-        val next = if (c.volume > 0f) 0f else lastVolume.takeIf { it > 0f } ?: 1f
-        c.volume = next
+        val next = if (_state.value.muted) {
+            lastVolume.takeIf { it > 0f } ?: 1f
+        } else {
+            0f
+        }
         if (next > 0f) lastVolume = next
         _state.update { it.copy(volume = next, muted = next == 0f) }
+        withController { it.volume = next }
     }
 
     fun seekTo(positionMs: Long) {
-        val c = controller ?: return
-        c.seekTo(positionMs.coerceAtLeast(0))
-        _state.update { it.copy(positionMs = positionMs.coerceAtLeast(0)) }
+        val target = positionMs.coerceAtLeast(0)
+        _state.update { it.copy(positionMs = target) }
+        val c = controller
+        if (c != null && c.isConnected && c.mediaItemCount > 0) {
+            c.seekTo(target)
+        }
+        // Seeks are rare (tap or drag end), so keep the saved position exact.
+        persist(force = true)
     }
 
     fun skipNext() {
         val c = controller
-        if (c != null && c.hasNextMediaItem()) {
+        if (c != null && c.isConnected && c.hasNextMediaItem()) {
             c.seekToNextMediaItem()
         } else if (queueIndex < queue.lastIndex) {
             playTracks(queue, queueIndex + 1, sourceTitle)
@@ -420,16 +584,19 @@ class PlayerConnection(
 
     fun skipPrevious() {
         val c = controller
-        if (c != null && c.currentPosition > 3_000) {
+        if (c != null && c.isConnected && c.currentPosition > 3_000) {
             c.seekTo(0)
             return
         }
-        if (c != null && c.hasPreviousMediaItem()) {
+        if (c != null && c.isConnected && c.hasPreviousMediaItem()) {
             c.seekToPreviousMediaItem()
         } else if (queueIndex > 0) {
             playTracks(queue, queueIndex - 1, sourceTitle)
-        } else {
-            c?.seekTo(0)
+        } else if (c != null && c.isConnected) {
+            c.seekTo(0)
+        } else if (restored) {
+            _state.update { it.copy(positionMs = 0) }
+            persist(force = true)
         }
     }
 
@@ -443,20 +610,21 @@ class PlayerConnection(
     }
 
     fun toggleShuffle() {
-        val c = controller ?: return
-        c.shuffleModeEnabled = !c.shuffleModeEnabled
-        _state.update { it.copy(shuffle = c.shuffleModeEnabled) }
+        val next = !_state.value.shuffle
+        _state.update { it.copy(shuffle = next) }
+        withController { it.shuffleModeEnabled = next }
+        persist(force = true)
     }
 
     fun cycleRepeat() {
-        val c = controller ?: return
-        val next = when (c.repeatMode) {
+        val next = when (_state.value.repeatMode) {
             Player.REPEAT_MODE_OFF -> Player.REPEAT_MODE_ALL
             Player.REPEAT_MODE_ALL -> Player.REPEAT_MODE_ONE
             else -> Player.REPEAT_MODE_OFF
         }
-        c.repeatMode = next
         _state.update { it.copy(repeatMode = next) }
+        withController { it.repeatMode = next }
+        persist(force = true)
     }
 
     fun playNext(track: Track) {
@@ -469,7 +637,23 @@ class PlayerConnection(
 
     private fun addTrack(track: Track, playNext: Boolean) {
         val c = controller
-        if (c == null || c.mediaItemCount == 0 || queue.isEmpty()) {
+        if (queue.isEmpty() || c == null || !c.isConnected || c.mediaItemCount == 0) {
+            // The player is empty but the last session is still on screen: add
+            // to that queue instead of replacing it with a single song.
+            if (restored && queue.isNotEmpty()) {
+                val mutable = queue.toMutableList()
+                val insertAt = if (playNext) {
+                    (queueIndex + 1).coerceIn(0, mutable.size)
+                } else {
+                    mutable.size
+                }
+                mutable.add(insertAt, track)
+                queue = mutable
+                _state.update { it.copy(queue = queue) }
+                persist(force = true)
+                _events.tryEmit(PlaybackEvent.Message(if (playNext) "Playing next" else "Added to queue"))
+                return
+            }
             playTracks(listOf(track), 0, "Queue")
             return
         }
@@ -488,6 +672,7 @@ class PlayerConnection(
                     queue = queue + track
                 }
                 _state.update { it.copy(queue = queue) }
+                persist(force = true)
                 _events.tryEmit(PlaybackEvent.Message(if (playNext) "Playing next" else "Added to queue"))
             } catch (e: Exception) {
                 _events.tryEmit(PlaybackEvent.Failure("Couldn't add “${track.title}” to the queue."))
@@ -500,13 +685,22 @@ class PlayerConnection(
     }
 
     private suspend fun awaitController(): MediaController {
-        val existing = controller
-        if (existing != null) return existing
+        controller?.takeIf { it.isConnected }?.let { return it }
+        val future = synchronized(this) {
+            val stale = controller
+            if (stale != null) {
+                // The service stopped (for example after the task was removed
+                // while paused). Build a fresh connection for the next action.
+                controller = null
+                controllerFuture = buildController()
+            }
+            controllerFuture
+        }
         return suspendCancellableCoroutine { continuation ->
-            controllerFuture.addListener(
+            future.addListener(
                 {
                     try {
-                        continuation.resume(controllerFuture.get())
+                        continuation.resume(future.get())
                     } catch (e: Exception) {
                         continuation.resumeWithException(e)
                     }
@@ -542,6 +736,25 @@ class PlayerConnection(
 
     private fun refresh() {
         val c = controller ?: return
+        if (!c.isConnected) return
+        if (c.mediaItemCount == 0) {
+            if (queue.isNotEmpty()) {
+                // The service is gone but the last session is still on screen.
+                restored = true
+                _state.update {
+                    it.copy(
+                        isPlaying = false,
+                        isPreparing = false,
+                        isBuffering = false,
+                        queue = queue,
+                        queueIndex = queueIndex,
+                        sourceTitle = sourceTitle,
+                    )
+                }
+            }
+            return
+        }
+        restored = false
         val item = c.currentMediaItem
         val track = item?.mediaId?.let { id ->
             queue.getOrNull(queueIndex)?.takeIf { it.id == id }
@@ -610,5 +823,8 @@ class PlayerConnection(
 
         /** Stop auto-advancing after this many failures in a row. */
         const val MAX_CONSECUTIVE_FAILURES = 3
+
+        /** How often the playback position is written while music plays. */
+        const val PERSIST_INTERVAL_MS = 5_000L
     }
 }

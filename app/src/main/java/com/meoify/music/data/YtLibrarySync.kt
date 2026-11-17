@@ -54,6 +54,34 @@ class YtLibrarySync(
         scope.launch { sync(force = true) }
     }
 
+    /**
+     * Re-reads only the Played count. Listening updates the account history
+     * without changing likes or playlists, so the profile card can stay
+     * current without a full library sync.
+     */
+    fun refreshPlayedCount() {
+        scope.launch {
+            if (!repository.signedIn) return@launch
+            val count = repository.playedCount()
+            // A failed read returns 0; keep the last known good number instead
+            // of blanking the stat on a flaky connection.
+            if (count > 0) {
+                _state.value = _state.value.copy(playedCount = count)
+            }
+        }
+    }
+
+    /**
+     * Counts a listen that YouTube just accepted. The history page can take a
+     * moment to list the new item, so the profile card follows immediately
+     * instead of waiting for the next full sync.
+     */
+    fun notePlayed() {
+        val current = _state.value
+        if (!current.signedIn || !current.ready) return
+        _state.value = current.copy(playedCount = current.playedCount + 1)
+    }
+
     /** Drops the account view after signing out. */
     fun reset() {
         _state.value = State(signedIn = false, ready = true)
