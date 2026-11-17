@@ -187,14 +187,17 @@ object LyricShare {
             val result = loader.execute(request)
             if (result is SuccessResult) {
                 val image = result.image
-                if (image is coil3.BitmapImage) {
+                val bmp = if (image is coil3.BitmapImage) {
                     image.bitmap
                 } else if (image.width > 0 && image.height > 0) {
-                    val bmp = Bitmap.createBitmap(image.width, image.height, Bitmap.Config.ARGB_8888)
-                    val c = Canvas(bmp)
+                    val b = Bitmap.createBitmap(image.width, image.height, Bitmap.Config.ARGB_8888)
+                    val c = Canvas(b)
                     image.draw(c)
-                    bmp
+                    b
                 } else null
+                bmp?.let {
+                    if (it.config == Bitmap.Config.HARDWARE) it.copy(Bitmap.Config.ARGB_8888, false) else it
+                }
             } else null
         } catch (_: Exception) {
             null
