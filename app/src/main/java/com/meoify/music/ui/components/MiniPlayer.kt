@@ -3,7 +3,6 @@ package com.meoify.music.ui.components
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
@@ -62,6 +61,13 @@ fun MiniPlayer(onOpen: () -> Unit) {
     val swipeOffset = remember { Animatable(0f) }
     var swipeHandled by remember { mutableStateOf(false) }
 
+    fun springBackMiniPlayer() {
+        if (swipeHandled) return
+        swipeScope.launch {
+            swipeOffset.animateTo(0f, spring(Spring.DampingRatioNoBouncy, Spring.StiffnessMedium))
+        }
+    }
+
     Surface(
         onClick = { if (!swipeHandled) onOpen() },
         shape = RoundedCornerShape(22.dp),
@@ -71,41 +77,28 @@ fun MiniPlayer(onOpen: () -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .pointerInput(onOpen) {
+                var dragUp = 0f
                 detectVerticalDragGestures(
-                    onDragStart = { swipeHandled = false },
+                    onDragStart = {
+                        dragUp = 0f
+                        swipeHandled = false
+                    },
                     onVerticalDrag = { change, delta ->
-                        if (delta < 0f) {
+                        if (delta < 0f && !swipeHandled) {
                             change.consume()
+                            dragUp += -delta
                             swipeScope.launch {
-                                swipeOffset.snapTo(
-                                    (swipeOffset.value - delta).coerceAtMost(swipeThreshold * 1.6f),
-                                )
+                                swipeOffset.snapTo(dragUp.coerceAtMost(swipeThreshold * 1.6f))
                             }
-                        }
-                    },
-                    onDragEnd = {
-                        val shouldOpen = swipeOffset.value >= swipeThreshold
-                        if (shouldOpen) swipeHandled = true
-                        swipeScope.launch {
-                            if (shouldOpen) {
-                                swipeOffset.animateTo(swipeThreshold * 1.6f, tween(120))
+                            // Same action as tapping the pill - no extra delay.
+                            if (dragUp >= swipeThreshold) {
+                                swipeHandled = true
                                 onOpen()
-                            } else {
-                                swipeOffset.animateTo(
-                                    0f,
-                                    spring(Spring.DampingRatioNoBouncy, Spring.StiffnessMedium),
-                                )
                             }
                         }
                     },
-                    onDragCancel = {
-                        swipeScope.launch {
-                            swipeOffset.animateTo(
-                                0f,
-                                spring(Spring.DampingRatioNoBouncy, Spring.StiffnessMedium),
-                            )
-                        }
-                    },
+                    onDragEnd = { springBackMiniPlayer() },
+                    onDragCancel = { springBackMiniPlayer() },
                 )
             }
             .graphicsLayer {

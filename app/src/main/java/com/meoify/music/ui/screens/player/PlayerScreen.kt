@@ -179,15 +179,12 @@ fun PlayerScreen(onClose: () -> Unit) {
     val dismissThreshold = with(density) { 96.dp.toPx() }
     val swipeScope = rememberCoroutineScope()
     val dismissOffset = remember { Animatable(0f) }
+    var dismissTriggered by remember { mutableStateOf(false) }
 
     fun settleDismissSwipe() {
+        if (dismissTriggered) return
         swipeScope.launch {
-            if (dismissOffset.value >= dismissThreshold) {
-                dismissOffset.animateTo(dismissThreshold * 1.6f, tween(140))
-                onClose()
-            } else {
-                dismissOffset.animateTo(0f, spring(Spring.DampingRatioNoBouncy, Spring.StiffnessMedium))
-            }
+            dismissOffset.animateTo(0f, spring(Spring.DampingRatioNoBouncy, Spring.StiffnessMedium))
         }
     }
 
@@ -336,25 +333,22 @@ fun PlayerScreen(onClose: () -> Unit) {
                         onQualityChange = { app.container.settings.setQuality(it) },
                         artworkSwipeModifier = Modifier.pointerInput(Unit) {
                             detectVerticalDragGestures(
+                                onDragStart = { dismissTriggered = false },
                                 onVerticalDrag = { change, delta ->
-                                    if (delta > 0f) {
+                                    if (delta > 0f && !dismissTriggered) {
                                         change.consume()
-                                        swipeScope.launch {
-                                            dismissOffset.snapTo(
-                                                (dismissOffset.value + delta).coerceAtMost(dismissThreshold * 1.6f),
-                                            )
+                                        val next = (dismissOffset.value + delta)
+                                            .coerceAtMost(dismissThreshold * 1.6f)
+                                        swipeScope.launch { dismissOffset.snapTo(next) }
+                                        // Same action as tapping the down arrow - no extra delay.
+                                        if (next >= dismissThreshold) {
+                                            dismissTriggered = true
+                                            onClose()
                                         }
                                     }
                                 },
                                 onDragEnd = { settleDismissSwipe() },
-                                onDragCancel = {
-                                    swipeScope.launch {
-                                        dismissOffset.animateTo(
-                                            0f,
-                                            spring(Spring.DampingRatioNoBouncy, Spring.StiffnessMedium),
-                                        )
-                                    }
-                                },
+                                onDragCancel = { settleDismissSwipe() },
                             )
                         },
                     )
