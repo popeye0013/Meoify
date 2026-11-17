@@ -12,6 +12,14 @@
          the upi://pay host keeps every installed UPI app visible to the
          donation chooser, including Paytm-style intent filters. -->
     <queries>
+        <!-- Needed so Instagram Stories can be resolved on Android 11+. -->
+        <intent>
+            <action android:name="com.instagram.share.ADD_TO_STORY" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.SEND" />
+            <data android:mimeType="image/*" />
+        </intent>
         <intent>
             <action android:name="android.intent.action.VIEW" />
             <data android:scheme="upi" />

@@ -1,217 +1,367 @@
 package com.meoify.music.util
 
-import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.LinearGradient
 import android.graphics.Paint
 import android.graphics.Rect
 import android.graphics.RectF
+import android.graphics.Shader
 import android.graphics.Typeface
 import android.net.Uri
+import android.os.Build
 import android.widget.Toast
 import androidx.core.content.FileProvider
+import coil3.BitmapImage
 import coil3.ImageLoader
 import coil3.request.ImageRequest
 import coil3.request.SuccessResult
-import java.io.File
-import java.io.FileOutputStream
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.io.File
+import java.io.FileOutputStream
+
+/** The two cards the now-playing screen can produce. */
+enum class ShareCardKind { SONG, LYRICS }
+
+data class ShareCardOptions(
+    val kind: ShareCardKind = ShareCardKind.LYRICS,
+    val lines: List<String> = emptyList(),
+    val title: String = "",
+    val artist: String = "",
+    val artworkUrl: String? = null,
+)
 
 /**
- * Renders the currently playing lyric line into a shareable image card and
- * launches the system share sheet (with a direct path to Instagram Stories).
+ * Renders a 9:16 card (full-bleed artwork, readable text, Meoify footer) and
+ * shares it as an image. Preview and export use the same renderer so what the
+ * user sees is exactly what gets shared.
  */
 object LyricShare {
 
-    private const val CARD_WIDTH = 1080
-    private const val CARD_HEIGHT = 1920
-
-    suspend fun share(
+    suspend fun renderCard(
         context: Context,
-        title: String,
-        artist: String,
-        lyric: String,
-        artworkUrl: String?,
-    ) = withContext(Dispatchers.IO) {
-        try {
-            val bitmap = renderCard(context, title, artist, lyric, artworkUrl)
-            val uri = saveBitmap(context, bitmap) ?: run {
-                withContext(Dispatchers.Main) {
-                    Toast.makeText(context, "Couldn't prepare the image", Toast.LENGTH_SHORT).show()
-                }
-                return@withContext
-            }
+        options: ShareCardOptions,
+        width: Int = 1080,
+        height: Int = 1920,
+    ): Bitmap = withContext(Dispatchers.Default) {
+        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+        val art = loadArtwork(context, options.artworkUrl)
 
-            withContext(Dispatchers.Main) {
-                try {
-                    val instagram = Intent("com.instagram.share.ADD_TO_STORY").apply {
-                        setDataAndType(uri, "image/*")
-                        putExtra("source_application", context.packageName)
-                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                    }
-                    if (instagram.resolveActivity(context.packageManager) != null) {
-                        try {
-                            context.startActivity(instagram)
-                            return@withContext
-                        } catch (_: Exception) {
-                        }
-                    }
-
-                    val share = Intent(Intent.ACTION_SEND).apply {
-                        type = "image/*"
-                        putExtra(Intent.EXTRA_STREAM, uri)
-                        putExtra(
-                            Intent.EXTRA_TEXT,
-                            "\u201c$lyric\u201d\n— $title${if (artist.isNotBlank()) " · $artist" else ""}\n\nShared from Meoify",
-                        )
-                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                    }
-                    context.startActivity(Intent.createChooser(share, "Share lyric"))
-                } catch (t: Throwable) {
-                    Toast.makeText(context, "Couldn't share: ${t.message}", Toast.LENGTH_LONG).show()
-                }
+        if (art != null) {
+            val scale = maxOf(width / art.width.toFloat(), height / art.height.toFloat())
+            val scaledW = art.width * scale
+            val scaledH = art.height * scale
+            val left = (width - scaledW) / 2f
+            val top = (height - scaledH) / 2f
+            canvas.drawBitmap(
+                art,
+                null,
+                RectF(left, top, left + scaledW, top + scaledH),
+                Paint(Paint.FILTER_BITMAP_FLAG),
+            )
+        } else {
+            val bg = Paint().apply {
+                shader = LinearGradient(
+                    0f, 0f, 0f, height.toFloat(),
+                    Color.parseColor("#312e81"),
+                    Color.parseColor("#0f172a"),
+                    Shader.TileMode.CLAMP,
+                )
             }
-        } catch (t: Throwable) {
-            withContext(Dispatchers.Main) {
+            canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), bg)
+        }
+
+        // Scrim + bottom gradient keep the text legible over any artwork.
+        canvas.drawRect(
+            0f, 0f, width.toFloat(), height.toFloat(),
+            Paint().apply { color = Color.argb(110, 0, 0, 0) },
+        )
+        canvas.drawRect(
+            0f, height * 0.45f, width.toFloat(), height.toFloat(),
+            Paint().apply {
+                shader = LinearGradient(
+                    0f, height * 0.45f, 0f, height.toFloat(),
+                    Color.TRANSPARENT,
+                    Color.argb(205, 0, 0, 0),
+                    Shader.TileMode.CLAMP,
+                )
+            },
+        )
+
+        // Small wordmark at the top.
+        val brandPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.argb(230, 255, 255, 255)
+            textSize = (width * 0.030f).coerceAtLeast(20f)
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            textAlign = Paint.Align.CENTER
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) brandPaint.letterSpacing = 4f
+        canvas.drawText("MEOIFY", width / 2f, height * 0.085f, brandPaint)
+
+        val selected = options.lines.map { it.trim() }.filter { it.isNotBlank() }
+        val blocks = if (options.kind == ShareCardKind.SONG || selected.isEmpty()) {
+            listOf(options.title.ifBlank { "Meoify" })
+        } else {
+            selected
+        }
+
+        // Fit the text block into the middle of the card.
+        val maxWidth = (width * 0.84f).toInt()
+        var textSize = (width * (if (blocks.size > 2) 0.052f else 0.068f)).coerceAtLeast(34f)
+        val minSize = (width * 0.035f).coerceAtLeast(22f)
+        val measure = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        }
+        var visualLines: List<String>
+        while (true) {
+            measure.textSize = textSize
+            val acc = mutableListOf<String>()
+            blocks.forEachIndexed { index, block ->
+                acc.addAll(wrapText(block, measure, maxWidth))
+                if (index < blocks.lastIndex) acc.add("")
+            }
+            visualLines = acc
+            val lineHeight = textSize * 1.32f
+            if (visualLines.size * lineHeight <= height * 0.52f || textSize <= minSize) break
+            textSize = (textSize - 2f).coerceAtLeast(minSize)
+        }
+
+        val mainPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.WHITE
+            this.textSize = textSize
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            textAlign = Paint.Align.CENTER
+            setShadowLayer(10f, 0f, 4f, Color.argb(150, 0, 0, 0))
+        }
+        val lineHeight = mainPaint.textSize * 1.32f
+        val blockHeight = visualLines.size * lineHeight
+        var y = (height * 0.47f) - (blockHeight / 2f) + mainPaint.textSize
+        visualLines.forEach { line ->
+            if (line.isNotBlank()) canvas.drawText(line, width / 2f, y, mainPaint)
+            y += lineHeight
+        }
+
+        if (options.kind == ShareCardKind.SONG && options.artist.isNotBlank()) {
+            val artistPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.argb(225, 255, 255, 255)
+                textSize = (width * 0.040f).coerceAtLeast(26f)
+                textAlign = Paint.Align.CENTER
+            }
+            canvas.drawText(
+                options.artist,
+                width / 2f,
+                y + mainPaint.textSize * 0.6f,
+                artistPaint,
+            )
+        }
+
+        // Footer strip: artwork thumbnail + track metadata.
+        val footerTop = height - (height * 0.155f)
+        val pad = (width * 0.08f).toInt()
+        val thumbSize = (width * 0.10f).toInt()
+        val cardPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.argb(45, 255, 255, 255)
+        }
+        canvas.drawRoundRect(
+            RectF(pad.toFloat(), footerTop, (width - pad).toFloat(), height - (height * 0.06f)),
+            (width * 0.04f),
+            (width * 0.04f),
+            cardPaint,
+        )
+        if (art != null) {
+            canvas.drawBitmap(
+                art,
+                null,
+                RectF(
+                    (pad + width * 0.025f).toFloat(),
+                    footerTop + (height * 0.0275f).toFloat(),
+                    (pad + width * 0.025f + thumbSize).toFloat(),
+                    footerTop + (height * 0.0275f + thumbSize).toFloat(),
+                ),
+                Paint(Paint.FILTER_BITMAP_FLAG),
+            )
+        }
+        val footerTitle = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.WHITE
+            textSize = (width * 0.034f).coerceAtLeast(23f)
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        }
+        val footerArtist = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.argb(210, 255, 255, 255)
+            textSize = (width * 0.027f).coerceAtLeast(19f)
+        }
+        val textX = pad + (if (art != null) width * 0.025f * 2 + thumbSize else width * 0.04f)
+        canvas.drawText(
+            fitText(options.title.ifBlank { "Meoify" }, footerTitle, width - textX - pad),
+            textX,
+            footerTop + height * 0.060f,
+            footerTitle,
+        )
+        if (options.artist.isNotBlank()) {
+            canvas.drawText(
+                fitText(options.artist, footerArtist, width - textX - pad),
+                textX,
+                footerTop + height * 0.095f,
+                footerArtist,
+            )
+        }
+
+        val caption = if (options.kind == ShareCardKind.SONG) {
+            "Now playing on Meoify"
+        } else {
+            "Lyrics · Meoify"
+        }
+        val captionPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.argb(180, 255, 255, 255)
+            textSize = (width * 0.025f).coerceAtLeast(18f)
+            textAlign = Paint.Align.CENTER
+        }
+        canvas.drawText(caption, width / 2f, height - (height * 0.020f), captionPaint)
+
+        bitmap
+    }
+
+    suspend fun shareToInstagramStory(context: Context, options: ShareCardOptions) {
+        val uri = prepareImage(context, options) ?: return
+        withContext(Dispatchers.Main) {
+            try {
+                val story = Intent("com.instagram.share.ADD_TO_STORY").apply {
+                    setDataAndType(uri, "image/*")
+                    putExtra("source_application", context.packageName)
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+                if (story.resolveActivity(context.packageManager) != null) {
+                    context.startActivity(story)
+                } else {
+                    Toast.makeText(context, "Instagram isn't installed", Toast.LENGTH_SHORT).show()
+                    launchChooser(context, uri, options)
+                }
+            } catch (t: Throwable) {
                 Toast.makeText(context, "Couldn't share: ${t.message}", Toast.LENGTH_LONG).show()
             }
         }
     }
 
-    private suspend fun renderCard(
-        context: Context,
-        title: String,
-        artist: String,
-        lyric: String,
-        artworkUrl: String?,
-    ): Bitmap {
-        val bitmap = Bitmap.createBitmap(CARD_WIDTH, CARD_HEIGHT, Bitmap.Config.ARGB_8888)
-        val canvas = Canvas(bitmap)
+    suspend fun shareToChat(context: Context, options: ShareCardOptions) {
+        val uri = prepareImage(context, options) ?: return
+        withContext(Dispatchers.Main) {
+            try {
+                launchChooser(context, uri, options)
+            } catch (t: Throwable) {
+                Toast.makeText(context, "Couldn't share: ${t.message}", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
 
-        // Background: artwork (if available) with a dark scrim, else gradient.
-        val art = loadArtwork(context, artworkUrl)
-        if (art != null) {
-            val src = Rect(0, 0, art.width, art.height)
-            val dst = Rect(0, 0, CARD_WIDTH, CARD_HEIGHT)
-            canvas.drawBitmap(art, src, dst, Paint(Paint.FILTER_BITMAP_FLAG))
-            canvas.drawRect(
-                0f, 0f, CARD_WIDTH.toFloat(), CARD_HEIGHT.toFloat(),
-                Paint().apply { color = Color.argb(150, 0, 0, 0) },
-            )
-        } else {
-            val paint = Paint()
-            paint.shader = android.graphics.LinearGradient(
-                0f, 0f, 0f, CARD_HEIGHT.toFloat(),
-                Color.parseColor("#1a1a2e"),
-                Color.parseColor("#16213e"),
-                android.graphics.Shader.TileMode.CLAMP,
-            )
-            canvas.drawRect(0f, 0f, CARD_WIDTH.toFloat(), CARD_HEIGHT.toFloat(), paint)
+    /** One-tap variant used when no preview sheet is shown. */
+    suspend fun share(context: Context, options: ShareCardOptions) {
+        val uri = prepareImage(context, options) ?: return
+        withContext(Dispatchers.Main) {
+            try {
+                val story = Intent("com.instagram.share.ADD_TO_STORY").apply {
+                    setDataAndType(uri, "image/*")
+                    putExtra("source_application", context.packageName)
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+                if (story.resolveActivity(context.packageManager) != null) {
+                    context.startActivity(story)
+                } else {
+                    launchChooser(context, uri, options)
+                }
+            } catch (_: Throwable) {
+                launchChooser(context, uri, options)
+            }
         }
+    }
 
-        // Lyric text, centered, wrapped.
-        val lyricPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.WHITE
-            textSize = 72f
-            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-            textAlign = Paint.Align.CENTER
-            setShadowLayer(8f, 0f, 4f, Color.argb(120, 0, 0, 0))
-        }
-        val maxTextWidth = CARD_WIDTH - 120
-        val lines = wrapText(lyric, lyricPaint, maxTextWidth)
-        val lineHeight = lyricPaint.textSize * 1.35f
-        val blockHeight = lines.size * lineHeight
-        var y = (CARD_HEIGHT / 2f) - (blockHeight / 2f) + lyricPaint.textSize
-        for (line in lines) {
-            canvas.drawText(line, CARD_WIDTH / 2f, y, lyricPaint)
-            y += lineHeight
-        }
-
-        // Track title / artist near the bottom.
-        val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.WHITE
-            textSize = 44f
-            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-            textAlign = Paint.Align.CENTER
-        }
-        val artistPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.argb(200, 255, 255, 255)
-            textSize = 36f
-            textAlign = Paint.Align.CENTER
-        }
-        val bottomY = CARD_HEIGHT - 180f
-        canvas.drawText(title, CARD_WIDTH / 2f, bottomY, titlePaint)
-        if (artist.isNotBlank()) {
-            canvas.drawText(artist, CARD_WIDTH / 2f, bottomY + 52f, artistPaint)
+    private suspend fun prepareImage(context: Context, options: ShareCardOptions): Uri? =
+        withContext(Dispatchers.IO) {
+            try {
+                val bitmap = renderCard(context, options)
+                val dir = File(context.cacheDir, "images").apply { mkdirs() }
+                val file = File(dir, "meoify_share_${System.currentTimeMillis()}.png")
+                FileOutputStream(file).use { out ->
+                    bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
+                }
+                FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+            } catch (t: Throwable) {
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(context, "Couldn't prepare the image: ${t.message}", Toast.LENGTH_LONG).show()
+                }
+                null
+            }
         }
 
-        // Watermark.
-        val wmPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.argb(140, 255, 255, 255)
-            textSize = 28f
-            textAlign = Paint.Align.CENTER
+    private fun launchChooser(context: Context, uri: Uri, options: ShareCardOptions) {
+        val caption = when (options.kind) {
+            ShareCardKind.SONG ->
+                "Now playing: ${options.title} — ${options.artist}\nShared from Meoify"
+            ShareCardKind.LYRICS ->
+                "\u201c${options.lines.joinToString(" ").trim()}\u201d\n— ${options.title}" +
+                    "${if (options.artist.isNotBlank()) " · ${options.artist}" else ""}\n\nShared from Meoify"
         }
-        canvas.drawText("Meoify", CARD_WIDTH / 2f, CARD_HEIGHT - 60f, wmPaint)
-
-        return bitmap
+        val send = Intent(Intent.ACTION_SEND).apply {
+            type = "image/*"
+            putExtra(Intent.EXTRA_STREAM, uri)
+            putExtra(Intent.EXTRA_TEXT, caption)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        context.startActivity(Intent.createChooser(send, "Share card"))
     }
 
     private fun wrapText(text: String, paint: Paint, maxWidth: Int): List<String> {
-        val words = text.split(Regex("\\s+"))
         val result = mutableListOf<String>()
-        val current = StringBuilder()
-        for (word in words) {
-            val candidate = if (current.isEmpty()) word else "$current $word"
-            if (paint.measureText(candidate) <= maxWidth) {
-                if (current.isNotEmpty()) current.append(' ')
-                current.append(word)
+        text.split(Regex("\\s+")).filter { it.isNotBlank() }.forEach { word ->
+            if (paint.measureText(word) > maxWidth) {
+                val chunk = StringBuilder()
+                word.forEach { char ->
+                    if (paint.measureText(chunk.toString() + char) > maxWidth && chunk.isNotEmpty()) {
+                        result.add(chunk.toString())
+                        chunk.clear()
+                    }
+                    chunk.append(char)
+                }
+                if (chunk.isNotEmpty()) result.add(chunk.toString())
+                return@forEach
+            }
+            val last = result.lastOrNull()
+            if (last != null && paint.measureText("$last $word") <= maxWidth) {
+                result[result.lastIndex] = "$last $word"
             } else {
-                if (current.isNotEmpty()) result.add(current.toString())
-                current.clear()
-                current.append(word)
+                result.add(word)
             }
         }
-        if (current.isNotEmpty()) result.add(current.toString())
         return result.ifEmpty { listOf(text) }
+    }
+
+    private fun fitText(text: String, paint: Paint, maxWidth: Float): String {
+        if (paint.measureText(text) <= maxWidth) return text
+        val end = text.length
+        var cut = end
+        while (cut > 1 && paint.measureText(text.take(cut) + "…") > maxWidth) cut--
+        return text.take(cut).trimEnd() + "…"
     }
 
     private suspend fun loadArtwork(context: Context, url: String?): Bitmap? {
         if (url.isNullOrBlank()) return null
         return try {
-            val loader = ImageLoader(context)
-            val request = ImageRequest.Builder(context).data(url).build()
-            val result = loader.execute(request)
-            if (result is SuccessResult) {
-                val image = result.image
-                val bmp = if (image is coil3.BitmapImage) {
-                    image.bitmap
-                } else if (image.width > 0 && image.height > 0) {
-                    val b = Bitmap.createBitmap(image.width, image.height, Bitmap.Config.ARGB_8888)
-                    val c = Canvas(b)
-                    image.draw(c)
-                    b
-                } else null
-                bmp?.let {
-                    if (it.config == Bitmap.Config.HARDWARE) it.copy(Bitmap.Config.ARGB_8888, false) else it
-                }
+            val result = ImageLoader(context).execute(ImageRequest.Builder(context).data(url).build())
+            if (result !is SuccessResult) return null
+            val image = result.image
+            val bmp = if (image is BitmapImage) {
+                image.bitmap
+            } else if (image.width > 0 && image.height > 0) {
+                val b = Bitmap.createBitmap(image.width, image.height, Bitmap.Config.ARGB_8888)
+                image.draw(Canvas(b))
+                b
             } else null
-        } catch (_: Exception) {
-            null
-        }
-    }
-
-    private fun saveBitmap(context: Context, bitmap: Bitmap): Uri? {
-        return try {
-            val dir = File(context.cacheDir, "images").apply { mkdirs() }
-            val file = File(dir, "lyric_share.png")
-            FileOutputStream(file).use { out ->
-                bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
-            }
-            FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+            bmp?.takeIf { it.config != Bitmap.Config.HARDWARE }
+                ?: bmp?.copy(Bitmap.Config.ARGB_8888, false)
         } catch (_: Exception) {
             null
         }

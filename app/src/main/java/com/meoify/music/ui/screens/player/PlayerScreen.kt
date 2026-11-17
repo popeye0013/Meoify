@@ -132,13 +132,13 @@ import com.meoify.music.playback.PlayerUiState
 import com.meoify.music.ui.components.TrackRow
 import com.meoify.music.ui.components.AudioQualitySheet
 import com.meoify.music.ui.components.ArtworkImage
+import com.meoify.music.ui.components.ShareCardSheet
 import com.meoify.music.ui.components.rememberTrackCover
 import com.meoify.music.ui.navigation.AppActions
 import com.meoify.music.ui.navigation.LocalAppActions
 import com.meoify.music.ui.navigation.LocalPlayerState
 import com.meoify.music.ui.theme.ArtworkColorCache
 import com.meoify.music.util.formatDuration
-import com.meoify.music.util.LyricShare
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -171,6 +171,10 @@ fun PlayerScreen(onClose: () -> Unit) {
     var showSleepTimer by remember { mutableStateOf(false) }
     var lyrics by remember { mutableStateOf<TrackLyrics?>(null) }
     var lyricsLoading by remember { mutableStateOf(false) }
+    var shareSong by remember { mutableStateOf(false) }
+    var shareLyrics by remember { mutableStateOf(false) }
+    var shareLines by remember { mutableStateOf<List<String>>(emptyList()) }
+    var shareInitialLine by remember { mutableStateOf(0) }
 
     // Swipe down on the artwork to return to the mini player. An Animatable
     // keeps the content glued to the finger while dragging and gives a soft
@@ -253,12 +257,7 @@ fun PlayerScreen(onClose: () -> Unit) {
     }
 
     fun shareTrack() {
-        val t = track ?: return
-        val send = Intent(Intent.ACTION_SEND).apply {
-            type = "text/plain"
-            putExtra(Intent.EXTRA_TEXT, "https://music.youtube.com/watch?v=${t.id}\n\n${t.title} — ${t.artist}")
-        }
-        context.startActivity(Intent.createChooser(send, "Share song"))
+        if (track != null) shareSong = true
     }
 
     Box(
@@ -316,6 +315,11 @@ fun PlayerScreen(onClose: () -> Unit) {
                         artworkUrl = cover,
                         accent = accent,
                         onBack = { showLyrics = false },
+                        onShare = { lines, initial ->
+                            shareLines = lines
+                            shareInitialLine = initial
+                            shareLyrics = true
+                        },
                         onSeek = actions.seekTo,
                         onTogglePlay = actions.togglePlayPause,
                         onNext = actions.skipNext,
@@ -377,6 +381,28 @@ fun PlayerScreen(onClose: () -> Unit) {
                 actions.clearQueue()
                 showQueue = false
             },
+        )
+    }
+
+    if (shareSong) {
+        ShareCardSheet(
+            title = track?.title.orEmpty(),
+            artist = track?.artist.orEmpty(),
+            artworkUrl = cover,
+            songMode = true,
+            accent = accent,
+            onDismiss = { shareSong = false },
+        )
+    }
+    if (shareLyrics) {
+        ShareCardSheet(
+            title = track?.title.orEmpty(),
+            artist = track?.artist.orEmpty(),
+            artworkUrl = cover,
+            lines = shareLines,
+            initialSelected = setOf(shareInitialLine),
+            accent = accent,
+            onDismiss = { shareLyrics = false },
         )
     }
 }
@@ -1196,13 +1222,12 @@ private fun LyricsView(
     artworkUrl: String?,
     accent: Color,
     onBack: () -> Unit,
+    onShare: (List<String>, Int) -> Unit,
     onSeek: (Long) -> Unit,
     onTogglePlay: () -> Unit,
     onNext: () -> Unit,
     onPrevious: () -> Unit,
 ) {
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
     val listState = rememberLazyListState()
     // Tapping a line seeks; it must not paint the rectangular ripple that a
     // full-width text row would show.
@@ -1271,18 +1296,15 @@ private fun LyricsView(
             Spacer(Modifier.width(8.dp))
             Surface(
                 onClick = {
-                    val currentLine = lyrics?.lines?.getOrNull(currentIndex)?.text
-                        ?: lyrics?.plain?.lines()?.firstOrNull().orEmpty()
-                    if (currentLine.isNotBlank()) {
-                        scope.launch {
-                            LyricShare.share(
-                                context = context,
-                                title = trackTitle,
-                                artist = trackArtist,
-                                lyric = currentLine,
-                                artworkUrl = artworkUrl,
-                            )
-                        }
+                    val lines = lyrics?.lines?.map { it.text }
+                        ?.filter { it.isNotBlank() }
+                        ?.takeIf { it.isNotEmpty() }
+                        ?: lyrics?.plain?.lines()
+                            ?.map { it.trim() }
+                            ?.filter { it.isNotBlank() }
+                            .orEmpty()
+                    if (lines.isNotEmpty()) {
+                        onShare(lines, currentIndex.coerceAtLeast(0).coerceAtMost(lines.lastIndex))
                     }
                 },
                 shape = CircleShape,
