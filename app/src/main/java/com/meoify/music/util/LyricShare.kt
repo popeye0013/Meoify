@@ -37,39 +37,48 @@ object LyricShare {
         lyric: String,
         artworkUrl: String?,
     ) = withContext(Dispatchers.IO) {
-        val bitmap = renderCard(context, title, artist, lyric, artworkUrl)
-        val uri = saveBitmap(context, bitmap) ?: run {
-            withContext(Dispatchers.Main) {
-                Toast.makeText(context, "Couldn't prepare the image", Toast.LENGTH_SHORT).show()
+        try {
+            val bitmap = renderCard(context, title, artist, lyric, artworkUrl)
+            val uri = saveBitmap(context, bitmap) ?: run {
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(context, "Couldn't prepare the image", Toast.LENGTH_SHORT).show()
+                }
+                return@withContext
             }
-            return@withContext
-        }
 
-        withContext(Dispatchers.Main) {
-            // Prefer Instagram Stories when it is installed.
-            val instagram = Intent("com.instagram.share.ADD_TO_STORY").apply {
-                setDataAndType(uri, "image/*")
-                putExtra("source_application", context.packageName)
-                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            }
-            if (instagram.resolveActivity(context.packageManager) != null) {
+            withContext(Dispatchers.Main) {
                 try {
-                    context.startActivity(instagram)
-                    return@withContext
-                } catch (_: ActivityNotFoundException) {
+                    val instagram = Intent("com.instagram.share.ADD_TO_STORY").apply {
+                        setDataAndType(uri, "image/*")
+                        putExtra("source_application", context.packageName)
+                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    }
+                    if (instagram.resolveActivity(context.packageManager) != null) {
+                        try {
+                            context.startActivity(instagram)
+                            return@withContext
+                        } catch (_: Exception) {
+                        }
+                    }
+
+                    val share = Intent(Intent.ACTION_SEND).apply {
+                        type = "image/*"
+                        putExtra(Intent.EXTRA_STREAM, uri)
+                        putExtra(
+                            Intent.EXTRA_TEXT,
+                            "\u201c$lyric\u201d\n— $title${if (artist.isNotBlank()) " · $artist" else ""}\n\nShared from Meoify",
+                        )
+                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    }
+                    context.startActivity(Intent.createChooser(share, "Share lyric"))
+                } catch (t: Throwable) {
+                    Toast.makeText(context, "Couldn't share: ${t.message}", Toast.LENGTH_LONG).show()
                 }
             }
-
-            val share = Intent(Intent.ACTION_SEND).apply {
-                type = "image/*"
-                putExtra(Intent.EXTRA_STREAM, uri)
-                putExtra(
-                    Intent.EXTRA_TEXT,
-                    "\u201c$lyric\u201d\n— $title${if (artist.isNotBlank()) " · $artist" else ""}\n\nShared from Meoify",
-                )
-                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        } catch (t: Throwable) {
+            withContext(Dispatchers.Main) {
+                Toast.makeText(context, "Couldn't share: ${t.message}", Toast.LENGTH_LONG).show()
             }
-            context.startActivity(Intent.createChooser(share, "Share lyric"))
         }
     }
 
@@ -180,12 +189,12 @@ object LyricShare {
                 val image = result.image
                 if (image is coil3.BitmapImage) {
                     image.bitmap
-                } else {
+                } else if (image.width > 0 && image.height > 0) {
                     val bmp = Bitmap.createBitmap(image.width, image.height, Bitmap.Config.ARGB_8888)
                     val c = Canvas(bmp)
                     image.draw(c)
                     bmp
-                }
+                } else null
             } else null
         } catch (_: Exception) {
             null
