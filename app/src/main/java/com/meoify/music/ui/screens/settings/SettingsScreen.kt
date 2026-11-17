@@ -1,8 +1,12 @@
 package com.meoify.music.ui.screens.settings
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Build
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
@@ -397,29 +401,6 @@ fun SettingsScreen(
                         ?: settings.localProfileName?.trim()?.take(1)?.uppercase(),
                     signedIn = settings.ytCookies != null,
                     loading = profileLoading,
-                    liked = if (signedIn && ytLibrary.ready) {
-                        ytLibrary.likedCount
-                    } else {
-                        library.liked.size
-                    },
-                    playlists = if (signedIn) {
-                        ytLibrary.playlists.size
-                    } else {
-                        library.playlists.size
-                    },
-                    played = if (signedIn && ytLibrary.ready) {
-                        // The account History page is the source of truth, but
-                        // it can be empty for accounts with watch history off or
-                        // when the page read fails. Fall back to the songs
-                        // Meoify itself knows were played so the stat is never
-                        // silently stuck at zero.
-                        ytLibrary.playedCount.takeIf { it > 0 } ?: library.recent.size
-                    } else {
-                        library.recent.size
-                    },
-                    onLiked = { actions.openLiked() },
-                    onPlaylists = { actions.openLibrary() },
-                    onPlayed = { actions.openLibrary() },
                     onRefresh = { profileViewModel.refresh(force = true) },
                     onEditLocal = {
                         nameDraft = settings.localProfileName.orEmpty()
@@ -604,7 +585,9 @@ fun SettingsScreen(
                         }
                     },
                     onCopy = {
-                        context.copyText("UPI ID", DeveloperInfo.UPI_ID)
+                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+                        clipboard?.setPrimaryClip(ClipData.newPlainText("UPI ID", DeveloperInfo.UPI_ID))
+                        Toast.makeText(context, DeveloperInfo.UPI_ID, Toast.LENGTH_LONG).show()
                     },
                 )
             }
@@ -919,12 +902,6 @@ private fun ProfileCard(
     initials: String?,
     signedIn: Boolean,
     loading: Boolean,
-    liked: Int,
-    playlists: Int,
-    played: Int,
-    onLiked: () -> Unit,
-    onPlaylists: () -> Unit,
-    onPlayed: () -> Unit,
     onRefresh: () -> Unit,
     onEditLocal: () -> Unit,
     onSignIn: () -> Unit,
@@ -1011,19 +988,6 @@ private fun ProfileCard(
                         )
                     }
                 }
-            }
-
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                ProfileStat("Liked", liked, Modifier.weight(1f), onLiked)
-                StatDivider()
-                ProfileStat("Playlists", playlists, Modifier.weight(1f), onPlaylists)
-                StatDivider()
-                ProfileStat("Played", played, Modifier.weight(1f), onPlayed)
             }
 
             Box(
@@ -1325,40 +1289,6 @@ private fun DonateCard(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Spacer(Modifier.height(12.dp))
-
-            Surface(
-                shape = RoundedCornerShape(18.dp),
-                color = MaterialTheme.colorScheme.surfaceContainerHighest,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Row(
-                    modifier = Modifier.padding(start = 14.dp, end = 4.dp, top = 6.dp, bottom = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "UPI ID",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        Text(
-                            text = DeveloperInfo.UPI_ID,
-                            style = MaterialTheme.typography.bodyLarge,
-                            fontWeight = FontWeight.SemiBold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                    IconButton(onClick = onCopy) {
-                        Icon(
-                            Icons.Filled.ContentCopy,
-                            contentDescription = "Copy UPI ID",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
-            }
 
             Spacer(Modifier.height(12.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
