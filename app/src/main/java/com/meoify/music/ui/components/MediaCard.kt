@@ -29,10 +29,14 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.meoify.music.data.model.MediaCard
 import com.meoify.music.data.model.MediaKind
+import com.meoify.music.ui.theme.AccentOrange
+import com.meoify.music.ui.theme.AccentPink
 import com.meoify.music.ui.theme.ArtworkColorCache
 
 @Composable
@@ -42,6 +46,7 @@ fun MediaCard(
     modifier: Modifier = Modifier,
     width: androidx.compose.ui.unit.Dp? = 160.dp,
     showPlay: Boolean = true,
+    badge: String? = null,
 ) {
     Column(
         modifier = modifier
@@ -69,6 +74,24 @@ fun MediaCard(
                         .fillMaxSize()
                         .background(Brush.linearGradient(listOf(pair.first, pair.second))),
                 )
+            }
+            if (badge != null) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(8.dp)
+                        .clip(RoundedCornerShape(50))
+                        .background(MaterialTheme.colorScheme.primary)
+                        .padding(horizontal = 9.dp, vertical = 3.dp),
+                ) {
+                    Text(
+                        text = badge,
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = MaterialTheme.colorScheme.onPrimary,
+                        letterSpacing = 0.6.sp,
+                    )
+                }
             }
             if (showPlay) {
                 Surface(
@@ -118,7 +141,7 @@ fun ArtistCard(
     card: MediaCard,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    width: androidx.compose.ui.unit.Dp? = 112.dp,
+    width: androidx.compose.ui.unit.Dp? = 108.dp,
 ) {
     Column(
         modifier = modifier
@@ -128,39 +151,160 @@ fun ArtistCard(
     ) {
         Box(
             modifier = Modifier
-                .size(112.dp)
+                .size(104.dp)
                 .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.surfaceContainerHigh),
-        ) {
-            if (!card.thumbnailUrl.isNullOrBlank()) {
-                ArtworkImage(
-                    url = card.thumbnailUrl,
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize(),
+                .background(
+                    Brush.linearGradient(
+                        listOf(
+                            MaterialTheme.colorScheme.primary,
+                            AccentPink,
+                            AccentOrange,
+                        ),
+                    ),
                 )
-            } else {
-                val pair = ArtworkColorCache.gradientPair(card.id)
-                Box(Modifier.fillMaxSize().background(Brush.linearGradient(listOf(pair.first, pair.second))))
+                .padding(2.dp),
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+            ) {
+                if (!card.thumbnailUrl.isNullOrBlank()) {
+                    ArtworkImage(
+                        url = card.thumbnailUrl,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                } else {
+                    val pair = ArtworkColorCache.gradientPair(card.id)
+                    Box(
+                        Modifier
+                            .fillMaxSize()
+                            .background(Brush.linearGradient(listOf(pair.first, pair.second))),
+                    )
+                }
             }
         }
         Spacer(Modifier.height(8.dp))
         Text(
             text = card.title,
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.SemiBold,
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onSurface,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
+            textAlign = TextAlign.Center,
         )
-        if (!card.subtitle.isNullOrBlank()) {
+        Text(
+            text = card.subtitle ?: "Artist",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = TextAlign.Center,
+        )
+    }
+}
+
+/**
+ * Self-contained card for a personal mix: the title sits on a palette-tinted
+ * gradient over the artwork, with a play button in the corner.
+ */
+@Composable
+fun MixCard(
+    card: MediaCard,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    width: androidx.compose.ui.unit.Dp = 176.dp,
+) {
+    val pair = ArtworkColorCache.gradientPair(card.id)
+    Box(
+        modifier = modifier
+            .width(width)
+            .aspectRatio(1f)
+            .clip(RoundedCornerShape(22.dp))
+            .clickable(onClick = onClick)
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+    ) {
+        if (!card.thumbnailUrl.isNullOrBlank()) {
+            ArtworkImage(
+                url = card.thumbnailUrl,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
+        } else {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(Brush.linearGradient(listOf(pair.first, pair.second))),
+            )
+        }
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        listOf(
+                            pair.first.copy(alpha = 0.22f),
+                            Color.Transparent,
+                            Color.Black.copy(alpha = 0.32f),
+                            Color.Black.copy(alpha = 0.86f),
+                        ),
+                    ),
+                ),
+        )
+        Text(
+            text = "MIX",
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.ExtraBold,
+            color = Color.White.copy(alpha = 0.88f),
+            letterSpacing = 1.4.sp,
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .padding(13.dp),
+        )
+        Column(
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .padding(start = 14.dp, end = 58.dp, bottom = 13.dp),
+        ) {
             Text(
-                text = card.subtitle,
+                text = card.title,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.ExtraBold,
+                color = Color.White,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = card.subtitle ?: "Made for you",
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = Color.White.copy(alpha = 0.78f),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
+        }
+        Surface(
+            onClick = onClick,
+            shape = CircleShape,
+            color = Color.White,
+            shadowElevation = 4.dp,
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(12.dp)
+                .size(40.dp),
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    imageVector = Icons.Filled.PlayArrow,
+                    contentDescription = "Play ${card.title}",
+                    tint = Color.Black,
+                    modifier = Modifier.size(24.dp),
+                )
+            }
         }
     }
 }

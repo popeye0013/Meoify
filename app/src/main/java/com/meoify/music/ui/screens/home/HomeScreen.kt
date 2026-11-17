@@ -57,6 +57,7 @@ import com.meoify.music.data.model.Track
 import com.meoify.music.data.model.UiState
 import com.meoify.music.ui.components.ArtistCard
 import com.meoify.music.ui.components.MediaCard
+import com.meoify.music.ui.components.MixCard
 import com.meoify.music.ui.components.SectionHeader
 import com.meoify.music.ui.components.ProfileAvatar
 import com.meoify.music.ui.components.ShimmerBox
@@ -232,10 +233,9 @@ fun HomeScreen() {
                                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                             ) {
                                 items(madeForYou, key = { it.id }) { card ->
-                                    MediaCard(
+                                    MixCard(
                                         card = card,
                                         onClick = { openCard(card, actions) },
-                                        width = 150.dp,
                                     )
                                 }
                             }
@@ -291,6 +291,7 @@ fun HomeScreen() {
                                         card = card,
                                         onClick = { actions.openAlbum(card.id) },
                                         width = 150.dp,
+                                        badge = "NEW",
                                     )
                                 }
                             }

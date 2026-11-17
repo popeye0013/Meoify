@@ -73,6 +73,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -245,6 +246,7 @@ fun PlayerScreen(onClose: () -> Unit) {
         ) {
             if (!showLyrics) {
                 NowPlayingHeader(
+                    track = track,
                     source = state.sourceTitle,
                     onClose = onClose,
                     menuOpen = menuOpen,
@@ -307,6 +309,7 @@ fun PlayerScreen(onClose: () -> Unit) {
 
 @Composable
 private fun NowPlayingHeader(
+    track: Track?,
     source: String,
     onClose: () -> Unit,
     menuOpen: Boolean,
@@ -373,46 +376,168 @@ private fun NowPlayingHeader(
                     )
                 }
             }
-            DropdownMenu(expanded = menuOpen, onDismissRequest = { onMenuOpenChange(false) }) {
-                DropdownMenuItem(
-                    text = { Text("Share") },
-                    leadingIcon = { Icon(Icons.Filled.Share, contentDescription = null) },
-                    onClick = {
-                        onMenuOpenChange(false)
-                        onShare()
+            DropdownMenu(
+                expanded = menuOpen,
+                onDismissRequest = { onMenuOpenChange(false) },
+                shape = RoundedCornerShape(22.dp),
+                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                tonalElevation = 0.dp,
+                shadowElevation = 18.dp,
+                modifier = Modifier.widthIn(min = 264.dp),
+            ) {
+                if (track != null) {
+                    Row(
+                        modifier = Modifier.padding(
+                            start = 16.dp,
+                            end = 16.dp,
+                            top = 14.dp,
+                            bottom = 10.dp,
+                        ),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(44.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(MaterialTheme.colorScheme.surfaceContainerHighest),
+                        ) {
+                            ArtworkImage(
+                                url = rememberTrackCover(track),
+                                contentDescription = null,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize(),
+                            )
+                        }
+                        Spacer(Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "NOW PLAYING",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.ExtraBold,
+                                letterSpacing = 1.4.sp,
+                                color = MaterialTheme.colorScheme.primary,
+                            )
+                            Text(
+                                text = track.title,
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            Text(
+                                text = track.artist,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
+                    HorizontalDivider(
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+                    )
+                    Spacer(Modifier.height(4.dp))
+                }
+                PlayerMenuItem(
+                    icon = Icons.Filled.Share,
+                    label = "Share",
+                    supporting = "Send this song to a friend",
+                ) {
+                    onMenuOpenChange(false)
+                    onShare()
+                }
+                PlayerMenuItem(
+                    icon = Icons.AutoMirrored.Filled.QueueMusic,
+                    label = "Queue",
+                    supporting = "See what's playing next",
+                ) {
+                    onMenuOpenChange(false)
+                    onShowQueue()
+                }
+                PlayerMenuItem(
+                    icon = Icons.Filled.VideoLibrary,
+                    label = "Open video",
+                    supporting = "Watch on YouTube Music",
+                ) {
+                    onMenuOpenChange(false)
+                    onOpenVideo()
+                }
+                PlayerMenuItem(
+                    icon = Icons.Filled.Timer,
+                    label = "Sleep timer",
+                    supporting = sleepLeftMinutes?.let { "$it min left" }
+                        ?: "Stop playback automatically",
+                    tint = if (sleepLeftMinutes != null) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.onSurface
                     },
-                )
-                DropdownMenuItem(
-                    text = { Text("Queue") },
-                    leadingIcon = { Icon(Icons.AutoMirrored.Filled.QueueMusic, contentDescription = null) },
-                    onClick = {
-                        onMenuOpenChange(false)
-                        onShowQueue()
-                    },
-                )
-                DropdownMenuItem(
-                    text = { Text("Open video") },
-                    leadingIcon = { Icon(Icons.Filled.VideoLibrary, contentDescription = null) },
-                    onClick = {
-                        onMenuOpenChange(false)
-                        onOpenVideo()
-                    },
-                )
-                DropdownMenuItem(
-                    text = {
-                        Text(
-                            text = sleepLeftMinutes?.let { "Sleep timer · ${it}m left" }
-                                ?: "Sleep timer",
-                        )
-                    },
-                    leadingIcon = { Icon(Icons.Filled.Timer, contentDescription = null) },
-                    onClick = {
-                        onMenuOpenChange(false)
-                        onSleepTimer()
-                    },
-                )
+                ) {
+                    onMenuOpenChange(false)
+                    onSleepTimer()
+                }
+                Spacer(Modifier.height(4.dp))
             }
         }
+    }
+}
+
+@Composable
+private fun PlayerMenuItem(
+    icon: ImageVector,
+    label: String,
+    supporting: String,
+    tint: Color = MaterialTheme.colorScheme.onSurface,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 8.dp, vertical = 2.dp)
+            .clip(RoundedCornerShape(14.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 8.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(38.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(tint.copy(alpha = 0.10f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = tint,
+                modifier = Modifier.size(19.dp),
+            )
+        }
+        Spacer(Modifier.width(12.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Text(
+                text = supporting,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        Spacer(Modifier.width(6.dp))
+        Icon(
+            Icons.Filled.KeyboardArrowRight,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f),
+            modifier = Modifier.size(18.dp),
+        )
     }
 }
 
