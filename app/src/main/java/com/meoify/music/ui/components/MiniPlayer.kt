@@ -1,5 +1,9 @@
 package com.meoify.music.ui.components
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
@@ -30,10 +34,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
@@ -42,6 +48,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.meoify.music.ui.navigation.LocalAppActions
 import com.meoify.music.ui.navigation.LocalPlayerState
+import kotlinx.coroutines.launch
 
 @Composable
 fun MiniPlayer(onOpen: () -> Unit) {
@@ -51,33 +58,60 @@ fun MiniPlayer(onOpen: () -> Unit) {
     val cover = rememberTrackCover(track)
     val density = LocalDensity.current
     val swipeThreshold = with(density) { 48.dp.toPx() }
-    var swipeOpened by remember { mutableStateOf(false) }
-    var swipeUp by remember { mutableStateOf(0f) }
+    val swipeScope = rememberCoroutineScope()
+    val swipeOffset = remember { Animatable(0f) }
+    var swipeHandled by remember { mutableStateOf(false) }
 
     Surface(
-        onClick = { if (!swipeOpened) onOpen() },
+        onClick = { if (!swipeHandled) onOpen() },
         shape = RoundedCornerShape(22.dp),
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         tonalElevation = 3.dp,
         shadowElevation = 6.dp,
         modifier = Modifier
             .fillMaxWidth()
-            .pointerInput(onOpen, swipeThreshold) {
+            .pointerInput(onOpen) {
                 detectVerticalDragGestures(
-                    onDragStart = { swipeUp = 0f },
+                    onDragStart = { swipeHandled = false },
                     onVerticalDrag = { change, delta ->
-                        if (!swipeOpened && delta < 0f) {
-                            swipeUp += -delta
-                            if (swipeUp >= swipeThreshold) {
-                                swipeOpened = true
-                                change.consume()
-                                onOpen()
+                        if (delta < 0f) {
+                            change.consume()
+                            swipeScope.launch {
+                                swipeOffset.snapTo(
+                                    (swipeOffset.value - delta).coerceAtMost(swipeThreshold * 1.6f),
+                                )
                             }
                         }
                     },
-                    onDragEnd = { swipeUp = 0f },
-                    onDragCancel = { swipeUp = 0f },
+                    onDragEnd = {
+                        val shouldOpen = swipeOffset.value >= swipeThreshold
+                        if (shouldOpen) swipeHandled = true
+                        swipeScope.launch {
+                            if (shouldOpen) {
+                                swipeOffset.animateTo(swipeThreshold * 1.6f, tween(120))
+                                onOpen()
+                            } else {
+                                swipeOffset.animateTo(
+                                    0f,
+                                    spring(Spring.DampingRatioNoBouncy, Spring.StiffnessMedium),
+                                )
+                            }
+                        }
+                    },
+                    onDragCancel = {
+                        swipeScope.launch {
+                            swipeOffset.animateTo(
+                                0f,
+                                spring(Spring.DampingRatioNoBouncy, Spring.StiffnessMedium),
+                            )
+                        }
+                    },
                 )
+            }
+            .graphicsLayer {
+                val progress = (swipeOffset.value / (swipeThreshold * 1.6f)).coerceIn(0f, 1f)
+                translationY = -swipeOffset.value * 0.55f
+                alpha = 1f - progress * 0.35f
             }
             // The 10dp bottom gap keeps the pill floating above the tab bar
             // (and, on detail pages, above the system navigation bar).

@@ -9,11 +9,14 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -169,13 +172,24 @@ fun PlayerScreen(onClose: () -> Unit) {
     var lyrics by remember { mutableStateOf<TrackLyrics?>(null) }
     var lyricsLoading by remember { mutableStateOf(false) }
 
-    // Swipe-down-to-mini is active only on the main player view. Lyrics, queue
-    // and the sleep-timer dialog have their own scrolling/dismiss behaviour.
+    // Swipe down on the artwork to return to the mini player. An Animatable
+    // keeps the content glued to the finger while dragging and gives a soft
+    // spring-back when the gesture is released before the threshold.
     val density = LocalDensity.current
-    val closeSwipeThreshold = with(density) { 120.dp.toPx() }
-    val closeSwipeTopZone = with(density) { 180.dp.toPx() }
-    var closeSwipeFromTop by remember { mutableStateOf(false) }
-    var closeSwipeDistance by remember { mutableStateOf(0f) }
+    val dismissThreshold = with(density) { 96.dp.toPx() }
+    val swipeScope = rememberCoroutineScope()
+    val dismissOffset = remember { Animatable(0f) }
+
+    fun settleDismissSwipe() {
+        swipeScope.launch {
+            if (dismissOffset.value >= dismissThreshold) {
+                dismissOffset.animateTo(dismissThreshold * 1.6f, tween(140))
+                onClose()
+            } else {
+                dismissOffset.animateTo(0f, spring(Spring.DampingRatioNoBouncy, Spring.StiffnessMedium))
+            }
+        }
+    }
 
     // Keep the remaining sleep time fresh while the timer runs.
     val sleepEndsAtMs = state.sleepEndsAtMs
@@ -262,35 +276,7 @@ fun PlayerScreen(onClose: () -> Unit) {
                         scheme.background,
                     ),
                 ),
-            )
-            .pointerInput(showLyrics, showQueue, showSleepTimer, onClose) {
-                if (showLyrics || showQueue || showSleepTimer) return@pointerInput
-                detectVerticalDragGestures(
-                    onDragStart = { offset ->
-                        closeSwipeFromTop = offset.y <= closeSwipeTopZone
-                        closeSwipeDistance = 0f
-                    },
-                    onVerticalDrag = { change, delta ->
-                        if (closeSwipeFromTop && delta > 0f) {
-                            closeSwipeDistance += delta
-                            if (closeSwipeDistance >= closeSwipeThreshold) {
-                                change.consume()
-                                closeSwipeDistance = 0f
-                                closeSwipeFromTop = false
-                                onClose()
-                            }
-                        }
-                    },
-                    onDragEnd = {
-                        closeSwipeDistance = 0f
-                        closeSwipeFromTop = false
-                    },
-                    onDragCancel = {
-                        closeSwipeDistance = 0f
-                        closeSwipeFromTop = false
-                    },
-                )
-            },
+            ),
     ) {
         Column(
             modifier = Modifier
@@ -298,11 +284,11 @@ fun PlayerScreen(onClose: () -> Unit) {
                 .statusBarsPadding()
                 .navigationBarsPadding()
                 .graphicsLayer {
-                    translationY = if (closeSwipeDistance > 0f) {
-                        (closeSwipeDistance * 0.35f).coerceAtMost(closeSwipeThreshold * 0.5f)
-                    } else {
-                        0f
-                    }
+                    val progress = (dismissOffset.value / dismissThreshold).coerceIn(0f, 1f)
+                    translationY = dismissOffset.value
+                    alpha = 1f - progress * 0.25f
+                    scaleX = 1f - progress * 0.04f
+                    scaleY = 1f - progress * 0.04f
                 },
         ) {
             if (!showLyrics) {
@@ -348,6 +334,29 @@ fun PlayerScreen(onClose: () -> Unit) {
                         onShowLyrics = { showLyrics = true },
                         onToggleMute = { app.container.player.toggleMute() },
                         onQualityChange = { app.container.settings.setQuality(it) },
+                        artworkSwipeModifier = Modifier.pointerInput(Unit) {
+                            detectVerticalDragGestures(
+                                onVerticalDrag = { change, delta ->
+                                    if (delta > 0f) {
+                                        change.consume()
+                                        swipeScope.launch {
+                                            dismissOffset.snapTo(
+                                                (dismissOffset.value + delta).coerceAtMost(dismissThreshold * 1.6f),
+                                            )
+                                        }
+                                    }
+                                },
+                                onDragEnd = { settleDismissSwipe() },
+                                onDragCancel = {
+                                    swipeScope.launch {
+                                        dismissOffset.animateTo(
+                                            0f,
+                                            spring(Spring.DampingRatioNoBouncy, Spring.StiffnessMedium),
+                                        )
+                                    }
+                                },
+                            )
+                        },
                     )
                 }
             }
@@ -622,6 +631,7 @@ private fun PlayerMainContent(
     onShowLyrics: () -> Unit,
     onToggleMute: () -> Unit,
     onQualityChange: (AudioQuality) -> Unit,
+    artworkSwipeModifier: Modifier = Modifier,
 ) {
     val cover = rememberTrackCover(track)
     val wide = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
@@ -635,7 +645,8 @@ private fun PlayerMainContent(
             BoxWithConstraints(
                 modifier = Modifier
                     .weight(1f)
-                    .fillMaxHeight(),
+                    .fillMaxHeight()
+                    .then(artworkSwipeModifier),
                 contentAlignment = Alignment.Center,
             ) {
                 val side = minOf(maxWidth, maxHeight)
@@ -675,7 +686,8 @@ private fun PlayerMainContent(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth()
-                    .padding(top = 8.dp, bottom = 16.dp),
+                    .padding(top = 8.dp, bottom = 16.dp)
+                    .then(artworkSwipeModifier),
                 contentAlignment = Alignment.Center,
             ) {
                 val side = minOf(maxWidth, maxHeight)
