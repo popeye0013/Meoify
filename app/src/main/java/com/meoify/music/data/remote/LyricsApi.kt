@@ -159,7 +159,7 @@ class LyricsApi(private val client: OkHttpClient) {
     private fun get(url: String): String? = runCatching {
         val request = Request.Builder()
             .url(url)
-            .header("User-Agent", "Meoify/1.0.21 (Android)")
+            .header("User-Agent", "Meoify/1.0.22 (Android)")
             .header("Accept", "application/json")
             .build()
         client.newCall(request).execute().use { response ->
