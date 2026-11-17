@@ -96,6 +96,7 @@ fun TrackRow(
     showDuration: Boolean = true,
     isCurrent: Boolean = false,
     modifier: Modifier = Modifier,
+    leadingContent: (@Composable () -> Unit)? = null,
 ) {
     val cover = rememberTrackCover(track)
     Row(
@@ -105,6 +106,10 @@ fun TrackRow(
             .padding(horizontal = 16.dp, vertical = 7.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        if (leadingContent != null) {
+            leadingContent()
+            Spacer(Modifier.width(2.dp))
+        }
         if (index != null) {
             Text(
                 text = (index + 1).toString(),

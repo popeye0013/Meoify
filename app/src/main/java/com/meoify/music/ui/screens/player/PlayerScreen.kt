@@ -21,6 +21,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -49,7 +50,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.QueueMusic
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.FormatQuote
@@ -102,17 +106,20 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.meoify.music.data.model.AudioQuality
@@ -133,6 +140,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlin.math.roundToInt
 import kotlin.math.PI
 import kotlin.math.sin
 
@@ -314,6 +322,14 @@ fun PlayerScreen(onClose: () -> Unit) {
             onMore = { track ->
                 showQueue = false
                 actions.openTrackMenu(track)
+            },
+            onMove = { from, to -> actions.moveQueueItem(from, to) },
+            onPlayNext = { index -> actions.playNextInQueue(index) },
+            onAddToQueue = { track -> actions.addToQueue(track) },
+            onRemove = { index -> actions.removeFromQueue(index) },
+            onClear = {
+                actions.clearQueue()
+                showQueue = false
             },
         )
     }
@@ -1385,7 +1401,20 @@ private fun QueueSheet(
     onDismiss: () -> Unit,
     onPlayAt: (Int) -> Unit,
     onMore: (Track) -> Unit,
+    onMove: (Int, Int) -> Unit,
+    onPlayNext: (Int) -> Unit,
+    onAddToQueue: (Track) -> Unit,
+    onRemove: (Int) -> Unit,
+    onClear: () -> Unit,
 ) {
+    var confirmClear by remember { mutableStateOf(false) }
+    var draggingIndex by remember { mutableStateOf(-1) }
+    var dragDistance by remember { mutableStateOf(0f) }
+    val listState = rememberLazyListState()
+    val density = LocalDensity.current
+    val fallbackRowHeight = with(density) { 72.dp.toPx() }
+    var rowHeight by remember { mutableStateOf(fallbackRowHeight) }
+
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(
             modifier = Modifier
@@ -1416,17 +1445,158 @@ private fun QueueSheet(
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                if (state.queue.isNotEmpty()) {
+                    IconButton(onClick = { confirmClear = true }) {
+                        Icon(
+                            imageVector = Icons.Filled.Delete,
+                            contentDescription = "Clear queue",
+                            tint = MaterialTheme.colorScheme.error,
+                        )
+                    }
+                }
             }
-            LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 520.dp)) {
-                items(state.queue.size) { index ->
-                    val track = state.queue[index]
-                    TrackRow(
-                        track = track,
-                        isCurrent = track.id == state.track?.id,
-                        onClick = { onPlayAt(index) },
-                        onMoreClick = { onMore(track) },
+
+            if (state.queue.isEmpty()) {
+                Box(
+                    modifier = Modifier.fillMaxWidth().padding(32.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = "Your queue is empty",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
+            } else {
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier.fillMaxWidth().heightIn(max = 520.dp),
+                ) {
+                    items(state.queue.size) { index ->
+                        val track = state.queue[index]
+                        var menuExpanded by remember { mutableStateOf(false) }
+                        val rowModifier = Modifier
+                            .zIndex(if (draggingIndex == index) 1f else 0f)
+                            .graphicsLayer {
+                                translationY = if (draggingIndex == index) dragDistance else 0f
+                            }
+                        Box {
+                            TrackRow(
+                                track = track,
+                                index = index,
+                                isCurrent = track.id == state.track?.id,
+                                onClick = { onPlayAt(index) },
+                                onMoreClick = { menuExpanded = true },
+                                modifier = rowModifier,
+                                leadingContent = {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(36.dp)
+                                            .pointerInput(index) {
+                                                detectVerticalDragGestures(
+                                                    onDragStart = {
+                                                        draggingIndex = index
+                                                        dragDistance = 0f
+                                                        rowHeight = listState.layoutInfo.visibleItemsInfo
+                                                            .firstOrNull { it.index == index }
+                                                            ?.size?.toFloat()
+                                                            ?.takeIf { it > 0f }
+                                                            ?: fallbackRowHeight
+                                                    },
+                                                    onVerticalDrag = { change, delta ->
+                                                        change.consume()
+                                                        dragDistance += delta
+                                                        val steps = (dragDistance / rowHeight).roundToInt()
+                                                        if (steps != 0) {
+                                                            val current = draggingIndex
+                                                            val max = listState.layoutInfo.totalItemsCount - 1
+                                                            val target = (current + steps).coerceIn(0, max)
+                                                            if (current >= 0 && target != current) {
+                                                                onMove(current, target)
+                                                                draggingIndex = target
+                                                            }
+                                                            dragDistance -= steps * rowHeight
+                                                        }
+                                                    },
+                                                    onDragEnd = {
+                                                        draggingIndex = -1
+                                                        dragDistance = 0f
+                                                    },
+                                                    onDragCancel = {
+                                                        draggingIndex = -1
+                                                        dragDistance = 0f
+                                                    },
+                                                )
+                                            },
+                                        contentAlignment = Alignment.Center,
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Filled.DragHandle,
+                                            contentDescription = "Drag to reorder ${track.title}",
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }
+                                },
+                            )
+                            DropdownMenu(
+                                expanded = menuExpanded,
+                                onDismissRequest = { menuExpanded = false },
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text("Play next") },
+                                    leadingIcon = { Icon(Icons.Filled.PlayArrow, contentDescription = null) },
+                                    onClick = {
+                                        menuExpanded = false
+                                        onPlayNext(index)
+                                    },
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Add to queue") },
+                                    leadingIcon = { Icon(Icons.Filled.Add, contentDescription = null) },
+                                    onClick = {
+                                        menuExpanded = false
+                                        onAddToQueue(track)
+                                    },
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Remove from queue") },
+                                    leadingIcon = { Icon(Icons.Filled.Close, contentDescription = null) },
+                                    onClick = {
+                                        menuExpanded = false
+                                        onRemove(index)
+                                    },
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("More options") },
+                                    leadingIcon = { Icon(Icons.Filled.MoreVert, contentDescription = null) },
+                                    onClick = {
+                                        menuExpanded = false
+                                        onMore(track)
+                                    },
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (confirmClear) {
+                AlertDialog(
+                    onDismissRequest = { confirmClear = false },
+                    title = { Text("Clear queue?") },
+                    text = { Text("Playback will stop and all songs will be removed from the queue.") },
+                    confirmButton = {
+                        TextButton(
+                            onClick = {
+                                confirmClear = false
+                                onClear()
+                            },
+                        ) { Text("Clear") }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { confirmClear = false }) { Text("Cancel") }
+                    },
+                )
             }
         }
     }

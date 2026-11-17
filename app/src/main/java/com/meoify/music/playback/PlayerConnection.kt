@@ -420,9 +420,13 @@ class PlayerConnection(
         startIndex: Int,
         sourceTitle: String,
         startPositionMs: Long = 0L,
+        preservePlayback: Boolean = false,
     ) {
         if (tracks.isEmpty()) return
         val start = startIndex.coerceIn(0, tracks.lastIndex)
+        val previous = _state.value
+        val resumePlaying = preservePlayback &&
+            (controller?.takeIf { it.isConnected }?.isPlaying ?: previous.isPlaying)
         generation++
         appendJob?.cancel()
         retriedTrackId = null
@@ -433,14 +437,18 @@ class PlayerConnection(
         this.sourceTitle = sourceTitle
         _state.value = PlayerUiState(
             track = tracks[start],
-            isPlaying = false,
-            isPreparing = true,
+            isPlaying = resumePlaying,
+            isPreparing = !preservePlayback,
             positionMs = startPositionMs.coerceAtLeast(0),
             durationMs = tracks[start].durationMs.coerceAtLeast(0),
+            shuffle = if (preservePlayback) previous.shuffle else false,
+            repeatMode = if (preservePlayback) previous.repeatMode else Player.REPEAT_MODE_OFF,
             queue = queue,
             queueIndex = start,
             sourceTitle = sourceTitle,
-            sleepEndsAtMs = _state.value.sleepEndsAtMs,
+            volume = if (preservePlayback) previous.volume else 1f,
+            muted = if (preservePlayback) previous.muted else false,
+            sleepEndsAtMs = previous.sleepEndsAtMs,
         )
 
         val myGeneration = generation
@@ -492,14 +500,20 @@ class PlayerConnection(
             val playTrack = queue.getOrNull(attempt) ?: return@launch
             val resumeAt = startPositionMs.coerceAtLeast(0)
             c.setMediaItems(listOf(playTrack.toMediaItem(audio)), 0, resumeAt)
-            c.prepare()
-            c.play()
+            if (preservePlayback) {
+                c.playWhenReady = resumePlaying
+                c.prepare()
+            } else {
+                c.prepare()
+                c.play()
+            }
             _state.update {
                 it.copy(
                     track = playTrack,
                     queueIndex = attempt,
                     positionMs = resumeAt,
                     isPreparing = false,
+                    isPlaying = resumePlaying,
                 )
             }
             library.addRecent(playTrack)
@@ -722,6 +736,77 @@ class PlayerConnection(
                 _events.tryEmit(PlaybackEvent.Failure("Couldn't add “${track.title}” to the queue."))
             }
         }
+    }
+
+    /** Moves an existing queue item, keeping the same song playing. */
+    fun moveQueueItem(from: Int, to: Int) {
+        if (from !in queue.indices || to !in queue.indices || from == to) return
+        val next = queue.toMutableList().apply { add(to, removeAt(from)) }
+        resyncQueue(next, QueueMath.indexAfterMove(queueIndex, from, to))
+    }
+
+    /** Moves a queue item to the slot right after the playing song. */
+    fun playNextInQueue(index: Int) {
+        if (index !in queue.indices || index == queueIndex) return
+        moveQueueItem(index, QueueMath.playNextTarget(queueIndex, index))
+    }
+
+    fun removeFromQueue(index: Int) {
+        if (index !in queue.indices) return
+        val next = queue.toMutableList().apply { removeAt(index) }
+        if (next.isEmpty()) {
+            clearQueue()
+            return
+        }
+        resyncQueue(next, QueueMath.indexAfterRemove(queueIndex, index, next.size))
+    }
+
+    fun clearQueue() {
+        generation++
+        appendJob?.cancel()
+        retriedTrackId = null
+        restored = false
+        queue = emptyList()
+        queueIndex = -1
+        _state.update {
+            it.copy(
+                track = null,
+                queue = emptyList(),
+                queueIndex = -1,
+                isPlaying = false,
+                isPreparing = false,
+                isBuffering = false,
+                positionMs = 0L,
+                durationMs = 0L,
+            )
+        }
+        playbackStore.clear()
+        withController { c ->
+            c.clearMediaItems()
+            c.stop()
+        }
+        _events.tryEmit(PlaybackEvent.Message("Queue cleared"))
+    }
+
+    /**
+     * Rebuilds the player's media items from an edited app queue. The current
+     * song and its position are carried over so editing doesn't restart it.
+     */
+    private fun resyncQueue(next: List<Track>, nextIndex: Int) {
+        if (next.isEmpty()) {
+            clearQueue()
+            return
+        }
+        val position = controller?.takeIf { it.isConnected && it.mediaItemCount > 0 }
+            ?.currentPosition
+            ?: _state.value.positionMs
+        playTracks(
+            tracks = next,
+            startIndex = nextIndex,
+            sourceTitle = sourceTitle,
+            startPositionMs = position,
+            preservePlayback = true,
+        )
     }
 
     fun toggleLike(track: Track) {

@@ -131,6 +131,10 @@ fun MeoifyApp(
             },
             playNext = { track -> container.player.playNext(track) },
             addToQueue = { track -> container.player.addToQueue(track) },
+            moveQueueItem = { from, to -> container.player.moveQueueItem(from, to) },
+            playNextInQueue = { index -> container.player.playNextInQueue(index) },
+            removeFromQueue = { index -> container.player.removeFromQueue(index) },
+            clearQueue = { container.player.clearQueue() },
             toggleLike = { track ->
                 if (container.repository.signedIn) {
                     val wasLiked = library.liked.any { it.id == track.id }
