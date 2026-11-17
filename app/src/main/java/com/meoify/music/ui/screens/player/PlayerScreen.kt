@@ -88,6 +88,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -120,7 +121,6 @@ import com.meoify.music.data.remote.TrackLyrics
 import com.meoify.music.playback.PlayerUiState
 import com.meoify.music.ui.components.TrackRow
 import com.meoify.music.ui.components.AudioQualitySheet
-import com.meoify.music.ui.components.LyricShareSheet
 import com.meoify.music.ui.components.ArtworkImage
 import com.meoify.music.ui.components.rememberTrackCover
 import com.meoify.music.ui.navigation.AppActions
@@ -128,6 +128,7 @@ import com.meoify.music.ui.navigation.LocalAppActions
 import com.meoify.music.ui.navigation.LocalPlayerState
 import com.meoify.music.ui.theme.ArtworkColorCache
 import com.meoify.music.util.formatDuration
+import com.meoify.music.util.LyricShare
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -159,9 +160,7 @@ fun PlayerScreen(onClose: () -> Unit) {
     var showSleepTimer by remember { mutableStateOf(false) }
     var lyrics by remember { mutableStateOf<TrackLyrics?>(null) }
     var lyricsLoading by remember { mutableStateOf(false) }
-    var showLyricShare by remember { mutableStateOf(false) }
-    var shareLines by remember { mutableStateOf<List<String>>(emptyList()) }
-    var shareCurrentIndex by remember { mutableStateOf(0) }
+
     // Keep the remaining sleep time fresh while the timer runs.
     val sleepEndsAtMs = state.sleepEndsAtMs
     var nowMs by remember { mutableStateOf(System.currentTimeMillis()) }
@@ -287,19 +286,6 @@ fun PlayerScreen(onClose: () -> Unit) {
                         onTogglePlay = actions.togglePlayPause,
                         onNext = actions.skipNext,
                         onPrevious = actions.skipPrevious,
-                        onOpenShare = {
-                            val ls = lyrics
-                            val idx = if (ls != null && ls.synced && ls.lines.isNotEmpty()) {
-                                ls.lines.indexOfLast { it.timeMs <= state.positionMs }.coerceAtLeast(0)
-                            } else 0
-                            shareLines = if (ls != null && ls.synced && ls.lines.isNotEmpty()) {
-                                ls.lines.map { it.text }
-                            } else {
-                                (ls?.plain ?: "").lines().filter { it.isNotBlank() }
-                            }
-                            shareCurrentIndex = if (shareLines.isEmpty()) 0 else idx.coerceIn(0, shareLines.lastIndex)
-                            showLyricShare = true
-                        },
                     )
                 } else {
                     PlayerMainContent(
@@ -329,18 +315,6 @@ fun PlayerScreen(onClose: () -> Unit) {
                 showQueue = false
                 actions.openTrackMenu(track)
             },
-        )
-    }
-
-    if (showLyricShare) {
-        LyricShareSheet(
-            title = track?.title.orEmpty(),
-            artist = track?.artist.orEmpty(),
-            artworkUrl = cover,
-            lines = shareLines.ifEmpty { listOf(track?.title.orEmpty()) },
-            initialSelected = setOf(shareCurrentIndex.coerceIn(0, shareLines.size.coerceAtLeast(1) - 1)),
-            accent = accent,
-            onDismiss = { showLyricShare = false },
         )
     }
 }
@@ -1161,8 +1135,9 @@ private fun LyricsView(
     onTogglePlay: () -> Unit,
     onNext: () -> Unit,
     onPrevious: () -> Unit,
-    onOpenShare: () -> Unit,
 ) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     val listState = rememberLazyListState()
     // Tapping a line seeks; it must not paint the rectangular ripple that a
     // full-width text row would show.
@@ -1230,7 +1205,21 @@ private fun LyricsView(
             }
             Spacer(Modifier.width(8.dp))
             Surface(
-                onClick = onOpenShare,
+                onClick = {
+                    val currentLine = lyrics?.lines?.getOrNull(currentIndex)?.text
+                        ?: lyrics?.plain?.lines()?.firstOrNull().orEmpty()
+                    if (currentLine.isNotBlank()) {
+                        scope.launch {
+                            LyricShare.share(
+                                context = context,
+                                title = trackTitle,
+                                artist = trackArtist,
+                                lyric = currentLine,
+                                artworkUrl = artworkUrl,
+                            )
+                        }
+                    }
+                },
                 shape = CircleShape,
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
                 modifier = Modifier.size(44.dp),
