@@ -3,11 +3,13 @@ package com.meoify.music.util
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
+import android.graphics.BitmapShader
+import android.graphics.BlurMaskFilter
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.LinearGradient
+import android.graphics.Matrix
 import android.graphics.Paint
-import android.graphics.Rect
 import android.graphics.RectF
 import android.graphics.Shader
 import android.graphics.Typeface
@@ -52,176 +54,170 @@ object LyricShare {
         val canvas = Canvas(bitmap)
         val art = loadArtwork(context, options.artworkUrl)
 
-        if (art != null) {
-            val scale = maxOf(width / art.width.toFloat(), height / art.height.toFloat())
-            val scaledW = art.width * scale
-            val scaledH = art.height * scale
-            val left = (width - scaledW) / 2f
-            val top = (height - scaledH) / 2f
-            canvas.drawBitmap(
-                art,
-                null,
-                RectF(left, top, left + scaledW, top + scaledH),
-                Paint(Paint.FILTER_BITMAP_FLAG),
-            )
-        } else {
-            val bg = Paint().apply {
+        // Clean dark backdrop; the artwork is the focal point of the card.
+        canvas.drawRect(
+            0f, 0f, width.toFloat(), height.toFloat(),
+            Paint().apply {
                 shader = LinearGradient(
                     0f, 0f, 0f, height.toFloat(),
                     Color.parseColor("#312e81"),
-                    Color.parseColor("#0f172a"),
-                    Shader.TileMode.CLAMP,
-                )
-            }
-            canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), bg)
-        }
-
-        // Scrim + bottom gradient keep the text legible over any artwork.
-        canvas.drawRect(
-            0f, 0f, width.toFloat(), height.toFloat(),
-            Paint().apply { color = Color.argb(110, 0, 0, 0) },
-        )
-        canvas.drawRect(
-            0f, height * 0.45f, width.toFloat(), height.toFloat(),
-            Paint().apply {
-                shader = LinearGradient(
-                    0f, height * 0.45f, 0f, height.toFloat(),
-                    Color.TRANSPARENT,
-                    Color.argb(205, 0, 0, 0),
+                    Color.parseColor("#0b1120"),
                     Shader.TileMode.CLAMP,
                 )
             },
         )
 
-        // Small wordmark at the top.
         val brandPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.argb(230, 255, 255, 255)
-            textSize = (width * 0.030f).coerceAtLeast(20f)
+            color = Color.argb(235, 255, 255, 255)
+            textSize = (width * 0.030f).coerceAtLeast(16f)
             typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
             textAlign = Paint.Align.CENTER
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) brandPaint.letterSpacing = 4f
-        canvas.drawText("MEOIFY", width / 2f, height * 0.085f, brandPaint)
+        canvas.drawText("MEOIFY", width / 2f, height * 0.072f, brandPaint)
 
-        val selected = options.lines.map { it.trim() }.filter { it.isNotBlank() }
-        val blocks = if (options.kind == ShareCardKind.SONG || selected.isEmpty()) {
-            listOf(options.title.ifBlank { "Meoify" })
+        // Square artwork, the same shape as the now-playing player.
+        val pad = (width * 0.066f).toInt()
+        val artSize = width - pad * 2
+        val artLeft = pad.toFloat()
+        val artTop = height * 0.125f
+        val radius = width * 0.055f
+        val artRect = RectF(artLeft, artTop, artLeft + artSize, artTop + artSize)
+
+        canvas.drawRoundRect(
+            RectF(artRect.left, artRect.top + width * 0.012f, artRect.right, artRect.bottom + width * 0.012f),
+            radius, radius,
+            Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.argb(120, 0, 0, 0)
+                maskFilter = BlurMaskFilter(width * 0.018f, BlurMaskFilter.Blur.NORMAL)
+            },
+        )
+
+        val artPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+        if (art != null) {
+            val shader = BitmapShader(art, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP)
+            val scale = maxOf(artSize / art.width.toFloat(), artSize / art.height.toFloat())
+            val offsetX = artLeft + (artSize - art.width * scale) / 2f
+            val offsetY = artTop + (artSize - art.height * scale) / 2f
+            shader.setLocalMatrix(Matrix().apply {
+                setScale(scale, scale)
+                postTranslate(offsetX, offsetY)
+            })
+            artPaint.shader = shader
         } else {
-            selected
+            artPaint.shader = LinearGradient(
+                artRect.left, artRect.top, artRect.right, artRect.bottom,
+                Color.parseColor("#4c1d95"),
+                Color.parseColor("#1e3a8a"),
+                Shader.TileMode.CLAMP,
+            )
         }
+        canvas.drawRoundRect(artRect, radius, radius, artPaint)
 
-        // Fit the text block into the middle of the card.
-        val maxWidth = (width * 0.84f).toInt()
-        var textSize = (width * (if (blocks.size > 2) 0.052f else 0.068f)).coerceAtLeast(34f)
-        val minSize = (width * 0.035f).coerceAtLeast(22f)
-        val measure = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-        }
-        var visualLines: List<String>
-        while (true) {
-            measure.textSize = textSize
-            val acc = mutableListOf<String>()
-            blocks.forEachIndexed { index, block ->
-                acc.addAll(wrapText(block, measure, maxWidth))
-                if (index < blocks.lastIndex) acc.add("")
+        val textTop = artRect.bottom + height * 0.035f
+        val footerY = height * 0.945f
+        val maxTextWidth = width - pad * 2
+
+        if (options.kind == ShareCardKind.SONG) {
+            val caption = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.argb(190, 255, 255, 255)
+                textSize = (width * 0.024f).coerceAtLeast(14f)
+                textAlign = Paint.Align.CENTER
             }
-            visualLines = acc
-            val lineHeight = textSize * 1.32f
-            if (visualLines.size * lineHeight <= height * 0.52f || textSize <= minSize) break
-            textSize = (textSize - 2f).coerceAtLeast(minSize)
-        }
+            canvas.drawText("NOW PLAYING", width / 2f, textTop + width * 0.018f, caption)
 
-        val mainPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.WHITE
-            this.textSize = textSize
-            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-            textAlign = Paint.Align.CENTER
-            setShadowLayer(10f, 0f, 4f, Color.argb(150, 0, 0, 0))
-        }
-        val lineHeight = mainPaint.textSize * 1.32f
-        val blockHeight = visualLines.size * lineHeight
-        var y = (height * 0.47f) - (blockHeight / 2f) + mainPaint.textSize
-        visualLines.forEach { line ->
-            if (line.isNotBlank()) canvas.drawText(line, width / 2f, y, mainPaint)
-            y += lineHeight
-        }
-
-        if (options.kind == ShareCardKind.SONG && options.artist.isNotBlank()) {
-            val artistPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = Color.argb(225, 255, 255, 255)
-                textSize = (width * 0.040f).coerceAtLeast(26f)
+            val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.WHITE
+                textSize = (width * 0.058f).coerceAtLeast(24f)
+                typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
                 textAlign = Paint.Align.CENTER
             }
             canvas.drawText(
-                options.artist,
+                fitText(options.title.ifBlank { "Meoify" }, titlePaint, maxTextWidth.toFloat()),
                 width / 2f,
-                y + mainPaint.textSize * 0.6f,
-                artistPaint,
+                textTop + width * 0.105f,
+                titlePaint,
             )
-        }
-
-        // Footer strip: artwork thumbnail + track metadata.
-        val footerTop = height - (height * 0.155f)
-        val pad = (width * 0.08f).toInt()
-        val thumbSize = (width * 0.10f).toInt()
-        val cardPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.argb(45, 255, 255, 255)
-        }
-        canvas.drawRoundRect(
-            RectF(pad.toFloat(), footerTop, (width - pad).toFloat(), height - (height * 0.06f)),
-            (width * 0.04f),
-            (width * 0.04f),
-            cardPaint,
-        )
-        if (art != null) {
-            canvas.drawBitmap(
-                art,
-                null,
-                RectF(
-                    (pad + width * 0.025f).toFloat(),
-                    footerTop + (height * 0.0275f).toFloat(),
-                    (pad + width * 0.025f + thumbSize).toFloat(),
-                    footerTop + (height * 0.0275f + thumbSize).toFloat(),
-                ),
-                Paint(Paint.FILTER_BITMAP_FLAG),
-            )
-        }
-        val footerTitle = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.WHITE
-            textSize = (width * 0.034f).coerceAtLeast(23f)
-            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-        }
-        val footerArtist = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.argb(210, 255, 255, 255)
-            textSize = (width * 0.027f).coerceAtLeast(19f)
-        }
-        val textX = pad + (if (art != null) width * 0.025f * 2 + thumbSize else width * 0.04f)
-        canvas.drawText(
-            fitText(options.title.ifBlank { "Meoify" }, footerTitle, width - textX - pad),
-            textX,
-            footerTop + height * 0.060f,
-            footerTitle,
-        )
-        if (options.artist.isNotBlank()) {
-            canvas.drawText(
-                fitText(options.artist, footerArtist, width - textX - pad),
-                textX,
-                footerTop + height * 0.095f,
-                footerArtist,
-            )
-        }
-
-        val caption = if (options.kind == ShareCardKind.SONG) {
-            "Now playing on Meoify"
+            if (options.artist.isNotBlank()) {
+                val artistPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = Color.argb(220, 255, 255, 255)
+                    textSize = (width * 0.038f).coerceAtLeast(18f)
+                    textAlign = Paint.Align.CENTER
+                }
+                canvas.drawText(
+                    fitText(options.artist, artistPaint, maxTextWidth.toFloat()),
+                    width / 2f,
+                    textTop + width * 0.165f,
+                    artistPaint,
+                )
+            }
         } else {
-            "Lyrics · Meoify"
+            val selected = options.lines.map { it.trim() }.filter { it.isNotBlank() }
+            val blocks = selected.ifEmpty { listOf(options.title.ifBlank { "Meoify" }) }
+            val available = (footerY - height * 0.115f) - textTop
+            var textSize = (width * 0.050f).coerceAtLeast(18f)
+            val minSize = (width * 0.026f).coerceAtLeast(12f)
+            val measure = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            }
+            var visualLines: List<String>
+            while (true) {
+                measure.textSize = textSize
+                val acc = mutableListOf<String>()
+                blocks.forEachIndexed { index, block ->
+                    acc.addAll(wrapText(block, measure, maxTextWidth))
+                    if (index < blocks.lastIndex) acc.add("")
+                }
+                visualLines = acc
+                if (visualLines.size * textSize * 1.32f <= available || textSize <= minSize) break
+                textSize = (textSize - 2f).coerceAtLeast(minSize)
+            }
+            val lyricPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.WHITE
+                this.textSize = textSize
+                typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+                textAlign = Paint.Align.CENTER
+            }
+            val lineHeight = textSize * 1.32f
+            var y = textTop + (available - visualLines.size * lineHeight) / 2f + textSize
+            visualLines.forEach { line ->
+                if (line.isNotBlank()) canvas.drawText(line, width / 2f, y, lyricPaint)
+                y += lineHeight
+            }
+
+            val metaY = footerY - height * 0.048f
+            val metaTitle = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.WHITE
+                textSize = (width * 0.030f).coerceAtLeast(15f)
+                typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+                textAlign = Paint.Align.CENTER
+            }
+            canvas.drawText(
+                fitText(options.title.ifBlank { "Meoify" }, metaTitle, maxTextWidth.toFloat()),
+                width / 2f, metaY, metaTitle,
+            )
+            if (options.artist.isNotBlank()) {
+                val metaArtist = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = Color.argb(200, 255, 255, 255)
+                    textSize = (width * 0.024f).coerceAtLeast(13f)
+                    textAlign = Paint.Align.CENTER
+                }
+                canvas.drawText(
+                    fitText(options.artist, metaArtist, maxTextWidth.toFloat()),
+                    width / 2f, metaY + width * 0.045f, metaArtist,
+                )
+            }
         }
+
         val captionPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.argb(180, 255, 255, 255)
-            textSize = (width * 0.025f).coerceAtLeast(18f)
+            textSize = (width * 0.024f).coerceAtLeast(14f)
             textAlign = Paint.Align.CENTER
         }
-        canvas.drawText(caption, width / 2f, height - (height * 0.020f), captionPaint)
+        canvas.drawText(
+            if (options.kind == ShareCardKind.SONG) "Now playing on Meoify" else "Lyrics · Meoify",
+            width / 2f, footerY, captionPaint,
+        )
 
         bitmap
     }
