@@ -2,13 +2,13 @@ package com.meoify.music.ui.screens.library
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -21,18 +21,23 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.automirrored.filled.ViewList
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.GridView
+import androidx.compose.material.icons.filled.LibraryMusic
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PlaylistAdd
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material.icons.filled.ViewList
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -40,6 +45,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -47,8 +53,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.meoify.music.MeoifyApplication
@@ -56,20 +64,18 @@ import com.meoify.music.data.model.LocalPlaylist
 import com.meoify.music.data.model.MediaCard as MediaCardModel
 import com.meoify.music.data.model.MediaKind
 import com.meoify.music.data.model.Track
+import com.meoify.music.ui.components.ArtworkImage
 import com.meoify.music.ui.components.MediaCard
-import com.meoify.music.ui.components.PlaylistCard
-import com.meoify.music.ui.components.PlaylistListCard
 import com.meoify.music.ui.components.SectionHeader
 import com.meoify.music.ui.components.ShimmerBox
-import com.meoify.music.ui.components.TrackCard
+import com.meoify.music.ui.components.TrackRow
 import com.meoify.music.ui.navigation.LocalAppActions
 import com.meoify.music.ui.navigation.LocalBottomContentInset
 import com.meoify.music.ui.navigation.LocalLibrary
-import com.meoify.music.ui.navigation.LocalPlayerState
 import com.meoify.music.ui.navigation.LocalSignedIn
-import com.meoify.music.ui.navigation.LocalYtLikedCount
 import com.meoify.music.ui.navigation.LocalYtLoading
 import com.meoify.music.ui.navigation.LocalYtPlaylists
+import com.meoify.music.ui.theme.ArtworkColorCache
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -85,14 +91,17 @@ fun LibraryScreen(
     val ytPlaylists = LocalYtPlaylists.current
     val ytLoading = LocalYtLoading.current
     val signedIn = LocalSignedIn.current
-    val ytLikedCount = LocalYtLikedCount.current
-    val currentTrackId = LocalPlayerState.current.track?.id
 
     var filterName by rememberSaveable { mutableStateOf(LibraryFilter.Playlists.name) }
     val filter = LibraryFilter.valueOf(filterName)
     // The layout lives in settings so it survives opening a playlist and
     // coming back to the Library tab.
     val gridView = settings.libraryGridView
+    var menuTarget by remember { mutableStateOf<PlaylistTarget?>(null) }
+    var renameTarget by remember { mutableStateOf<PlaylistTarget?>(null) }
+    var deleteTarget by remember { mutableStateOf<PlaylistTarget?>(null) }
+    var renameValue by remember { mutableStateOf("") }
+
     val listState = rememberLazyListState()
 
     LaunchedEffect(filterName) {
@@ -121,25 +130,9 @@ fun LibraryScreen(
                     modifier = Modifier.weight(1f),
                 )
                 if (filter == LibraryFilter.Playlists) {
-                    if (signedIn) {
-                        IconButton(onClick = { app.container.ytLibrary.refresh() }) {
-                            if (ytLoading) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(20.dp),
-                                    strokeWidth = 2.dp,
-                                )
-                            } else {
-                                Icon(
-                                    imageVector = Icons.Filled.Refresh,
-                                    contentDescription = "Sync library",
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                        }
-                    }
                     IconButton(onClick = { app.container.settings.setLibraryGridView(!gridView) }) {
                         Icon(
-                            imageVector = if (gridView) Icons.AutoMirrored.Filled.ViewList else Icons.Filled.GridView,
+                            imageVector = if (gridView) Icons.Filled.ViewList else Icons.Filled.GridView,
                             contentDescription = if (gridView) "Show as list" else "Show as grid",
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -188,31 +181,24 @@ fun LibraryScreen(
         when (filter) {
             LibraryFilter.Playlists -> {
                 item {
-                    if (signedIn) {
-                        LikedSongsRow(
-                            count = ytLikedCount,
-                            syncing = ytLoading,
-                            onSync = { app.container.ytLibrary.refresh() },
-                            onClick = actions.openLiked,
-                        )
-                    } else {
-                        LikedSongsRow(
-                            count = library.liked.size,
-                            onClick = actions.openLiked,
-                        )
-                    }
+                    LikedSongsRow(
+                        count = library.liked.size,
+                        onClick = actions.openLiked,
+                    )
                 }
 
                 if (signedIn) {
-                    // SectionHeader removed; refresh affordance lives in the
-                    // Library header so the list stays clean.
+                    item {
+                        SectionHeader(
+                            title = "YouTube Music playlists",
+                            actionLabel = if (ytLoading) "Syncing…" else "Refresh",
+                            onAction = { app.container.ytLibrary.refresh() },
+                        )
+                    }
+
                     when {
-                        ytPlaylists.isEmpty() && ytLoading -> items(if (gridView) 2 else 3) {
-                            if (gridView) {
-                                PlaylistGridSkeleton()
-                            } else {
-                                YtPlaylistSkeleton()
-                            }
+                        ytPlaylists.isEmpty() && ytLoading -> items(3) {
+                            YtPlaylistSkeleton()
                         }
 
                         ytPlaylists.isEmpty() -> item {
@@ -228,16 +214,21 @@ fun LibraryScreen(
                             items = ytPlaylists.chunked(2).toList(),
                             key = { row -> "yt_" + row.joinToString("|") { it.id } },
                         ) { row ->
-                            PlaylistGridRow(
-                                row = row,
-                                onOpen = { actions.openPlaylist(it.id) },
-                            )
+                            PlaylistGridRow(row = row, onOpen = { actions.openPlaylist(it.id) })
                         }
 
                         else -> items(ytPlaylists, key = { it.id }) { card ->
-                            PlaylistListCard(
+                            YtPlaylistRow(
                                 card = card,
                                 onClick = { actions.openPlaylist(card.id) },
+                                onMenu = {
+                                    menuTarget = PlaylistTarget(
+                                        id = card.id,
+                                        title = card.title,
+                                        songCount = null,
+                                        fromYouTube = true,
+                                    )
+                                },
                             )
                         }
                     }
@@ -252,21 +243,40 @@ fun LibraryScreen(
                             )
                         }
                     } else if (gridView) {
-                        val cards = library.playlists.map { it.toCard() }
                         items(
-                            items = cards.chunked(2).toList(),
+                            items = library.playlists.chunked(2).toList(),
                             key = { row -> "local_" + row.joinToString("|") { it.id } },
                         ) { row ->
                             PlaylistGridRow(
-                                row = row,
+                                row = row.map { playlist ->
+                                    MediaCardModel(
+                                        id = playlist.id,
+                                        kind = MediaKind.PLAYLIST,
+                                        title = playlist.name,
+                                        subtitle = when (playlist.tracks.size) {
+                                            0 -> "Playlist"
+                                            1 -> "1 song"
+                                            else -> "${playlist.tracks.size} songs"
+                                        },
+                                        thumbnailUrl = playlist.artworkUrl,
+                                    )
+                                },
                                 onOpen = { actions.openLocalPlaylist(it.id) },
                             )
                         }
                     } else {
                         items(library.playlists, key = { it.id }) { playlist ->
-                            PlaylistListCard(
-                                card = playlist.toCard(),
+                            PlaylistRow(
+                                playlist = playlist,
                                 onClick = { actions.openLocalPlaylist(playlist.id) },
+                                onMenu = {
+                                    menuTarget = PlaylistTarget(
+                                        id = playlist.id,
+                                        title = playlist.name,
+                                        songCount = playlist.tracks.size,
+                                        fromYouTube = false,
+                                    )
+                                },
                             )
                         }
                     }
@@ -285,14 +295,12 @@ fun LibraryScreen(
                     }
                 } else {
                     items(library.liked, key = { it.id }) { track ->
-                        TrackCard(
+                        TrackRow(
                             track = track,
-                            isCurrent = currentTrackId == track.id,
                             onClick = {
                                 actions.playTracks(library.liked, library.liked.indexOf(track), "Liked Songs")
                             },
                             onMoreClick = { actions.openTrackMenu(track) },
-                            onSwipeRight = { actions.addToQueue(track) },
                         )
                     }
                 }
@@ -347,9 +355,8 @@ fun LibraryScreen(
         if (filter == LibraryFilter.Playlists && library.recent.isNotEmpty()) {
             item { SectionHeader(title = "Recently played") }
             items(library.recent.take(12), key = { "recent_${it.id}" }) { track ->
-                TrackCard(
+                TrackRow(
                     track = track,
-                    isCurrent = currentTrackId == track.id,
                     onClick = {
                         actions.playTracks(library.recent, library.recent.indexOf(track), "Recently played")
                     },
@@ -360,7 +367,78 @@ fun LibraryScreen(
         item { Spacer(Modifier.height(28.dp)) }
     }
 
+    menuTarget?.let { target ->
+        PlaylistMenu(
+            target = target,
+            onDismiss = { menuTarget = null },
+            onRename = {
+                menuTarget = null
+                renameValue = target.title
+                renameTarget = target
+            },
+            onDelete = {
+                menuTarget = null
+                deleteTarget = target
+            },
+        )
+    }
+
+    renameTarget?.let { target ->
+        AlertDialog(
+            onDismissRequest = { renameTarget = null },
+            title = { Text("Rename playlist") },
+            text = {
+                OutlinedTextField(
+                    value = renameValue,
+                    onValueChange = { renameValue = it },
+                    label = { Text("Playlist name") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        if (renameValue.isNotBlank()) actions.renamePlaylist(target.id, renameValue.trim())
+                        renameTarget = null
+                    },
+                    enabled = renameValue.isNotBlank(),
+                ) { Text("Save") }
+            },
+            dismissButton = { TextButton(onClick = { renameTarget = null }) { Text("Cancel") } },
+        )
+    }
+
+    deleteTarget?.let { target ->
+        AlertDialog(
+            onDismissRequest = { deleteTarget = null },
+            title = { Text("Delete playlist?") },
+            text = {
+                Text(
+                    if (target.fromYouTube) {
+                        "“${target.title}” will be deleted from your YouTube Music account. This can't be undone."
+                    } else {
+                        "“${target.title}” will be removed from your library. This can't be undone."
+                    },
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    actions.deletePlaylist(target.id)
+                    deleteTarget = null
+                }) { Text("Delete") }
+            },
+            dismissButton = { TextButton(onClick = { deleteTarget = null }) { Text("Cancel") } },
+        )
+    }
 }
+
+private data class PlaylistTarget(
+    val id: String,
+    val title: String,
+    val songCount: Int?,
+    val fromYouTube: Boolean,
+)
 
 enum class LibraryFilter { Playlists, Songs, Albums }
 
@@ -372,56 +450,39 @@ private fun PlaylistGridRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 5.dp),
+            .padding(horizontal = 16.dp, vertical = 6.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         row.forEach { card ->
-            PlaylistCard(
+            MediaCard(
                 card = card,
                 onClick = { onOpen(card) },
                 modifier = Modifier.weight(1f),
+                width = null,
             )
         }
         if (row.size == 1) Spacer(Modifier.weight(1f))
     }
 }
 
-/** A local playlist as the card model the Library renders. */
-private fun LocalPlaylist.toCard(): MediaCardModel = MediaCardModel(
-    id = id,
-    kind = MediaKind.PLAYLIST,
-    title = name,
-    subtitle = when (tracks.size) {
-        0 -> "Playlist"
-        1 -> "1 song"
-        else -> "${tracks.size} songs"
-    },
-    thumbnailUrl = artworkUrl,
-)
-
 @Composable
-private fun LikedSongsRow(
-    count: Int,
-    onClick: () -> Unit,
-    syncing: Boolean = false,
-    onSync: (() -> Unit)? = null,
-) {
+private fun LikedSongsRow(count: Int, onClick: () -> Unit) {
     Surface(
         onClick = onClick,
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(18.dp),
         color = MaterialTheme.colorScheme.surfaceContainerLow,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 5.dp),
+            .padding(horizontal = 16.dp, vertical = 6.dp),
     ) {
         Row(
-            modifier = Modifier.padding(start = 10.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
+            modifier = Modifier.padding(8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(
                 modifier = Modifier
-                    .size(60.dp)
-                    .clip(RoundedCornerShape(16.dp))
+                    .size(58.dp)
+                    .clip(RoundedCornerShape(14.dp))
                     .background(
                         Brush.linearGradient(listOf(Color(0xFF7A122A), Color(0xFFFF7A9A))),
                     ),
@@ -434,7 +495,7 @@ private fun LikedSongsRow(
                     modifier = Modifier.size(28.dp),
                 )
             }
-            Spacer(Modifier.width(12.dp))
+            Spacer(Modifier.width(14.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = "Liked Songs",
@@ -443,31 +504,82 @@ private fun LikedSongsRow(
                     color = MaterialTheme.colorScheme.onSurface,
                 )
                 Text(
-                    text = "$count ${if (count == 1) "song" else "songs"}" +
-                        if (syncing) " • Syncing…" else "",
+                    text = "$count ${if (count == 1) "song" else "songs"}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            if (onSync != null) {
-                IconButton(onClick = onSync, enabled = !syncing) {
-                    if (syncing) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(20.dp),
-                            strokeWidth = 2.dp,
-                        )
-                    } else {
+        }
+    }
+}
+
+@Composable
+private fun PlaylistRow(
+    playlist: LocalPlaylist,
+    onClick: () -> Unit,
+    onMenu: () -> Unit,
+) {
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(18.dp),
+        color = Color.Transparent,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 2.dp),
+    ) {
+        Row(
+            modifier = Modifier.padding(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(58.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+            ) {
+                if (!playlist.artworkUrl.isNullOrBlank()) {
+                    ArtworkImage(
+                        url = playlist.artworkUrl,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                } else {
+                    val pair = ArtworkColorCache.gradientPair(playlist.id)
+                    Box(
+                        Modifier
+                            .fillMaxSize()
+                            .background(Brush.linearGradient(listOf(pair.first, pair.second))),
+                        contentAlignment = Alignment.Center,
+                    ) {
                         Icon(
-                            Icons.Filled.Refresh,
-                            contentDescription = "Sync liked songs",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            Icons.Filled.LibraryMusic,
+                            contentDescription = null,
+                            tint = Color.White.copy(alpha = 0.9f),
                         )
                     }
                 }
-            } else {
+            }
+            Spacer(Modifier.width(14.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = playlist.name,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = "${playlist.tracks.size} ${if (playlist.tracks.size == 1) "song" else "songs"}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            IconButton(onClick = onMenu) {
                 Icon(
-                    Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                    contentDescription = null,
+                    Icons.Filled.MoreVert,
+                    contentDescription = "Playlist options",
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
@@ -476,34 +588,75 @@ private fun LikedSongsRow(
 }
 
 @Composable
-private fun PlaylistGridSkeleton() {
-    Row(
+private fun YtPlaylistRow(
+    card: MediaCardModel,
+    onClick: () -> Unit,
+    onMenu: () -> Unit,
+) {
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(18.dp),
+        color = Color.Transparent,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 5.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+            .padding(horizontal = 16.dp, vertical = 2.dp),
     ) {
-        repeat(2) {
+        Row(
+            modifier = Modifier.padding(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(58.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+            ) {
+                if (!card.thumbnailUrl.isNullOrBlank()) {
+                    ArtworkImage(
+                        url = card.thumbnailUrl,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                } else {
+                    val pair = ArtworkColorCache.gradientPair(card.id)
+                    Box(
+                        Modifier
+                            .fillMaxSize()
+                            .background(Brush.linearGradient(listOf(pair.first, pair.second))),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            Icons.Filled.LibraryMusic,
+                            contentDescription = null,
+                            tint = Color.White.copy(alpha = 0.9f),
+                        )
+                    }
+                }
+            }
+            Spacer(Modifier.width(14.dp))
             Column(modifier = Modifier.weight(1f)) {
-                ShimmerBox(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .aspectRatio(1f)
-                        .clip(RoundedCornerShape(20.dp)),
+                Text(
+                    text = card.title,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
-                Spacer(Modifier.height(8.dp))
-                ShimmerBox(
-                    modifier = Modifier
-                        .fillMaxWidth(0.75f)
-                        .height(14.dp)
-                        .clip(RoundedCornerShape(7.dp)),
+                Text(
+                    text = card.subtitle ?: "Playlist",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
-                Spacer(Modifier.height(6.dp))
-                ShimmerBox(
-                    modifier = Modifier
-                        .fillMaxWidth(0.4f)
-                        .height(10.dp)
-                        .clip(RoundedCornerShape(5.dp)),
+            }
+            IconButton(onClick = onMenu) {
+                Icon(
+                    Icons.Filled.MoreVert,
+                    contentDescription = "Playlist options",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }
@@ -538,6 +691,68 @@ private fun YtPlaylistSkeleton() {
                     .height(10.dp)
                     .clip(RoundedCornerShape(5.dp)),
             )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun PlaylistMenu(
+    target: PlaylistTarget,
+    onDismiss: () -> Unit,
+    onRename: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 20.dp, end = 20.dp, bottom = 28.dp),
+        ) {
+            Text(
+                text = target.title,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.ExtraBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = when {
+                    target.songCount != null ->
+                        "${target.songCount} ${if (target.songCount == 1) "song" else "songs"}"
+                    target.fromYouTube -> "Playlist on YouTube Music"
+                    else -> "Playlist"
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(12.dp))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(onClick = onRename)
+                    .padding(vertical = 16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(Icons.Filled.Edit, contentDescription = null)
+                Spacer(Modifier.width(14.dp))
+                Text("Rename playlist", style = MaterialTheme.typography.bodyLarge)
+            }
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(onClick = onDelete)
+                    .padding(vertical = 16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(Icons.Filled.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error)
+                Spacer(Modifier.width(14.dp))
+                Text(
+                    "Delete playlist",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
         }
     }
 }
