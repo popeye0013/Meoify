@@ -5,11 +5,16 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.animateIntAsState
+import androidx.compose.animation.core.animateIntOffsetAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
@@ -17,6 +22,8 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -35,6 +42,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -63,6 +71,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -70,12 +79,17 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.boundsInParent
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.meoify.music.BuildConfig
@@ -96,6 +110,8 @@ import com.meoify.music.ui.screens.player.PlayerScreen
 import com.meoify.music.ui.screens.search.SearchScreen
 import com.meoify.music.ui.screens.settings.SettingsScreen
 import com.meoify.music.util.openUrl
+import kotlin.math.absoluteValue
+import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -314,17 +330,48 @@ fun MeoifyScaffold(
                                     // not spent building a heavy screen.
                                     beyondViewportPageCount = 1,
                                 ) { page ->
-                                    when (tabs[page]) {
-                                        Tab.Home -> HomeScreen()
-                                        Tab.Search -> SearchScreen(
-                                            pendingSearch = pendingSearch,
-                                            onConsumedPending = onConsumedPending,
-                                            onBack = { onTabChange(Tab.Home) },
-                                        )
-                                        Tab.Library -> LibraryScreen(
-                                            onShowCreatePlaylist = onShowCreatePlaylist,
-                                            onAddToPlaylist = onAddToPlaylist,
-                                        )
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .graphicsLayer {
+                                                // Read the scroll state inside the
+                                                // layer block so sliding only
+                                                // invalidates the layer instead of
+                                                // recomposing the whole page.
+                                                val pageOffset =
+                                                    (pagerState.currentPage - page) +
+                                                        pagerState.currentPageOffsetFraction
+                                                val distance = pageOffset
+                                                    .absoluteValue
+                                                    .coerceIn(0f, 1f)
+                                                val eased =
+                                                    FastOutSlowInEasing.transform(distance)
+                                                // Neighbouring pages drift slower than
+                                                // the pager itself and fade/shrink a
+                                                // little, which adds depth without
+                                                // making the content hard to read.
+                                                alpha = 1f - 0.28f * eased
+                                                val direction =
+                                                    if (pageOffset >= 0f) 1f else -1f
+                                                translationX =
+                                                    size.width * 0.12f * eased * direction
+                                                val scale = 1f - 0.045f * eased
+                                                scaleX = scale
+                                                scaleY = scale
+                                            },
+                                    ) {
+                                        when (tabs[page]) {
+                                            Tab.Home -> HomeScreen()
+                                            Tab.Search -> SearchScreen(
+                                                pendingSearch = pendingSearch,
+                                                onConsumedPending = onConsumedPending,
+                                                onBack = { onTabChange(Tab.Home) },
+                                            )
+                                            Tab.Library -> LibraryScreen(
+                                                onShowCreatePlaylist = onShowCreatePlaylist,
+                                                onAddToPlaylist = onAddToPlaylist,
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -368,7 +415,8 @@ fun MeoifyScaffold(
                     }
                     AnimatedVisibility(
                         visible = showNavBar,
-                        enter = fadeIn(tween(160)),
+                        enter = fadeIn(tween(200)) +
+                            scaleIn(tween(240), initialScale = 0.94f),
                         exit = fadeOut(tween(120)),
                     ) {
                         MeoifyNavigationBar(
@@ -485,6 +533,32 @@ private fun MeoifyNavigationBar(
     hasDetail: Boolean,
     onSelect: (Tab) -> Unit,
 ) {
+    val selectedIndex = if (hasDetail) -1 else tab.ordinal
+    val density = LocalDensity.current
+    // Bounds are captured in the row's own coordinate space so the selection
+    // pill can follow the item while its label grows or shrinks.
+    val itemBounds = remember { mutableStateMapOf<Int, Rect>() }
+    val targetBounds = itemBounds[selectedIndex]
+
+    val pillOffset by animateIntOffsetAsState(
+        targetValue = targetBounds?.let {
+            IntOffset(it.left.roundToInt(), it.top.roundToInt())
+        } ?: IntOffset.Zero,
+        animationSpec = spring(dampingRatio = 0.85f, stiffness = 420f),
+        label = "navPillOffset",
+    )
+    val pillWidth by animateIntAsState(
+        targetValue = targetBounds?.width?.roundToInt() ?: 0,
+        animationSpec = spring(dampingRatio = 0.85f, stiffness = 420f),
+        label = "navPillWidth",
+    )
+    val pillHeight = targetBounds?.height?.roundToInt() ?: 0
+    val pillAlpha by animateFloatAsState(
+        targetValue = if (targetBounds != null) 1f else 0f,
+        animationSpec = tween(180),
+        label = "navPillAlpha",
+    )
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -500,58 +574,106 @@ private fun MeoifyNavigationBar(
             shadowElevation = 14.dp,
             modifier = Modifier.fillMaxWidth(),
         ) {
-            Row(
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 10.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.SpaceEvenly,
-                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Tab.entries.forEach { item ->
-                    val selected = tab == item && !hasDetail
-                    val container by animateColorAsState(
-                        targetValue = if (selected) MaterialTheme.colorScheme.primary else Color.Transparent,
-                        animationSpec = tween(240),
-                        label = "navContainer",
-                    )
-                    val contentColor = if (selected) {
-                        MaterialTheme.colorScheme.onPrimary
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    }
-                    Row(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(28.dp))
-                            .background(container)
-                            .clickable { onSelect(item) }
-                            .padding(horizontal = 18.dp, vertical = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center,
-                    ) {
-                        Icon(
-                            imageVector = when (item) {
-                                Tab.Home -> Icons.Filled.Home
-                                Tab.Search -> Icons.Filled.Search
-                                Tab.Library -> Icons.AutoMirrored.Filled.QueueMusic
-                            },
-                            contentDescription = navLabel(item),
-                            tint = contentColor,
-                            modifier = Modifier.size(23.dp),
+                // Sliding selection pill: it glides between items instead of
+                // fading in place, and resizes with the selected item.
+                Box(
+                    modifier = Modifier
+                        .offset { pillOffset }
+                        .size(
+                            width = with(density) { pillWidth.toDp() },
+                            height = with(density) { pillHeight.toDp() },
                         )
-                        AnimatedVisibility(
-                            visible = selected,
-                            enter = fadeIn(tween(160)) + expandHorizontally(tween(200)),
-                            exit = fadeOut(tween(120)) + shrinkHorizontally(tween(160)),
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Spacer(Modifier.width(8.dp))
-                                Text(
-                                    text = navLabel(item),
-                                    style = MaterialTheme.typography.labelLarge,
-                                    fontWeight = FontWeight.Bold,
-                                    color = contentColor,
-                                    maxLines = 1,
+                        .graphicsLayer { alpha = pillAlpha }
+                        .clip(RoundedCornerShape(28.dp))
+                        .background(MaterialTheme.colorScheme.primary),
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Tab.entries.forEach { item ->
+                        val selected = tab == item && !hasDetail
+                        val contentColor by animateColorAsState(
+                            targetValue = if (selected) {
+                                MaterialTheme.colorScheme.onPrimary
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            },
+                            animationSpec = tween(240),
+                            label = "navContentColor",
+                        )
+                        val iconScale by animateFloatAsState(
+                            targetValue = if (selected) 1.12f else 1f,
+                            animationSpec = spring(
+                                dampingRatio = 0.45f,
+                                stiffness = 600f,
+                            ),
+                            label = "navIconScale",
+                        )
+                        val interactionSource = remember { MutableInteractionSource() }
+                        val pressed by interactionSource.collectIsPressedAsState()
+                        val pressScale by animateFloatAsState(
+                            targetValue = if (pressed) 0.93f else 1f,
+                            animationSpec = spring(
+                                dampingRatio = 0.5f,
+                                stiffness = 900f,
+                            ),
+                            label = "navPressScale",
+                        )
+                        Row(
+                            modifier = Modifier
+                                .graphicsLayer {
+                                    scaleX = pressScale
+                                    scaleY = pressScale
+                                }
+                                .onGloballyPositioned { coords ->
+                                    itemBounds[item.ordinal] = coords.boundsInParent()
+                                }
+                                .clip(RoundedCornerShape(28.dp))
+                                .clickable(
+                                    interactionSource = interactionSource,
+                                    onClick = { onSelect(item) },
                                 )
+                                .padding(horizontal = 18.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center,
+                        ) {
+                            Icon(
+                                imageVector = when (item) {
+                                    Tab.Home -> Icons.Filled.Home
+                                    Tab.Search -> Icons.Filled.Search
+                                    Tab.Library -> Icons.AutoMirrored.Filled.QueueMusic
+                                },
+                                contentDescription = navLabel(item),
+                                tint = contentColor,
+                                modifier = Modifier
+                                    .size(23.dp)
+                                    .graphicsLayer {
+                                        scaleX = iconScale
+                                        scaleY = iconScale
+                                    },
+                            )
+                            AnimatedVisibility(
+                                visible = selected,
+                                enter = fadeIn(tween(160)) + expandHorizontally(tween(200)),
+                                exit = fadeOut(tween(120)) + shrinkHorizontally(tween(160)),
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Spacer(Modifier.width(8.dp))
+                                    Text(
+                                        text = navLabel(item),
+                                        style = MaterialTheme.typography.labelLarge,
+                                        fontWeight = FontWeight.Bold,
+                                        color = contentColor,
+                                        maxLines = 1,
+                                    )
+                                }
                             }
                         }
                     }
