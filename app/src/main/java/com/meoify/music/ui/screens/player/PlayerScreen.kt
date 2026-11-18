@@ -43,7 +43,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -52,7 +51,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.QueueMusic
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
@@ -68,11 +66,9 @@ import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.RepeatOne
-import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
-import androidx.compose.material.icons.filled.VideoLibrary
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.filled.VolumeOff
 import androidx.compose.material.icons.filled.VolumeUp
@@ -81,7 +77,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -313,11 +308,9 @@ fun PlayerScreen(onClose: () -> Unit) {
         ) {
             if (!showLyrics) {
                 NowPlayingHeader(
-                    track = track,
                     source = state.sourceTitle,
                     onClose = onClose,
-                    menuOpen = menuOpen,
-                    onMenuOpenChange = { menuOpen = it },
+                    onMenuClick = { menuOpen = true },
                     onShare = ::shareTrack,
                     onShowQueue = { showQueue = true },
                     onOpenVideo = ::openVideo,
@@ -403,15 +396,26 @@ fun PlayerScreen(onClose: () -> Unit) {
         )
     }
 
+    if (menuOpen && track != null) {
+        NowPlayingSheet(
+            track = track,
+            source = state.sourceTitle,
+            sleepLeftMinutes = sleepLeftMinutes,
+            onDismiss = { menuOpen = false },
+            onShare = ::shareTrack,
+            onShowQueue = { showQueue = true },
+            onOpenVideo = ::openVideo,
+            onSleepTimer = { showSleepTimer = true },
+        )
+    }
+
 }
 
 @Composable
 private fun NowPlayingHeader(
-    track: Track?,
     source: String,
     onClose: () -> Unit,
-    menuOpen: Boolean,
-    onMenuOpenChange: (Boolean) -> Unit,
+    onMenuClick: () -> Unit,
     onShare: () -> Unit,
     onShowQueue: () -> Unit,
     onOpenVideo: () -> Unit,
@@ -462,128 +466,22 @@ private fun NowPlayingHeader(
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        Box {
-            Surface(
-                onClick = {
-                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                    onMenuOpenChange(true)
-                },
-                shape = CircleShape,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
-                modifier = Modifier.size(42.dp),
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        Icons.Filled.MoreVert,
-                        contentDescription = "More options",
-                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.92f),
-                        modifier = Modifier.size(22.dp),
-                    )
-                }
-            }
-            DropdownMenu(
-                expanded = menuOpen,
-                onDismissRequest = { onMenuOpenChange(false) },
-                shape = RoundedCornerShape(22.dp),
-                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                tonalElevation = 0.dp,
-                shadowElevation = 18.dp,
-                modifier = Modifier.widthIn(min = 264.dp),
-            ) {
-                if (track != null) {
-                    Row(
-                        modifier = Modifier.padding(
-                            start = 16.dp,
-                            end = 16.dp,
-                            top = 14.dp,
-                            bottom = 10.dp,
-                        ),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(44.dp)
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(MaterialTheme.colorScheme.surfaceContainerHighest),
-                        ) {
-                            ArtworkImage(
-                                url = rememberTrackCover(track),
-                                contentDescription = null,
-                                contentScale = ContentScale.Crop,
-                                modifier = Modifier.fillMaxSize(),
-                            )
-                        }
-                        Spacer(Modifier.width(12.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "NOW PLAYING",
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.ExtraBold,
-                                letterSpacing = 1.4.sp,
-                                color = MaterialTheme.colorScheme.primary,
-                            )
-                            Text(
-                                text = track.title,
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                            Text(
-                                text = track.artist,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        }
-                    }
-                    HorizontalDivider(
-                        modifier = Modifier.padding(horizontal = 16.dp),
-                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
-                    )
-                    Spacer(Modifier.height(4.dp))
-                }
-                PlayerMenuItem(
-                    icon = Icons.Filled.Share,
-                    label = "Share",
-                    supporting = "Send this song to a friend",
-                ) {
-                    onMenuOpenChange(false)
-                    onShare()
-                }
-                PlayerMenuItem(
-                    icon = Icons.AutoMirrored.Filled.QueueMusic,
-                    label = "Queue",
-                    supporting = "See what's playing next",
-                ) {
-                    onMenuOpenChange(false)
-                    onShowQueue()
-                }
-                PlayerMenuItem(
-                    icon = Icons.Filled.VideoLibrary,
-                    label = "Open video",
-                    supporting = "Watch on YouTube Music",
-                ) {
-                    onMenuOpenChange(false)
-                    onOpenVideo()
-                }
-                PlayerMenuItem(
-                    icon = Icons.Filled.Timer,
-                    label = "Sleep timer",
-                    supporting = sleepLeftMinutes?.let { "$it min left" }
-                        ?: "Stop playback automatically",
-                    tint = if (sleepLeftMinutes != null) {
-                        MaterialTheme.colorScheme.primary
-                    } else {
-                        MaterialTheme.colorScheme.onSurface
-                    },
-                ) {
-                    onMenuOpenChange(false)
-                    onSleepTimer()
-                }
-                Spacer(Modifier.height(4.dp))
+        Surface(
+            onClick = {
+                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                onMenuClick()
+            },
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
+            modifier = Modifier.size(42.dp),
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    Icons.Filled.MoreVert,
+                    contentDescription = "More options",
+                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.92f),
+                    modifier = Modifier.size(22.dp),
+                )
             }
         }
     }
@@ -649,7 +547,6 @@ private fun PlayerMenuItem(
         )
     }
 }
-
 @Composable
 private fun PlayerMainContent(
     state: PlayerUiState,

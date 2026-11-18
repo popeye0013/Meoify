@@ -212,6 +212,9 @@ private fun DetailContent(
     var showSave by remember { mutableStateOf(false) }
     var renameValue by remember(page.title) { mutableStateOf(page.title) }
     val localPlaylistId = (destination as? Destination.LocalPlaylist)?.id
+    // Swipe-right is a playlist shortcut: adding the next song to the queue
+    // makes sense there, while album and artist pages are browsed in order.
+    val swipeRightToQueue = page.kind == MediaKind.PLAYLIST || page.kind == MediaKind.MIX
     val canSave = page.tracks.isNotEmpty() &&
         localPlaylistId == null &&
         page.id != "liked" &&
@@ -329,6 +332,11 @@ private fun DetailContent(
                     isCurrent = currentTrackId == track.id,
                     onClick = { actions.playTracks(page.tracks, idx, page.title) },
                     onMoreClick = { actions.openTrackMenu(track) },
+                    onSwipeRight = if (swipeRightToQueue) {
+                        { actions.addToQueue(track) }
+                    } else {
+                        null
+                    },
                 )
             }
         }
@@ -368,6 +376,11 @@ private fun DetailContent(
                         isCurrent = currentTrackId == track.id,
                         onClick = { actions.playTracks(section.tracks, idx, section.title) },
                         onMoreClick = { actions.openTrackMenu(track) },
+                        onSwipeRight = if (swipeRightToQueue) {
+                            { actions.addToQueue(track) }
+                        } else {
+                            null
+                        },
                     )
                 }
             }

@@ -77,6 +77,8 @@ Meoify is distributed as a signed APK on GitHub Releases.
 ### Play
 
 - **Full player** — square artwork, wavy seek bar, shuffle, repeat, mute, queue management and a floating mini player.
+- **Now Playing sheet** — the three-dot menu opens a modal sheet with queue, share, video and sleep actions plus full song details.
+- **Swipe to queue** — swipe a song right in any playlist or Liked Songs to add it to the queue without leaving the list.
 - **Background playback** — Media3 / ExoPlayer with lockscreen and notification controls.
 - **Five audio modes** — Auto, Lossless (Hi-Res), Standard (320 kbps), YouTube Music and Data Saver. See [Audio quality](#audio-quality).
 - **Sleep timer** — stop playback after 5, 10, 15, 30, 45 or 60 minutes.

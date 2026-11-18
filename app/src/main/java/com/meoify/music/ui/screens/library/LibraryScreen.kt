@@ -269,6 +269,7 @@ fun LibraryScreen(
                                 actions.playTracks(library.liked, library.liked.indexOf(track), "Liked Songs")
                             },
                             onMoreClick = { actions.openTrackMenu(track) },
+                            onSwipeRight = { actions.addToQueue(track) },
                         )
                     }
                 }
