@@ -255,4 +255,4 @@ Meoify is an **unofficial, independent project**. It is not affiliated with, end
 - Meoify does **not** host, store or redistribute audio. Audio is streamed from YouTube Music.
 - All trademarks, logos and content belong to their respective owners.
 
-If you are a rights holder and have a concern, please open an issue or contact the maintainer.
+If you are a rights holder and have a concern, please open an issue or contact me
