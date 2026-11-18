@@ -312,14 +312,25 @@ object YTMusicParser {
     }
 
     fun parsePlaylist(root: JsonObject, playlistId: String): DetailPage {
-        val header = root.findAll("musicResponsiveHeaderRenderer").firstOrNull()?.asObjectOrNull()
+        // An owned playlist is wrapped in an editable header that also carries
+        // its privacy (and, when YouTube exposes it, its comment policy).
+        val editableHeader = root.findAll("musicEditablePlaylistDetailHeaderRenderer")
+            .firstOrNull()?.asObjectOrNull()
+        val editHeader = editableHeader?.get("editHeader")?.asObjectOrNull()
+            ?.get("musicPlaylistEditHeaderRenderer")?.asObjectOrNull()
+        val header = editableHeader?.get("header")?.asObjectOrNull()
+            ?.get("musicResponsiveHeaderRenderer")?.asObjectOrNull()
+            ?: root.findAll("musicResponsiveHeaderRenderer").firstOrNull()?.asObjectOrNull()
             ?: root.findAll("musicDetailHeaderRenderer").firstOrNull()?.asObjectOrNull()
         val title = header?.get("title")?.readText().orEmpty().ifBlank { "Playlist" }
         val subtitle = header?.get("subtitle")?.readText().orEmpty()
         val secondSubtitle = header?.get("secondSubtitle")?.readText().orEmpty()
         val thumbnail = header?.findThumbnail()
-        val description = root.findAll("musicDescriptionShelfRenderer").firstOrNull()?.asObjectOrNull()
+        val description = header?.get("description")?.asObjectOrNull()
+            ?.get("musicDescriptionShelfRenderer")?.asObjectOrNull()
             ?.get("description")?.readText()
+            ?: root.findAll("musicDescriptionShelfRenderer").firstOrNull()?.asObjectOrNull()
+                ?.get("description")?.readText()
 
         // Playlist layouts differ between public playlists, the signed-in
         // library and Liked Music. Collect every responsive list row that has
@@ -332,9 +343,45 @@ object YTMusicParser {
             title = title,
             subtitle = listOf(subtitle, secondSubtitle).filter { it.isNotBlank() }.joinToString(" • "),
             thumbnailUrl = thumbnail,
-            description = description,
+            description = description?.takeUnless(::isLikedMusicBoilerplate),
             tracks = tracks.map { it.copy(thumbnailUrl = it.thumbnailUrl ?: thumbnail) },
+            owned = editableHeader != null,
+            privacy = editHeader?.get("privacy")?.readText()?.uppercase(),
+            comments = editHeader?.playlistCommentPolicy(),
         )
+    }
+
+    /** The Liked Music page carries a settings hint that Meoify replaces. */
+    private fun isLikedMusicBoilerplate(text: String): Boolean {
+        val lower = text.lowercase()
+        return lower.contains("only the music you like in youtube music") ||
+            (lower.contains("liked music from youtube") && lower.contains("settings"))
+    }
+
+    /**
+     * YouTube Music returns the playlist comment setting as a plain field when
+     * it is available. Older responses omit it entirely, in which case the
+     * editor keeps the current value and only sends it on change.
+     */
+    private fun JsonObject.playlistCommentPolicy(): String? {
+        val direct = listOf(
+            "commentsPolicy",
+            "commentPolicy",
+            "commentsSetting",
+            "commentSetting",
+        ).firstNotNullOfOrNull { key -> get(key)?.readText() }
+        val raw = direct ?: findAll("musicPlaylistCommentsEditRenderer")
+            .firstOrNull()?.asObjectOrNull()
+            ?.let { renderer ->
+                listOf("commentsPolicy", "commentPolicy", "policy", "value")
+                    .firstNotNullOfOrNull { key -> renderer[key]?.readText() }
+            }
+        return when (raw?.uppercase()) {
+            "ON", "COMMENTS_ON", "ALLOWED", "ALLOW" -> "ON"
+            "PAUSED", "COMMENTS_PAUSED", "PAUSE" -> "PAUSED"
+            "OFF", "COMMENTS_OFF", "DISABLED", "DENY" -> "OFF"
+            else -> null
+        }
     }
 
     /** Every playable row in a page, regardless of which shelf holds it. */

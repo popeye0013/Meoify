@@ -6,6 +6,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.add
 import kotlinx.serialization.json.addJsonObject
+import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
@@ -273,6 +274,69 @@ class InnerTube(private val client: OkHttpClient) {
             },
         )
     }.isSuccess
+
+    /**
+     * Updates the parts of a playlist the signed-in account owns. Only the
+     * fields that are passed are sent, so an edit never clears a description
+     * or changes privacy by accident.
+     */
+    suspend fun editPlaylist(
+        playlistId: String,
+        title: String? = null,
+        description: String? = null,
+        privacy: String? = null,
+    ): Boolean = runCatching {
+        val actions = buildJsonArray {
+            if (title != null) {
+                addJsonObject {
+                    put("action", "ACTION_SET_PLAYLIST_NAME")
+                    put("playlistName", title)
+                }
+            }
+            if (description != null) {
+                addJsonObject {
+                    put("action", "ACTION_SET_PLAYLIST_DESCRIPTION")
+                    put("playlistDescription", description)
+                }
+            }
+            if (privacy != null) {
+                addJsonObject {
+                    put("action", "ACTION_SET_PLAYLIST_PRIVACY")
+                    put("playlistPrivacy", privacy.uppercase())
+                }
+            }
+        }
+        if (actions.isEmpty()) return@runCatching true
+        val root = post(
+            "browse/edit_playlist",
+            buildJsonObject {
+                put("playlistId", playlistId.removePrefix("VL"))
+                put("actions", actions)
+            },
+        )
+        root["status"]?.jsonPrimitive?.contentOrNull != "STATUS_FAILED"
+    }.getOrDefault(false)
+
+    /**
+     * Applies the playlist comment setting. YouTube Music only publishes this
+     * for some accounts and regions, so the request is sent on its own and a
+     * rejection must not roll back a title, description or privacy change.
+     */
+    suspend fun setPlaylistComments(playlistId: String, comments: String): Boolean = runCatching {
+        val root = post(
+            "browse/edit_playlist",
+            buildJsonObject {
+                put("playlistId", playlistId.removePrefix("VL"))
+                putJsonArray("actions") {
+                    addJsonObject {
+                        put("action", "ACTION_SET_PLAYLIST_COMMENTS")
+                        put("playlistComments", comments.uppercase())
+                    }
+                }
+            },
+        )
+        root["status"]?.jsonPrimitive?.contentOrNull != "STATUS_FAILED"
+    }.getOrDefault(false)
 
     suspend fun addToPlaylist(playlistId: String, videoId: String): Boolean = runCatching {
         post(

@@ -87,6 +87,20 @@ data class DetailPage(
     val tracks: List<Track> = emptyList(),
     val sections: List<DetailSection> = emptyList(),
     val roundArt: Boolean = false,
+    /** The signed-in account created this playlist, so it can be edited. */
+    val owned: Boolean = false,
+    /** PUBLIC, UNLISTED or PRIVATE for an owned playlist. */
+    val privacy: String? = null,
+    /** ON, PAUSED or OFF when YouTube Music exposes the setting. */
+    val comments: String? = null,
+)
+
+/** The editable metadata of a playlist, as shown on YouTube Music. */
+data class PlaylistEdit(
+    val title: String,
+    val description: String = "",
+    val privacy: String = "PRIVATE",
+    val comments: String = "ON",
 )
 
 data class DetailSection(

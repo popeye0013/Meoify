@@ -1,5 +1,6 @@
 package com.meoify.music.ui.screens.detail
 
+import android.content.Intent
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -30,23 +31,22 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Album
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.LibraryAdd
 import androidx.compose.material.icons.filled.LibraryMusic
+import androidx.compose.material.icons.filled.Link
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
@@ -71,6 +71,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -82,11 +83,14 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.meoify.music.MeoifyApplication
 import com.meoify.music.data.model.DetailPage
 import com.meoify.music.data.model.MediaKind
+import com.meoify.music.data.model.PlaylistEdit
 import com.meoify.music.data.model.UiState
 import com.meoify.music.playback.PlayerUiState
 import com.meoify.music.ui.components.ArtistCard
 import com.meoify.music.ui.components.MediaCard
 import com.meoify.music.ui.components.ArtworkImage
+import com.meoify.music.ui.components.PlaylistActionSheet
+import com.meoify.music.ui.components.PlaylistEditorSheet
 import com.meoify.music.ui.components.SectionHeader
 import com.meoify.music.ui.components.TrackCard
 import com.meoify.music.ui.navigation.Destination
@@ -123,6 +127,7 @@ fun DetailScreen(destination: Destination, onBack: () -> Unit) {
                 subtitle = "${pl?.tracks?.size ?: 0} songs",
                 thumbnailUrl = pl?.artworkUrl,
                 tracks = pl?.tracks ?: emptyList(),
+                owned = true,
             )
         }
 
@@ -131,7 +136,7 @@ fun DetailScreen(destination: Destination, onBack: () -> Unit) {
 
     if (page != null) {
         DetailContent(
-            page = page,
+            loadedPage = page,
             onBack = onBack,
             actions = actions,
             playerState = playerState,
@@ -168,7 +173,7 @@ fun DetailScreen(destination: Destination, onBack: () -> Unit) {
 
         is UiState.Success -> {
             DetailContent(
-                page = s.value,
+                loadedPage = s.value,
                 onBack = onBack,
                 actions = actions,
                 playerState = playerState,
@@ -180,12 +185,18 @@ fun DetailScreen(destination: Destination, onBack: () -> Unit) {
 
 @Composable
 private fun DetailContent(
-    page: DetailPage,
+    loadedPage: DetailPage,
     onBack: () -> Unit,
     actions: com.meoify.music.ui.navigation.AppActions,
     playerState: PlayerUiState,
     destination: Destination,
 ) {
+    // Edits are applied to this local copy so the header reflects a saved title
+    // or privacy without waiting for a second network round-trip.
+    var page by remember(loadedPage.id) { mutableStateOf(loadedPage) }
+    LaunchedEffect(loadedPage) { page = loadedPage }
+    val context = LocalContext.current
+
     val fallbackAccent = remember(page.id) { ArtworkColorCache.fallbackColor(page.id) }
     var accent by remember(page.id) { mutableStateOf(fallbackAccent) }
     LaunchedEffect(page.thumbnailUrl, page.id) {
@@ -207,17 +218,25 @@ private fun DetailContent(
     val isCurrentPage = currentTrackId != null && page.tracks.any { it.id == currentTrackId }
     val isPlayingPage = isCurrentPage && playerState.isPlaying
 
-    var showRename by remember { mutableStateOf(false) }
+    var showMenu by remember { mutableStateOf(false) }
+    var showEdit by remember { mutableStateOf(false) }
     var showDelete by remember { mutableStateOf(false) }
     var showSave by remember { mutableStateOf(false) }
-    var renameValue by remember(page.title) { mutableStateOf(page.title) }
     val localPlaylistId = (destination as? Destination.LocalPlaylist)?.id
+    val localId = localPlaylistId
+    val isLocal = localId != null
     // Swipe-right is a playlist shortcut: adding the next song to the queue
     // makes sense there, while album and artist pages are browsed in order.
     val swipeRightToQueue = page.kind == MediaKind.PLAYLIST || page.kind == MediaKind.MIX
+    val isLikedPage = destination is Destination.Liked || page.id == "liked"
+    // YouTube Music returns the editable header only for playlists the signed-in
+    // account owns; local playlists are always editable.
+    val canEdit = !isLikedPage && (localPlaylistId != null || page.owned)
+    val canDelete = canEdit
     val canSave = page.tracks.isNotEmpty() &&
         localPlaylistId == null &&
-        page.id != "liked" &&
+        !isLikedPage &&
+        !page.owned &&
         page.kind != MediaKind.ARTIST
 
     val kindLabel = when (page.kind) {
@@ -269,7 +288,6 @@ private fun DetailContent(
                 scrollOffset = headerScroll,
                 isPlayingPage = isPlayingPage,
                 canSave = canSave,
-                localPlaylistId = localPlaylistId,
                 onBack = onBack,
                 onPlay = {
                     if (isCurrentPage) {
@@ -280,11 +298,7 @@ private fun DetailContent(
                 },
                 onShuffle = { actions.playShuffled(page.tracks, page.title) },
                 onSave = { showSave = true },
-                onRename = {
-                    renameValue = page.title
-                    showRename = true
-                },
-                onDelete = { showDelete = true },
+                onMenu = { showMenu = true },
                 onHeightChange = { headerHeightPx = it.height.toFloat() },
             )
         }
@@ -292,7 +306,7 @@ private fun DetailContent(
         if (!page.description.isNullOrBlank()) {
             item {
                 Text(
-                    text = page.description,
+                    text = page.description.orEmpty(),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 4,
@@ -389,29 +403,99 @@ private fun DetailContent(
         item { Spacer(Modifier.height(28.dp)) }
     }
 
-    if (showRename && localPlaylistId != null) {
-        AlertDialog(
-            onDismissRequest = { showRename = false },
-            title = { Text("Rename playlist") },
-            text = {
-                OutlinedTextField(
-                    value = renameValue,
-                    onValueChange = { renameValue = it },
-                    label = { Text("Playlist name") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                )
+    if (showMenu) {
+        val playlistLink = if (localPlaylistId == null && !isLikedPage) {
+            "https://music.youtube.com/playlist?list=${page.id.removePrefix("VL")}"
+        } else {
+            null
+        }
+        PlaylistActionSheet(
+            title = page.title,
+            subtitle = page.subtitle,
+            artworkUrl = page.thumbnailUrl,
+            canEdit = canEdit,
+            canSave = canSave,
+            canDelete = canDelete,
+            hasTracks = page.tracks.isNotEmpty(),
+            onDismiss = { showMenu = false },
+            onPlayNext = {
+                showMenu = false
+                actions.playNextTracks(page.tracks)
             },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        if (renameValue.isNotBlank()) actions.renamePlaylist(localPlaylistId, renameValue)
-                        showRename = false
-                    },
-                    enabled = renameValue.isNotBlank(),
-                ) { Text("Save") }
+            onShare = {
+                showMenu = false
+                val text = buildString {
+                    append(page.title)
+                    playlistLink?.let { append("\n").append(it) }
+                    append("\n")
+                    append("${page.tracks.size} ${if (page.tracks.size == 1) "song" else "songs"}")
+                }
+                val send = Intent(Intent.ACTION_SEND).apply {
+                    type = "text/plain"
+                    putExtra(Intent.EXTRA_TEXT, text)
+                }
+                runCatching {
+                    context.startActivity(Intent.createChooser(send, "Share playlist"))
+                }
             },
-            dismissButton = { TextButton(onClick = { showRename = false }) { Text("Cancel") } },
+            onShuffle = {
+                showMenu = false
+                actions.playShuffled(page.tracks, page.title)
+            },
+            onStartMix = {
+                showMenu = false
+                page.tracks.firstOrNull()?.let { seed ->
+                    actions.playFromSearch(seed, page.tracks)
+                }
+            },
+            onEdit = {
+                showMenu = false
+                showEdit = true
+            },
+            onAddToQueue = {
+                showMenu = false
+                actions.addTracksToQueue(page.tracks)
+            },
+            onSave = {
+                showMenu = false
+                showSave = true
+            },
+            onDelete = {
+                showMenu = false
+                showDelete = true
+            },
+        )
+    }
+
+    if (showEdit) {
+        val isLocal = localPlaylistId != null
+        PlaylistEditorSheet(
+            title = page.title,
+            description = page.description.orEmpty(),
+            privacy = page.privacy ?: "PRIVATE",
+            comments = page.comments ?: "ON",
+            artworkUrl = page.thumbnailUrl,
+            editableDescription = !isLocal,
+            editablePrivacy = !isLocal,
+            editableComments = !isLocal,
+            onDismiss = { showEdit = false },
+            onSave = { edit: PlaylistEdit ->
+                val local = localId
+                if (local != null) {
+                    actions.renamePlaylist(local, edit.title)
+                    page = page.copy(title = edit.title)
+                    actions.showSnackbar("Playlist updated")
+                } else {
+                    actions.editPlaylist(page.id, edit)
+                    page = page.copy(
+                        title = edit.title,
+                        description = edit.description.ifBlank { null },
+                        privacy = edit.privacy,
+                        comments = edit.comments,
+                    )
+                }
+                showEdit = false
+            },
         )
     }
 
@@ -436,14 +520,14 @@ private fun DetailContent(
         )
     }
 
-    if (showDelete && localPlaylistId != null) {
+    if (showDelete && canDelete) {
         AlertDialog(
             onDismissRequest = { showDelete = false },
             title = { Text("Delete playlist?") },
             text = { Text("“${page.title}” will be removed from your library. This can't be undone.") },
             confirmButton = {
                 TextButton(onClick = {
-                    actions.deletePlaylist(localPlaylistId)
+                    actions.deletePlaylist(page.id)
                     showDelete = false
                     onBack()
                 }) { Text("Delete") }
@@ -469,17 +553,14 @@ private fun DetailHeader(
     scrollOffset: Float,
     isPlayingPage: Boolean,
     canSave: Boolean,
-    localPlaylistId: String?,
     onBack: () -> Unit,
     onPlay: () -> Unit,
     onShuffle: () -> Unit,
     onSave: () -> Unit,
-    onRename: () -> Unit,
-    onDelete: () -> Unit,
+    onMenu: () -> Unit,
     onHeightChange: (androidx.compose.ui.unit.IntSize) -> Unit,
 ) {
     val background = MaterialTheme.colorScheme.background
-    var menuOpen by remember { mutableStateOf(false) }
     val totalMs = page.tracks.sumOf { it.durationMs.coerceAtLeast(0L) }
     val coverScale = 1f + (scrollOffset / 2400f).coerceIn(0f, 0.07f)
     val coverShape = if (page.roundArt || page.kind == MediaKind.ARTIST) {
@@ -529,42 +610,19 @@ private fun DetailHeader(
                 }
             }
             Spacer(Modifier.weight(1f))
-            Box {
-                IconButton(onClick = { menuOpen = true }) {
+            Surface(
+                onClick = onMenu,
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.75f),
+                modifier = Modifier.size(44.dp),
+            ) {
+                Box(contentAlignment = Alignment.Center) {
                     Icon(
                         Icons.Filled.MoreHoriz,
-                        contentDescription = "More options",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        contentDescription = "Playlist options",
+                        tint = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.size(22.dp),
                     )
-                }
-                DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                    DropdownMenuItem(
-                        text = { Text("Shuffle play") },
-                        leadingIcon = { Icon(Icons.Filled.Shuffle, contentDescription = null) },
-                        enabled = page.tracks.isNotEmpty(),
-                        onClick = {
-                            menuOpen = false
-                            onShuffle()
-                        },
-                    )
-                    if (localPlaylistId != null) {
-                        DropdownMenuItem(
-                            text = { Text("Rename playlist") },
-                            leadingIcon = { Icon(Icons.Filled.Edit, contentDescription = null) },
-                            onClick = {
-                                menuOpen = false
-                                onRename()
-                            },
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Delete playlist") },
-                            leadingIcon = { Icon(Icons.Filled.Delete, contentDescription = null) },
-                            onClick = {
-                                menuOpen = false
-                                onDelete()
-                            },
-                        )
-                    }
                 }
             }
         }
@@ -708,6 +766,16 @@ private fun DetailHeader(
                     )
                 }
                 durationLabel(totalMs)?.let { MetaPill(icon = Icons.Filled.Schedule, label = it) }
+                page.privacy?.let { privacy ->
+                    MetaPill(
+                        icon = when (privacy) {
+                            "PUBLIC" -> Icons.Filled.Public
+                            "UNLISTED" -> Icons.Filled.Link
+                            else -> Icons.Filled.Lock
+                        },
+                        label = privacy.lowercase().replaceFirstChar { it.uppercase() },
+                    )
+                }
             }
         }
 

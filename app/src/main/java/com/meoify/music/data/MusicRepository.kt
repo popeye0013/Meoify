@@ -447,6 +447,28 @@ class MusicRepository(private val settings: com.meoify.music.data.local.Settings
         return runCatching { innerTube.renamePlaylist(playlistId, title) }.getOrDefault(false)
     }
 
+    /**
+     * Saves the editable metadata of an owned playlist. Comment settings are
+     * sent separately because YouTube Music exposes them inconsistently; a
+     * rejected comment policy must not discard a saved title or privacy change.
+     */
+    suspend fun editPlaylist(
+        playlistId: String,
+        title: String? = null,
+        description: String? = null,
+        privacy: String? = null,
+        comments: String? = null,
+    ): Boolean {
+        if (!cookiesPresent) return false
+        val saved = runCatching {
+            innerTube.editPlaylist(playlistId, title, description, privacy)
+        }.getOrDefault(false)
+        if (saved && comments != null) {
+            runCatching { innerTube.setPlaylistComments(playlistId, comments) }
+        }
+        return saved
+    }
+
     suspend fun addSongToPlaylist(playlistId: String, videoId: String): Boolean {
         if (!cookiesPresent) return false
         return runCatching { innerTube.addToPlaylist(playlistId, videoId) }.getOrDefault(false)

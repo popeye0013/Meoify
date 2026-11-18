@@ -22,6 +22,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
@@ -54,7 +55,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.FormatQuote
@@ -81,7 +81,10 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.material3.Surface
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -1396,6 +1399,7 @@ private fun QueueSheet(
     var draggingIndex by remember { mutableStateOf(-1) }
     var dragDistance by remember { mutableStateOf(0f) }
     val listState = rememberLazyListState()
+    val haptic = LocalHapticFeedback.current
     val density = LocalDensity.current
     val fallbackRowHeight = with(density) { 72.dp.toPx() }
     var rowHeight by remember { mutableStateOf(fallbackRowHeight) }
@@ -1441,6 +1445,15 @@ private fun QueueSheet(
                 }
             }
 
+            if (state.queue.isNotEmpty()) {
+                Text(
+                    text = "Hold a song to reorder · Swipe right to remove",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(start = 20.dp, end = 20.dp, bottom = 8.dp),
+                )
+            }
+
             if (state.queue.isEmpty()) {
                 Box(
                     modifier = Modifier.fillMaxWidth().padding(32.dp),
@@ -1460,105 +1473,138 @@ private fun QueueSheet(
                     items(state.queue.size) { index ->
                         val track = state.queue[index]
                         var menuExpanded by remember { mutableStateOf(false) }
+                        val dismissState = rememberSwipeToDismissBoxState(
+                            confirmValueChange = { value ->
+                                if (value == SwipeToDismissBoxValue.StartToEnd) {
+                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    onRemove(index)
+                                }
+                                // Stay settled: removing the entry is the
+                                // feedback, so the next row must not inherit a
+                                // half-dismissed state.
+                                false
+                            },
+                        )
                         val rowModifier = Modifier
                             .zIndex(if (draggingIndex == index) 1f else 0f)
                             .graphicsLayer {
                                 translationY = if (draggingIndex == index) dragDistance else 0f
                             }
-                        Box {
-                            TrackRow(
-                                track = track,
-                                index = index,
-                                isCurrent = track.id == state.track?.id,
-                                onClick = { onPlayAt(index) },
-                                onMoreClick = { menuExpanded = true },
-                                modifier = rowModifier,
-                                leadingContent = {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(36.dp)
-                                            .pointerInput(index) {
-                                                detectVerticalDragGestures(
-                                                    onDragStart = {
-                                                        draggingIndex = index
-                                                        dragDistance = 0f
-                                                        rowHeight = listState.layoutInfo.visibleItemsInfo
-                                                            .firstOrNull { it.index == index }
-                                                            ?.size?.toFloat()
-                                                            ?.takeIf { it > 0f }
-                                                            ?: fallbackRowHeight
-                                                    },
-                                                    onVerticalDrag = { change, delta ->
-                                                        change.consume()
-                                                        dragDistance += delta
-                                                        val steps = (dragDistance / rowHeight).roundToInt()
-                                                        if (steps != 0) {
-                                                            val current = draggingIndex
-                                                            val max = listState.layoutInfo.totalItemsCount - 1
-                                                            val target = (current + steps).coerceIn(0, max)
-                                                            if (current >= 0 && target != current) {
-                                                                onMove(current, target)
-                                                                draggingIndex = target
-                                                            }
-                                                            dragDistance -= steps * rowHeight
-                                                        }
-                                                    },
-                                                    onDragEnd = {
-                                                        draggingIndex = -1
-                                                        dragDistance = 0f
-                                                    },
-                                                    onDragCancel = {
-                                                        draggingIndex = -1
-                                                        dragDistance = 0f
-                                                    },
-                                                )
-                                            },
-                                        contentAlignment = Alignment.Center,
+                        SwipeToDismissBox(
+                            state = dismissState,
+                            modifier = rowModifier,
+                            enableDismissFromStartToEnd = true,
+                            enableDismissFromEndToStart = false,
+                            backgroundContent = {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .background(MaterialTheme.colorScheme.errorContainer),
+                                    contentAlignment = Alignment.CenterStart,
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(start = 22.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
                                     ) {
                                         Icon(
-                                            imageVector = Icons.Filled.DragHandle,
-                                            contentDescription = "Drag to reorder ${track.title}",
-                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            imageVector = Icons.Filled.Delete,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.onErrorContainer,
+                                        )
+                                        Spacer(Modifier.width(10.dp))
+                                        Text(
+                                            text = "Remove",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = MaterialTheme.colorScheme.onErrorContainer,
                                         )
                                     }
-                                },
-                            )
-                            DropdownMenu(
-                                expanded = menuExpanded,
-                                onDismissRequest = { menuExpanded = false },
-                            ) {
-                                DropdownMenuItem(
-                                    text = { Text("Play next") },
-                                    leadingIcon = { Icon(Icons.Filled.PlayArrow, contentDescription = null) },
-                                    onClick = {
-                                        menuExpanded = false
-                                        onPlayNext(index)
+                                }
+                            },
+                        ) {
+                            Box {
+                                TrackRow(
+                                    track = track,
+                                    index = index,
+                                    isCurrent = track.id == state.track?.id,
+                                    onClick = { onPlayAt(index) },
+                                    onMoreClick = { menuExpanded = true },
+                                    modifier = Modifier.pointerInput(index) {
+                                        // Hold the song, then drag up or down.
+                                        detectDragGesturesAfterLongPress(
+                                            onDragStart = {
+                                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                                draggingIndex = index
+                                                dragDistance = 0f
+                                                rowHeight = listState.layoutInfo.visibleItemsInfo
+                                                    .firstOrNull { it.index == index }
+                                                    ?.size?.toFloat()
+                                                    ?.takeIf { it > 0f }
+                                                    ?: fallbackRowHeight
+                                            },
+                                            onDrag = { change, dragAmount ->
+                                                change.consume()
+                                                dragDistance += dragAmount.y
+                                                val steps = (dragDistance / rowHeight).roundToInt()
+                                                if (steps != 0) {
+                                                    val current = draggingIndex
+                                                    val max = listState.layoutInfo.totalItemsCount - 1
+                                                    val target = (current + steps).coerceIn(0, max)
+                                                    if (current >= 0 && target != current) {
+                                                        onMove(current, target)
+                                                        draggingIndex = target
+                                                    }
+                                                    dragDistance -= steps * rowHeight
+                                                }
+                                            },
+                                            onDragEnd = {
+                                                draggingIndex = -1
+                                                dragDistance = 0f
+                                            },
+                                            onDragCancel = {
+                                                draggingIndex = -1
+                                                dragDistance = 0f
+                                            },
+                                        )
                                     },
                                 )
-                                DropdownMenuItem(
-                                    text = { Text("Add to queue") },
-                                    leadingIcon = { Icon(Icons.Filled.Add, contentDescription = null) },
-                                    onClick = {
-                                        menuExpanded = false
-                                        onAddToQueue(track)
-                                    },
-                                )
-                                DropdownMenuItem(
-                                    text = { Text("Remove from queue") },
-                                    leadingIcon = { Icon(Icons.Filled.Close, contentDescription = null) },
-                                    onClick = {
-                                        menuExpanded = false
-                                        onRemove(index)
-                                    },
-                                )
-                                DropdownMenuItem(
-                                    text = { Text("More options") },
-                                    leadingIcon = { Icon(Icons.Filled.MoreVert, contentDescription = null) },
-                                    onClick = {
-                                        menuExpanded = false
-                                        onMore(track)
-                                    },
-                                )
+                                DropdownMenu(
+                                    expanded = menuExpanded,
+                                    onDismissRequest = { menuExpanded = false },
+                                ) {
+                                    DropdownMenuItem(
+                                        text = { Text("Play next") },
+                                        leadingIcon = { Icon(Icons.Filled.PlayArrow, contentDescription = null) },
+                                        onClick = {
+                                            menuExpanded = false
+                                            onPlayNext(index)
+                                        },
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text("Add to queue") },
+                                        leadingIcon = { Icon(Icons.Filled.Add, contentDescription = null) },
+                                        onClick = {
+                                            menuExpanded = false
+                                            onAddToQueue(track)
+                                        },
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text("Remove from queue") },
+                                        leadingIcon = { Icon(Icons.Filled.Close, contentDescription = null) },
+                                        onClick = {
+                                            menuExpanded = false
+                                            onRemove(index)
+                                        },
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text("More options") },
+                                        leadingIcon = { Icon(Icons.Filled.MoreVert, contentDescription = null) },
+                                        onClick = {
+                                            menuExpanded = false
+                                            onMore(track)
+                                        },
+                                    )
+                                }
                             }
                         }
                     }

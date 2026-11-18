@@ -27,6 +27,8 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.PlaylistAdd
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -65,6 +67,7 @@ import com.meoify.music.ui.navigation.LocalBottomContentInset
 import com.meoify.music.ui.navigation.LocalLibrary
 import com.meoify.music.ui.navigation.LocalPlayerState
 import com.meoify.music.ui.navigation.LocalSignedIn
+import com.meoify.music.ui.navigation.LocalYtLikedCount
 import com.meoify.music.ui.navigation.LocalYtLoading
 import com.meoify.music.ui.navigation.LocalYtPlaylists
 
@@ -82,6 +85,7 @@ fun LibraryScreen(
     val ytPlaylists = LocalYtPlaylists.current
     val ytLoading = LocalYtLoading.current
     val signedIn = LocalSignedIn.current
+    val ytLikedCount = LocalYtLikedCount.current
     val currentTrackId = LocalPlayerState.current.track?.id
 
     var filterName by rememberSaveable { mutableStateOf(LibraryFilter.Playlists.name) }
@@ -117,6 +121,22 @@ fun LibraryScreen(
                     modifier = Modifier.weight(1f),
                 )
                 if (filter == LibraryFilter.Playlists) {
+                    if (signedIn) {
+                        IconButton(onClick = { app.container.ytLibrary.refresh() }) {
+                            if (ytLoading) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(20.dp),
+                                    strokeWidth = 2.dp,
+                                )
+                            } else {
+                                Icon(
+                                    imageVector = Icons.Filled.Refresh,
+                                    contentDescription = "Sync library",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                    }
                     IconButton(onClick = { app.container.settings.setLibraryGridView(!gridView) }) {
                         Icon(
                             imageVector = if (gridView) Icons.AutoMirrored.Filled.ViewList else Icons.Filled.GridView,
@@ -168,21 +188,24 @@ fun LibraryScreen(
         when (filter) {
             LibraryFilter.Playlists -> {
                 item {
-                    LikedSongsRow(
-                        count = library.liked.size,
-                        onClick = actions.openLiked,
-                    )
+                    if (signedIn) {
+                        LikedSongsRow(
+                            count = ytLikedCount,
+                            syncing = ytLoading,
+                            onSync = { app.container.ytLibrary.refresh() },
+                            onClick = actions.openLiked,
+                        )
+                    } else {
+                        LikedSongsRow(
+                            count = library.liked.size,
+                            onClick = actions.openLiked,
+                        )
+                    }
                 }
 
                 if (signedIn) {
-                    item {
-                        SectionHeader(
-                            title = "YouTube Music playlists",
-                            actionLabel = if (ytLoading) "Syncing…" else "Refresh",
-                            onAction = { app.container.ytLibrary.refresh() },
-                        )
-                    }
-
+                    // SectionHeader removed; refresh affordance lives in the
+                    // Library header so the list stays clean.
                     when {
                         ytPlaylists.isEmpty() && ytLoading -> items(if (gridView) 2 else 3) {
                             if (gridView) {
@@ -377,7 +400,12 @@ private fun LocalPlaylist.toCard(): MediaCardModel = MediaCardModel(
 )
 
 @Composable
-private fun LikedSongsRow(count: Int, onClick: () -> Unit) {
+private fun LikedSongsRow(
+    count: Int,
+    onClick: () -> Unit,
+    syncing: Boolean = false,
+    onSync: (() -> Unit)? = null,
+) {
     Surface(
         onClick = onClick,
         shape = RoundedCornerShape(20.dp),
@@ -415,16 +443,34 @@ private fun LikedSongsRow(count: Int, onClick: () -> Unit) {
                     color = MaterialTheme.colorScheme.onSurface,
                 )
                 Text(
-                    text = "$count ${if (count == 1) "song" else "songs"}",
+                    text = "$count ${if (count == 1) "song" else "songs"}" +
+                        if (syncing) " • Syncing…" else "",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            Icon(
-                Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            if (onSync != null) {
+                IconButton(onClick = onSync, enabled = !syncing) {
+                    if (syncing) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            strokeWidth = 2.dp,
+                        )
+                    } else {
+                        Icon(
+                            Icons.Filled.Refresh,
+                            contentDescription = "Sync liked songs",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            } else {
+                Icon(
+                    Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
     }
 }

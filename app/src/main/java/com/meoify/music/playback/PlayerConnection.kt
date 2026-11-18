@@ -754,7 +754,11 @@ class PlayerConnection(
      * song. [expectedTrackId] guards against a late radio response landing
      * after the listener already skipped or started something else.
      */
-    fun addTracksToQueue(tracks: List<Track>, expectedTrackId: String? = null) {
+    fun addTracksToQueue(
+        tracks: List<Track>,
+        expectedTrackId: String? = null,
+        playNext: Boolean = false,
+    ) {
         val candidates = tracks.distinctBy { it.id }
         if (candidates.isEmpty()) return
         val myGeneration = generation
@@ -766,7 +770,15 @@ class PlayerConnection(
             } catch (e: Exception) {
                 return@launch
             }
-            if (c.mediaItemCount == 0) return@launch
+            if (expectedTrackId != null && _state.value.track?.id != expectedTrackId) {
+                return@launch
+            }
+            if (c.mediaItemCount == 0) {
+                // Nothing is loaded yet: starting the collection is more
+                // useful than silently dropping it into an empty queue.
+                playTracks(candidates, 0, "Queue")
+                return@launch
+            }
 
             var added = 0
             for (track in candidates) {
@@ -781,8 +793,19 @@ class PlayerConnection(
                     if (expectedTrackId != null && _state.value.track?.id != expectedTrackId) {
                         return@launch
                     }
-                    c.addMediaItem(track.toMediaItem(audio))
-                    queue = queue + track
+                    val item = track.toMediaItem(audio)
+                    if (playNext) {
+                        val mediaAt = (c.currentMediaItemIndex + 1 + added)
+                            .coerceIn(0, c.mediaItemCount)
+                        c.addMediaItem(mediaAt, item)
+                        val mutable = queue.toMutableList()
+                        val queueAt = (queueIndex + 1 + added).coerceIn(0, mutable.size)
+                        mutable.add(queueAt, track)
+                        queue = mutable
+                    } else {
+                        c.addMediaItem(item)
+                        queue = queue + track
+                    }
                     _state.update { it.copy(queue = queue) }
                     added++
                 } catch (e: CancellationException) {
@@ -793,7 +816,11 @@ class PlayerConnection(
             }
             if (added > 0) {
                 persist(force = true)
-                _events.tryEmit(PlaybackEvent.Message("Added $added songs from this mix"))
+                _events.tryEmit(
+                    PlaybackEvent.Message(
+                        if (playNext) "Playing $added songs next" else "Added $added songs to the queue",
+                    ),
+                )
             }
         }
     }

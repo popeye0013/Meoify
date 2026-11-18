@@ -5,6 +5,7 @@ import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.unit.dp
 import com.meoify.music.data.model.LibraryData
 import com.meoify.music.data.model.MediaCard
+import com.meoify.music.data.model.PlaylistEdit
 import com.meoify.music.data.model.Track
 import com.meoify.music.playback.PlayerUiState
 
@@ -23,6 +24,10 @@ data class AppActions(
     val playShuffled: (List<Track>, String) -> Unit,
     val playNext: (Track) -> Unit,
     val addToQueue: (Track) -> Unit,
+    /** Queues a whole playlist or album after the current song. */
+    val playNextTracks: (List<Track>) -> Unit,
+    /** Appends a whole playlist or album to the end of the queue. */
+    val addTracksToQueue: (List<Track>) -> Unit,
     val moveQueueItem: (Int, Int) -> Unit,
     val playNextInQueue: (Int) -> Unit,
     val removeFromQueue: (Int) -> Unit,
@@ -56,6 +61,7 @@ data class AppActions(
     val savePlaylist: (String, List<Track>) -> Unit,
     val deletePlaylist: (String) -> Unit,
     val renamePlaylist: (String, String) -> Unit,
+    val editPlaylist: (String, PlaylistEdit) -> Unit,
     val clearRecentSearches: () -> Unit,
     val clearRecent: () -> Unit,
 )
@@ -76,6 +82,8 @@ val LocalBottomContentInset = compositionLocalOf { 0.dp }
 /** Playlists in the signed-in YouTube Music account. Empty when signed out. */
 val LocalYtPlaylists = compositionLocalOf<List<MediaCard>> { emptyList() }
 val LocalYtLoading = compositionLocalOf { false }
+/** Number of songs in the account's Liked Music, while signed in. */
+val LocalYtLikedCount = compositionLocalOf { 0 }
 val LocalSignedIn = compositionLocalOf { false }
 
 @Composable

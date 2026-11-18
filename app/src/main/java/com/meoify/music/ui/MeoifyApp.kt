@@ -15,6 +15,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.meoify.music.AppContainer
 import com.meoify.music.data.model.AppSettings
 import com.meoify.music.data.model.LibraryData
+import com.meoify.music.data.model.PlaylistEdit
 import com.meoify.music.data.model.Track
 import com.meoify.music.data.model.UiState
 import com.meoify.music.playback.PlayerUiState
@@ -24,6 +25,7 @@ import com.meoify.music.ui.navigation.LocalAppActions
 import com.meoify.music.ui.navigation.LocalLibrary
 import com.meoify.music.ui.navigation.LocalPlayerState
 import com.meoify.music.ui.navigation.LocalSignedIn
+import com.meoify.music.ui.navigation.LocalYtLikedCount
 import com.meoify.music.ui.navigation.LocalYtLoading
 import com.meoify.music.ui.navigation.LocalYtPlaylists
 import kotlinx.coroutines.launch
@@ -151,6 +153,12 @@ fun MeoifyApp(
             },
             playNext = { track -> container.player.playNext(track) },
             addToQueue = { track -> container.player.addToQueue(track) },
+            playNextTracks = { tracks ->
+                if (tracks.isNotEmpty()) container.player.addTracksToQueue(tracks, playNext = true)
+            },
+            addTracksToQueue = { tracks ->
+                if (tracks.isNotEmpty()) container.player.addTracksToQueue(tracks)
+            },
             moveQueueItem = { from, to -> container.player.moveQueueItem(from, to) },
             playNextInQueue = { index -> container.player.playNextInQueue(index) },
             removeFromQueue = { index -> container.player.removeFromQueue(index) },
@@ -282,6 +290,25 @@ fun MeoifyApp(
                     container.library.renamePlaylist(id, name)
                 }
             },
+            editPlaylist = { id, edit ->
+                if (container.repository.signedIn && !id.startsWith("local_")) {
+                    scope.launch {
+                        val ok = container.ytLibrary.editPlaylist(
+                            id = id,
+                            title = edit.title,
+                            description = edit.description,
+                            privacy = edit.privacy,
+                            comments = edit.comments,
+                        )
+                        snackbarHostState.showSnackbar(
+                            if (ok) "Playlist updated" else "Couldn't update playlist",
+                        )
+                    }
+                } else {
+                    container.library.renamePlaylist(id, edit.title)
+                    scope.launch { snackbarHostState.showSnackbar("Playlist updated") }
+                }
+            },
             clearRecentSearches = { container.library.clearRecentSearches() },
             clearRecent = { container.library.clearRecent() },
         )
@@ -293,6 +320,7 @@ fun MeoifyApp(
         LocalPlayerState provides playerState,
         LocalYtPlaylists provides ytState.playlists,
         LocalYtLoading provides ytState.loading,
+        LocalYtLikedCount provides ytState.likedCount,
         LocalSignedIn provides (settings.ytCookies != null),
     ) {
         MeoifyScaffold(

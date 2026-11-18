@@ -113,6 +113,14 @@ import com.meoify.music.util.openUrl
 import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
 
+private sealed interface ShellScreen {
+    data object Login : ShellScreen
+    data object Onboarding : ShellScreen
+    data object Settings : ShellScreen
+    data object Tabs : ShellScreen
+    data class Detail(val destination: Destination) : ShellScreen
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MeoifyScaffold(
@@ -213,12 +221,12 @@ fun MeoifyScaffold(
         else -> navigationBarInset
     }
 
-    val screenTarget = when {
-        loginOpen -> "login"
-        !settings.onboardingCompleted -> "onboarding"
-        settingsOpen -> "settings"
-        detailStack.isNotEmpty() -> detailStack.last().key
-        else -> "tabs"
+    val screenTarget: ShellScreen = when {
+        loginOpen -> ShellScreen.Login
+        !settings.onboardingCompleted -> ShellScreen.Onboarding
+        settingsOpen -> ShellScreen.Settings
+        detailStack.isNotEmpty() -> ShellScreen.Detail(detailStack.last())
+        else -> ShellScreen.Tabs
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -261,15 +269,44 @@ fun MeoifyScaffold(
                     AnimatedContent(
                         targetState = screenTarget,
                         transitionSpec = {
-                            (fadeIn(tween(220)) + slideInHorizontally(tween(260)) { it / 10 })
-                                .togetherWith(fadeOut(tween(180)) + slideOutHorizontally(tween(240)) { -it / 12 })
+                            val targetIsDetail = targetState is ShellScreen.Detail
+                            val initialIsDetail = initialState is ShellScreen.Detail
+                            when {
+                                // Opening a playlist/album/artist pushes it in from
+                                // the right while the list recedes slightly.
+                                targetIsDetail && !initialIsDetail ->
+                                    (fadeIn(tween(160)) + slideInHorizontally(
+                                        tween(340, easing = FastOutSlowInEasing),
+                                    ) { it }).togetherWith(
+                                        fadeOut(tween(220)) + slideOutHorizontally(
+                                            tween(340, easing = FastOutSlowInEasing),
+                                        ) { -it / 5 },
+                                    )
+
+                                // Closing reverses the motion, so Back feels like
+                                // pulling the page away instead of opening another.
+                                !targetIsDetail && initialIsDetail ->
+                                    (fadeIn(tween(220)) + slideInHorizontally(
+                                        tween(340, easing = FastOutSlowInEasing),
+                                    ) { -it / 5 }).togetherWith(
+                                        fadeOut(tween(160)) + slideOutHorizontally(
+                                            tween(340, easing = FastOutSlowInEasing),
+                                        ) { it },
+                                    )
+
+                                else ->
+                                    (fadeIn(tween(220)) + slideInHorizontally(tween(260)) { it / 10 })
+                                        .togetherWith(
+                                            fadeOut(tween(180)) + slideOutHorizontally(tween(240)) { -it / 12 },
+                                        )
+                            }
                         },
                         label = "screen",
-                    ) { _ ->
-                        when {
+                    ) { target ->
+                        when (target) {
                             // Login wins over onboarding: tapping "Sign in" on the
                             // welcome screen must actually open the sign-in page.
-                            loginOpen -> YouTubeLoginScreen(
+                            ShellScreen.Login -> YouTubeLoginScreen(
                                 onBack = { loginOpen = false },
                                 onSignedIn = {
                                     app.container.settings.setOnboardingCompleted(true)
@@ -277,7 +314,7 @@ fun MeoifyScaffold(
                                 },
                             )
 
-                            !settings.onboardingCompleted -> WelcomeScreen(
+                            ShellScreen.Onboarding -> WelcomeScreen(
                                 onSignIn = { loginOpen = true },
                                 onCreateLocalProfile = { name ->
                                     app.container.settings.setLocalProfileName(name)
@@ -285,17 +322,17 @@ fun MeoifyScaffold(
                                 },
                             )
 
-                            settingsOpen -> SettingsScreen(
+                            ShellScreen.Settings -> SettingsScreen(
                                 onBack = { onSettingsOpenChange(false) },
                                 onOpenLogin = { loginOpen = true },
                             )
 
-                            detailStack.isNotEmpty() -> DetailScreen(
-                                destination = detailStack.last(),
+                            is ShellScreen.Detail -> DetailScreen(
+                                destination = target.destination,
                                 onBack = { closeDetail() },
                             )
 
-                            else -> {
+                            ShellScreen.Tabs -> {
                                 val tabs = Tab.values()
                                 val pagerState = rememberPagerState(
                                     initialPage = tab.ordinal,

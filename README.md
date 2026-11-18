@@ -77,6 +77,7 @@ Meoify is distributed as a signed APK on GitHub Releases.
 ### Play
 
 - **Full player** — square artwork, wavy seek bar, shuffle, repeat, mute, queue management and a floating mini player.
+- **Queue gestures** — hold a song to reorder the queue, or swipe it right to remove it.
 - **Now Playing sheet** — the three-dot menu opens a modal sheet with queue, share, video and sleep actions plus full song details.
 - **Swipe to queue** — swipe a song right in any playlist or Liked Songs to add it to the queue without leaving the list.
 - **Background playback** — Media3 / ExoPlayer with lockscreen and notification controls.

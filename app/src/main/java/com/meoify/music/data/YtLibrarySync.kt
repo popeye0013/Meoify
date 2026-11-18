@@ -210,6 +210,29 @@ class YtLibrarySync(
         return ok
     }
 
+    /** Saves the full YouTube Music playlist editor: title, description, privacy and comments. */
+    suspend fun editPlaylist(
+        id: String,
+        title: String,
+        description: String,
+        privacy: String,
+        comments: String,
+    ): Boolean {
+        val ok = repository.editPlaylist(id, title, description, privacy, comments)
+        if (ok) {
+            _state.value = _state.value.copy(
+                playlists = _state.value.playlists.map { card ->
+                    if (matchesPlaylistId(card.id, id)) card.copy(title = title.trim()) else card
+                },
+            )
+            scope.launch { sync(force = true) }
+        }
+        return ok
+    }
+
+    private fun matchesPlaylistId(a: String, b: String): Boolean =
+        a.removePrefix("VL") == b.removePrefix("VL")
+
     suspend fun addToPlaylist(playlistId: String, track: Track): Boolean {
         val ok = repository.addSongToPlaylist(playlistId, track.id)
         if (ok) scope.launch { sync(force = true) }
