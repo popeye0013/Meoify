@@ -69,10 +69,12 @@ import com.meoify.music.ui.components.MediaCard
 import com.meoify.music.ui.components.PlaylistListCard
 import com.meoify.music.ui.components.SectionHeader
 import com.meoify.music.ui.components.ShimmerBox
+import com.meoify.music.ui.components.TrackCard
 import com.meoify.music.ui.components.TrackRow
 import com.meoify.music.ui.navigation.LocalAppActions
 import com.meoify.music.ui.navigation.LocalBottomContentInset
 import com.meoify.music.ui.navigation.LocalLibrary
+import com.meoify.music.ui.navigation.LocalPlayerState
 import com.meoify.music.ui.navigation.LocalSignedIn
 import com.meoify.music.ui.navigation.LocalYtLoading
 import com.meoify.music.ui.navigation.LocalYtPlaylists
@@ -92,6 +94,7 @@ fun LibraryScreen(
     val ytPlaylists = LocalYtPlaylists.current
     val ytLoading = LocalYtLoading.current
     val signedIn = LocalSignedIn.current
+    val currentTrackId = LocalPlayerState.current.track?.id
 
     var filterName by rememberSaveable { mutableStateOf(LibraryFilter.Playlists.name) }
     val filter = LibraryFilter.valueOf(filterName)
@@ -340,8 +343,9 @@ fun LibraryScreen(
         if (filter == LibraryFilter.Playlists && library.recent.isNotEmpty()) {
             item { SectionHeader(title = "Recently played") }
             items(library.recent.take(12), key = { "recent_${it.id}" }) { track ->
-                TrackRow(
+                TrackCard(
                     track = track,
+                    isCurrent = currentTrackId == track.id,
                     onClick = {
                         actions.playTracks(library.recent, library.recent.indexOf(track), "Recently played")
                     },
