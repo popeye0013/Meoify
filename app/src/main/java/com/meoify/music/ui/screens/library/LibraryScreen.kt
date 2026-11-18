@@ -66,6 +66,7 @@ import com.meoify.music.data.model.MediaKind
 import com.meoify.music.data.model.Track
 import com.meoify.music.ui.components.ArtworkImage
 import com.meoify.music.ui.components.MediaCard
+import com.meoify.music.ui.components.PlaylistListCard
 import com.meoify.music.ui.components.SectionHeader
 import com.meoify.music.ui.components.ShimmerBox
 import com.meoify.music.ui.components.TrackRow
@@ -218,17 +219,9 @@ fun LibraryScreen(
                         }
 
                         else -> items(ytPlaylists, key = { it.id }) { card ->
-                            YtPlaylistRow(
+                            PlaylistListCard(
                                 card = card,
                                 onClick = { actions.openPlaylist(card.id) },
-                                onMenu = {
-                                    menuTarget = PlaylistTarget(
-                                        id = card.id,
-                                        title = card.title,
-                                        songCount = null,
-                                        fromYouTube = true,
-                                    )
-                                },
                             )
                         }
                     }
@@ -266,17 +259,9 @@ fun LibraryScreen(
                         }
                     } else {
                         items(library.playlists, key = { it.id }) { playlist ->
-                            PlaylistRow(
-                                playlist = playlist,
+                            PlaylistListCard(
+                                card = playlist.toCard(),
                                 onClick = { actions.openLocalPlaylist(playlist.id) },
-                                onMenu = {
-                                    menuTarget = PlaylistTarget(
-                                        id = playlist.id,
-                                        title = playlist.name,
-                                        songCount = playlist.tracks.size,
-                                        fromYouTube = false,
-                                    )
-                                },
                             )
                         }
                     }
@@ -756,6 +741,19 @@ private fun PlaylistMenu(
         }
     }
 }
+
+/** A local playlist as the card model the Library renders. */
+private fun LocalPlaylist.toCard(): MediaCardModel = MediaCardModel(
+    id = id,
+    kind = MediaKind.PLAYLIST,
+    title = name,
+    subtitle = when (tracks.size) {
+        0 -> "Playlist"
+        1 -> "1 song"
+        else -> "${tracks.size} songs"
+    },
+    thumbnailUrl = artworkUrl,
+)
 
 @Composable
 private fun EmptyLibrary(
