@@ -61,6 +61,7 @@ import androidx.compose.material.icons.filled.FormatQuote
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
@@ -348,6 +349,7 @@ fun PlayerScreen(onClose: () -> Unit) {
                         actions = actions,
                         accent = accent,
                         onShowLyrics = { showLyrics = true },
+                        onShowQueue = { showQueue = true },
                         onToggleMute = { app.container.player.toggleMute() },
                         onQualityChange = { app.container.settings.setQuality(it) },
                         artworkSwipeModifier = Modifier.pointerInput(Unit) {
@@ -552,6 +554,7 @@ private fun PlayerMainContent(
     actions: AppActions,
     accent: Color,
     onShowLyrics: () -> Unit,
+    onShowQueue: () -> Unit,
     onToggleMute: () -> Unit,
     onQualityChange: (AudioQuality) -> Unit,
     artworkSwipeModifier: Modifier = Modifier,
@@ -632,6 +635,70 @@ private fun PlayerMainContent(
                 onShowLyrics = onShowLyrics,
                 onToggleMute = onToggleMute,
                 onQualityChange = onQualityChange,
+            )
+            QueueSwipeHandle(
+                queueSize = state.queue.size,
+                onOpen = onShowQueue,
+                modifier = Modifier.padding(top = 4.dp),
+            )
+        }
+    }
+}
+
+/** Bottom edge of the now playing screen: swipe up (or tap) to view the queue. */
+@Composable
+private fun QueueSwipeHandle(
+    queueSize: Int,
+    onOpen: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val haptic = LocalHapticFeedback.current
+    var dragUp by remember { mutableStateOf(0f) }
+    val threshold = 56f
+    Surface(
+        onClick = onOpen,
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f),
+        modifier = modifier
+            .fillMaxWidth()
+            .pointerInput(Unit) {
+                detectVerticalDragGestures(
+                    onVerticalDrag = { change, delta ->
+                        if (delta < 0f) {
+                            change.consume()
+                            dragUp += -delta
+                            if (dragUp >= threshold) {
+                                dragUp = 0f
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                onOpen()
+                            }
+                        } else {
+                            dragUp = 0f
+                        }
+                    },
+                    onDragEnd = { dragUp = 0f },
+                    onDragCancel = { dragUp = 0f },
+                )
+            },
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 7.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center,
+        ) {
+            Icon(
+                imageVector = Icons.Filled.KeyboardArrowUp,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(16.dp),
+            )
+            Spacer(Modifier.width(6.dp))
+            Text(
+                text = "Queue · $queueSize ${if (queueSize == 1) "song" else "songs"}",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }
@@ -1493,7 +1560,9 @@ private fun QueueSheet(
                             isCurrent = track.id == state.track?.id,
                             onClick = { onPlayAt(index) },
                             onMoreClick = { onMore(track) },
-                            modifier = Modifier.pointerInput(index) {
+                            modifier = Modifier
+                                .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                                .pointerInput(index) {
                                 // Hold the song, then drag up or down to change play order.
                                 detectDragGesturesAfterLongPress(
                                     onDragStart = {
