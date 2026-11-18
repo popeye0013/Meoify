@@ -371,12 +371,23 @@ class PlayerConnection(
     fun onAppBackgrounded() {
         persist(force = true)
         val c = controller
-        val keepsPlaying = c != null && c.isConnected &&
-            (c.isPlaying || c.playbackState == Player.STATE_BUFFERING)
-        detachController()
-        if (!keepsPlaying) {
-            runCatching { context.stopService(Intent(context, PlaybackService::class.java)) }
+        val ui = _state.value
+        // A song that was just started can still be resolving/preparing, so
+        // isPlaying is false for a moment. Stopping the service here would kill
+        // that pending playback when the screen turns off. Keep it alive while
+        // there is any active playback intent; the service stops itself after a
+        // real pause.
+        val keepsPlaying = ui.isPlaying || ui.isPreparing ||
+            (c != null && c.isConnected && c.mediaItemCount > 0 &&
+                (c.isPlaying || c.playWhenReady || c.playbackState == Player.STATE_BUFFERING))
+        if (keepsPlaying) {
+            // Keep the controller bound too: playTracks may still be resolving
+            // the first stream, and releasing it here would make that pending
+            // start fail. The service tears itself down after a real pause.
+            return
         }
+        detachController()
+        runCatching { context.stopService(Intent(context, PlaybackService::class.java)) }
     }
 
     /** Reconnects the UI to a service that kept playing in the background. */
