@@ -169,6 +169,8 @@ data class AppSettings(
     val quality: AudioQuality = AudioQuality.AUTO,
     /** Base URL of a hifi-api compatible server used for Lossless and 320 kbps. */
     val losslessServer: String? = null,
+    /** User-defined label shown for the lossless server in Settings. */
+    val losslessServerName: String? = null,
     val historySync: Boolean = true,
     val ytCookies: String? = null,
     val accountName: String? = null,

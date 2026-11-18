@@ -1,7 +1,9 @@
 package com.meoify.music.playback
 
 import android.app.PendingIntent
+import android.content.Context
 import android.content.Intent
+import android.media.AudioManager
 import android.os.Bundle
 import android.widget.Toast
 import androidx.media3.common.AudioAttributes
@@ -59,6 +61,7 @@ class PlaybackService : MediaSessionService() {
 
     private val likeCommand = SessionCommand(ACTION_TOGGLE_LIKE, Bundle.EMPTY)
     private val shuffleCommand = SessionCommand(ACTION_TOGGLE_SHUFFLE, Bundle.EMPTY)
+    private val setDeviceCommand = SessionCommand(ACTION_SET_AUDIO_DEVICE, Bundle.EMPTY)
 
     override fun onCreate() {
         super.onCreate()
@@ -132,6 +135,7 @@ class PlaybackService : MediaSessionService() {
                 val commands = ConnectionResult.DEFAULT_SESSION_COMMANDS.buildUpon()
                     .add(likeCommand)
                     .add(shuffleCommand)
+                    .add(setDeviceCommand)
                     .build()
                 return ConnectionResult.AcceptedResultBuilder(session)
                     .setAvailableSessionCommands(commands)
@@ -152,6 +156,21 @@ class PlaybackService : MediaSessionService() {
                 ACTION_TOGGLE_SHUFFLE -> {
                     toggleShuffle()
                     Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
+                }
+
+                ACTION_SET_AUDIO_DEVICE -> {
+                    val id = args.getInt(EXTRA_AUDIO_DEVICE_ID, -1)
+                    val audio = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+                    val device = runCatching { audio.getDevices(AudioManager.GET_DEVICES_OUTPUTS) }
+                        .getOrDefault(emptyArray())
+                        .firstOrNull { it.id == id }
+                    val exoPlayer = mediaSession?.player as? ExoPlayer
+                    if (device != null && exoPlayer != null) {
+                        exoPlayer.setPreferredAudioDevice(device)
+                        Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
+                    } else {
+                        Futures.immediateFuture(SessionResult(SessionResult.RESULT_ERROR_UNKNOWN))
+                    }
                 }
 
                 else -> super.onCustomCommand(session, controller, customCommand, args)
@@ -308,9 +327,11 @@ class PlaybackService : MediaSessionService() {
         player.shuffleModeEnabled = !player.shuffleModeEnabled
     }
 
-    private companion object {
+    companion object {
         const val ACTION_TOGGLE_LIKE = "com.meoify.music.action.TOGGLE_LIKE"
         const val ACTION_TOGGLE_SHUFFLE = "com.meoify.music.action.TOGGLE_SHUFFLE"
+        const val ACTION_SET_AUDIO_DEVICE = "com.meoify.music.action.SET_AUDIO_DEVICE"
+        const val EXTRA_AUDIO_DEVICE_ID = "com.meoify.music.extra.AUDIO_DEVICE_ID"
 
         /** Grace period before a background pause tears the service down. */
         const val IDLE_STOP_DELAY_MS = 5_000L

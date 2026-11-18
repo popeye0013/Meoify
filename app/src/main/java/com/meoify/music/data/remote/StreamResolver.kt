@@ -114,6 +114,17 @@ class StreamResolver(
         }
     }
 
+    /** Returns null when the server answers a valid catalogue search, or an error message. */
+    suspend fun checkServer(server: String): String? = withContext(Dispatchers.IO) {
+        runCatching {
+            val response = getJson(server, "search", "s" to "test", "limit" to "1")
+            response["data"]?.jsonObject?.get("items")?.jsonArray
+                ?: throw StreamUnavailableException("The server returned an unexpected response.")
+        }.exceptionOrNull()
+            ?.message
+            ?.takeIf { it.isNotBlank() }
+    }
+
     private fun cacheKey(videoId: String, quality: AudioQuality, server: String?): String {
         val connection = if (quality == AudioQuality.AUTO) {
             if (isMeteredConnection()) "mobile" else "unmetered"

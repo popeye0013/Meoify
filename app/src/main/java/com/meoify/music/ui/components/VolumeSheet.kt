@@ -40,6 +40,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -48,14 +49,25 @@ import androidx.compose.ui.unit.dp
 /** Android-style volume and output-device picker opened from the player speaker button. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun VolumeSheet(onDismiss: () -> Unit) {
+fun VolumeSheet(
+    selectedOutputType: Int,
+    selectedOutputDeviceId: Int?,
+    onSelectDevice: (AudioDeviceInfo) -> Unit,
+    onDismiss: () -> Unit,
+) {
     val context = LocalContext.current
     val audio = remember { context.getSystemService(Context.AUDIO_SERVICE) as AudioManager }
     val max = audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC).coerceAtLeast(1)
     var volume by remember { mutableStateOf(audio.getStreamVolume(AudioManager.STREAM_MUSIC).coerceIn(0, max)) }
     var lastVolume by remember { mutableStateOf(volume.coerceAtLeast(1)) }
     val outputs = remember { outputDevices(audio) }
-    val active = outputs.firstOrNull { it.type != AudioDeviceInfo.TYPE_BUILTIN_SPEAKER } ?: outputs.firstOrNull()
+    val selected = remember(selectedOutputType, selectedOutputDeviceId, outputs) {
+        outputs.firstOrNull {
+            it.device.id == selectedOutputDeviceId && it.device.type == selectedOutputType
+        } ?: outputs.firstOrNull { it.device.type == selectedOutputType }
+        ?: outputs.firstOrNull { it.isBuiltIn }
+        ?: outputs.firstOrNull()
+    }
 
     fun setVolume(value: Int) {
         val level = value.coerceIn(0, max)
@@ -96,7 +108,7 @@ fun VolumeSheet(onDismiss: () -> Unit) {
                         fontWeight = FontWeight.ExtraBold,
                     )
                     Text(
-                        text = active?.detail ?: "Phone speaker",
+                        text = selected?.title ?: "Phone speaker",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -141,36 +153,50 @@ fun VolumeSheet(onDismiss: () -> Unit) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             } else {
-                outputs.forEach { device ->
-                    Row(
+                outputs.forEach { output ->
+                    val isSelected = selected?.key == output.key
+                    Surface(
+                        onClick = { onSelectDevice(output.device) },
+                        shape = RoundedCornerShape(16.dp),
+                        color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
+                            .padding(vertical = 3.dp),
                     ) {
-                        Icon(
-                            imageVector = device.icon,
-                            contentDescription = null,
-                            tint = if (device == active) MaterialTheme.colorScheme.primary
-                            else MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(20.dp),
-                        )
-                        Spacer(Modifier.width(12.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(device.detail, style = MaterialTheme.typography.bodyMedium)
-                            Text(
-                                text = device.label,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                        if (device == active) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
                             Icon(
-                                Icons.Filled.Check,
-                                contentDescription = "Active output",
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(18.dp),
+                                imageVector = output.icon,
+                                contentDescription = null,
+                                tint = if (isSelected) MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(20.dp),
                             )
+                            Spacer(Modifier.width(12.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = output.title,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer
+                                    else MaterialTheme.colorScheme.onSurface,
+                                )
+                                Text(
+                                    text = output.subtitle,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.75f)
+                                    else MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            if (isSelected) {
+                                Icon(
+                                    Icons.Filled.Check,
+                                    contentDescription = "Active output",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(18.dp),
+                                )
+                            }
                         }
                     }
                 }
@@ -196,37 +222,70 @@ fun VolumeSheet(onDismiss: () -> Unit) {
 }
 
 private data class AudioOutput(
-    val label: String,
-    val detail: String,
-    val type: Int,
+    val key: String,
+    val title: String,
+    val subtitle: String,
+    val device: AudioDeviceInfo,
     val icon: ImageVector,
+    val isBuiltIn: Boolean,
 )
 
-private fun outputDevices(audio: AudioManager): List<AudioOutput> =
-    runCatching { audio.getDevices(AudioManager.GET_DEVICES_OUTPUTS) }
+/** One entry per physical output; phone speaker variants are merged into one. */
+private fun outputDevices(audio: AudioManager): List<AudioOutput> {
+    val devices = runCatching { audio.getDevices(AudioManager.GET_DEVICES_OUTPUTS) }
         .getOrDefault(emptyArray())
-        .mapNotNull { device ->
-            val detail = device.type.detail()
-            val label = runCatching { device.productName?.toString()?.trim() }
-                .getOrNull()
-                ?.takeIf { it.isNotBlank() }
-                ?: detail
-            AudioOutput(label = label, detail = detail, type = device.type, icon = device.type.icon())
-        }
-        .distinctBy { "${it.label}|${it.type}" }
+        .toList()
+    val builtIn = devices.filter { it.isBuiltInSpeaker() }
+        .minByOrNull { if (it.type == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER_SAFE) 1 else 0 }
+    val others = devices.filterNot { it.isBuiltInSpeaker() }
+        .groupBy { it.outputKey() }
+        .map { (_, group) -> group.first() }
 
-private fun Int.detail(): String = when (this) {
-    AudioDeviceInfo.TYPE_BLUETOOTH_A2DP -> "Bluetooth speaker"
-    AudioDeviceInfo.TYPE_WIRED_HEADSET -> "Wired headset"
-    AudioDeviceInfo.TYPE_WIRED_HEADPHONES -> "Wired headphones"
-    AudioDeviceInfo.TYPE_USB_DEVICE, AudioDeviceInfo.TYPE_USB_HEADSET -> "USB audio"
-    AudioDeviceInfo.TYPE_HDMI -> "HDMI output"
-    else -> "Phone speaker"
+    return listOfNotNull(builtIn?.let { device ->
+        AudioOutput(
+            key = "builtin-speaker",
+            title = "Phone speaker",
+            subtitle = "Built-in speaker",
+            device = device,
+            icon = Icons.Filled.Speaker,
+            isBuiltIn = true,
+        )
+    }) + others.map { device ->
+        val name = device.productName()
+        AudioOutput(
+            key = device.outputKey(),
+            title = name.ifBlank { outputLabel(device.type) },
+            subtitle = outputLabel(device.type),
+            device = device,
+            icon = outputIcon(device.type),
+            isBuiltIn = false,
+        )
+    }
 }
 
-private fun Int.icon(): ImageVector = when (this) {
-    AudioDeviceInfo.TYPE_BLUETOOTH_A2DP -> Icons.Filled.Bluetooth
+private fun AudioDeviceInfo.isBuiltInSpeaker(): Boolean =
+    type == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER ||
+        type == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER_SAFE
+
+private fun AudioDeviceInfo.outputKey(): String = "${type}|${productName().lowercase()}"
+
+private fun AudioDeviceInfo.productName(): String =
+    runCatching { productName?.toString()?.trim() }.getOrNull().orEmpty()
+
+/** Public so the player control can show the same output icon as this sheet. */
+fun outputIcon(type: Int): ImageVector = when (type) {
+    AudioDeviceInfo.TYPE_BLUETOOTH_A2DP, AudioDeviceInfo.TYPE_BLUETOOTH_SCO -> Icons.Filled.Bluetooth
     AudioDeviceInfo.TYPE_WIRED_HEADSET, AudioDeviceInfo.TYPE_WIRED_HEADPHONES -> Icons.Filled.Headset
-    AudioDeviceInfo.TYPE_USB_DEVICE, AudioDeviceInfo.TYPE_USB_HEADSET -> Icons.Filled.Usb
+    AudioDeviceInfo.TYPE_USB_DEVICE, AudioDeviceInfo.TYPE_USB_HEADSET, AudioDeviceInfo.TYPE_USB_ACCESSORY -> Icons.Filled.Usb
     else -> Icons.Filled.Speaker
+}
+
+/** Short label used for now-playing accessibility text. */
+fun outputLabel(type: Int): String = when (type) {
+    AudioDeviceInfo.TYPE_BLUETOOTH_A2DP, AudioDeviceInfo.TYPE_BLUETOOTH_SCO -> "Bluetooth device"
+    AudioDeviceInfo.TYPE_WIRED_HEADSET -> "Wired headset"
+    AudioDeviceInfo.TYPE_WIRED_HEADPHONES -> "Wired headphones"
+    AudioDeviceInfo.TYPE_USB_DEVICE, AudioDeviceInfo.TYPE_USB_HEADSET, AudioDeviceInfo.TYPE_USB_ACCESSORY -> "USB audio"
+    AudioDeviceInfo.TYPE_HDMI -> "HDMI output"
+    else -> "Phone speaker"
 }

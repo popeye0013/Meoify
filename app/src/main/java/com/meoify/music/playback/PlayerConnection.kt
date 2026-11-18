@@ -3,7 +3,10 @@ package com.meoify.music.playback
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.media.AudioDeviceInfo
+import android.media.AudioManager
 import android.net.Uri
+import android.os.Bundle
 import android.os.SystemClock
 import androidx.core.content.ContextCompat
 import androidx.media3.common.C
@@ -12,6 +15,7 @@ import androidx.media3.common.MediaMetadata
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.session.MediaController
+import androidx.media3.session.SessionCommand
 import androidx.media3.session.SessionToken
 import com.google.common.util.concurrent.ListenableFuture
 import com.meoify.music.data.CoverArtResolver
@@ -56,6 +60,9 @@ data class PlayerUiState(
     val sourceTitle: String = "YouTube Music",
     val volume: Float = 1f,
     val muted: Boolean = false,
+    /** Audio output chosen in the volume sheet, used for the player icon. */
+    val outputType: Int = AudioDeviceInfo.TYPE_BUILTIN_SPEAKER,
+    val outputDeviceId: Int? = null,
     /** Epoch millis when the sleep timer pauses playback, or null when off. */
     val sleepEndsAtMs: Long? = null,
 ) {
@@ -70,6 +77,35 @@ sealed interface PlaybackEvent {
     data class Failure(val text: String) : PlaybackEvent
 }
 
+/** Best-effort initial route so the player icon matches a connected device on startup. */
+@Suppress("DEPRECATION")
+private fun detectAudioOutput(audio: AudioManager?): Pair<Int, Int?> {
+    if (audio == null) return AudioDeviceInfo.TYPE_BUILTIN_SPEAKER to null
+    val devices = runCatching { audio.getDevices(AudioManager.GET_DEVICES_OUTPUTS) }
+        .getOrDefault(emptyArray())
+        .toList()
+    fun firstOf(vararg types: Int) = devices.firstOrNull { device -> device.type in types }
+    return when {
+        audio.isBluetoothA2dpOn -> {
+            val device = firstOf(
+                AudioDeviceInfo.TYPE_BLUETOOTH_A2DP,
+                AudioDeviceInfo.TYPE_BLUETOOTH_SCO,
+            )
+            (device?.type ?: AudioDeviceInfo.TYPE_BLUETOOTH_A2DP) to device?.id
+        }
+        audio.isWiredHeadsetOn -> {
+            val device = firstOf(
+                AudioDeviceInfo.TYPE_WIRED_HEADSET,
+                AudioDeviceInfo.TYPE_WIRED_HEADPHONES,
+                AudioDeviceInfo.TYPE_USB_DEVICE,
+                AudioDeviceInfo.TYPE_USB_HEADSET,
+            )
+            (device?.type ?: AudioDeviceInfo.TYPE_WIRED_HEADSET) to device?.id
+        }
+        else -> AudioDeviceInfo.TYPE_BUILTIN_SPEAKER to null
+    }
+}
+
 class PlayerConnection(
     private val context: Context,
     private val resolver: StreamResolver,
@@ -79,7 +115,14 @@ class PlayerConnection(
 ) {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
-    private val _state = MutableStateFlow(PlayerUiState())
+    private val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+    private val initialOutput = detectAudioOutput(audioManager)
+    private val _state = MutableStateFlow(
+        PlayerUiState(
+            outputType = initialOutput.first,
+            outputDeviceId = initialOutput.second,
+        ),
+    )
     val state: StateFlow<PlayerUiState> = _state.asStateFlow()
 
     private val _events = MutableSharedFlow<PlaybackEvent>(extraBufferCapacity = 12)
@@ -639,6 +682,20 @@ class PlayerConnection(
         if (next > 0f) lastVolume = next
         _state.update { it.copy(volume = next, muted = next == 0f) }
         withController { it.volume = next }
+    }
+
+    /** Routes ExoPlayer's audio to the chosen output device. */
+    fun selectAudioDevice(device: AudioDeviceInfo) {
+        val args = Bundle().apply {
+            putInt(PlaybackService.EXTRA_AUDIO_DEVICE_ID, device.id)
+        }
+        withController { controller ->
+            controller.sendCustomCommand(
+                SessionCommand(PlaybackService.ACTION_SET_AUDIO_DEVICE, Bundle.EMPTY),
+                args,
+            )
+        }
+        _state.update { it.copy(outputType = device.type, outputDeviceId = device.id) }
     }
 
     fun seekTo(positionMs: Long) {

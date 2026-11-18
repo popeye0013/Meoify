@@ -98,7 +98,7 @@ Meoify is distributed as a signed APK on GitHub Releases.
 ### Design & details
 
 - **Material 3 Expressive** — light, dark and pure-black themes, dynamic colour on Android 12+, rounded surfaces and Google Sans Flex.
-- **Volume & output popup** — the speaker button on Now Playing opens a media volume slider, connected output devices and a Bluetooth connection shortcut.
+- **Volume & output popup** — the speaker button on Now Playing opens a media volume slider, deduplicated connected outputs with one-tap switching (phone speaker, Bluetooth, wired or USB), and a Bluetooth connection shortcut. The button shows a speaker or Bluetooth icon to match the active output.
 - **Sharing** — share songs or jump to album and artist pages from the track menu.
 - **In-app updates** — release notes in Settings and an optional home-screen prompt.
 
@@ -116,7 +116,7 @@ Pick a mode in **Settings → Playback**, or tap the quality pill on the Now Pla
 | **Balanced (256 kbps)** | 256 kbps AAC / Opus, the native YouTube Music stream. |
 | **Data Saver** | Low-bitrate audio to reduce mobile data use. |
 
-> YouTube Music itself tops out at 256 kbps AAC/Opus. To make Hi-Res and 320 kbps real, add the base URL of a [hifi-api](https://github.com/binimum/hifi-api) compatible server under **Settings → Playback → Lossless server**. Meoify searches that server for a matching Tidal track, then streams FLAC (via BTS manifest or DASH) or 320 kbps AAC. When no server is set or the server fails, those tiers fall back to the best YouTube Music stream. Meoify never upsamples or fakes lossless audio. A new mode applies from the next track.
+> YouTube Music itself tops out at 256 kbps AAC/Opus. To make Hi-Res and 320 kbps real, add the base URL of a [hifi-api](https://github.com/binimum/hifi-api) compatible server under **Settings → Playback → Lossless server**. Meoify searches that server for a matching Tidal track, then streams FLAC (via BTS manifest or DASH) or 320 kbps AAC. When no server is set or the server fails, those tiers fall back to the best YouTube Music stream. You can give the server a custom name and test it before saving; Settings shows whether the saved server is responding. Meoify never upsamples or fakes lossless audio. A new mode applies from the next track.
 
 ---
 

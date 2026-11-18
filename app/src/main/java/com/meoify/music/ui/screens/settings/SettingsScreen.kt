@@ -167,7 +167,20 @@ fun SettingsScreen(
     var showQualitySheet by remember { mutableStateOf(false) }
     var showServerDialog by remember { mutableStateOf(false) }
     var serverDraft by remember { mutableStateOf("") }
+    var serverNameDraft by remember { mutableStateOf("") }
+    var serverError by remember { mutableStateOf<String?>(null) }
+    var checkingServer by remember { mutableStateOf(false) }
+    var serverWorking by remember { mutableStateOf<Boolean?>(null) }
     var nameDraft by remember { mutableStateOf("") }
+
+    val configuredServer = settings.losslessServer
+    LaunchedEffect(configuredServer) {
+        serverWorking = if (configuredServer == null) {
+            null
+        } else {
+            app.container.streamResolver.checkServer(configuredServer) == null
+        }
+    }
     var restoreUri by remember { mutableStateOf<Uri?>(null) }
     var checkingUpdate by remember { mutableStateOf(false) }
     var updateRelease by remember { mutableStateOf<UpdateChecker.Release?>(null) }
@@ -518,6 +531,8 @@ fun SettingsScreen(
                 Surface(
                     onClick = {
                         serverDraft = settings.losslessServer.orEmpty()
+                        serverNameDraft = settings.losslessServerName.orEmpty()
+                        serverError = null
                         showServerDialog = true
                     },
                     shape = RoundedCornerShape(24.dp),
@@ -538,7 +553,9 @@ fun SettingsScreen(
                             )
                             Spacer(Modifier.height(2.dp))
                             Text(
-                                text = settings.losslessServer ?: "Not set — use YouTube Music",
+                                text = settings.losslessServerName
+                                    ?: settings.losslessServer
+                                    ?: "Not set — use YouTube Music",
                                 style = MaterialTheme.typography.titleSmall,
                                 fontWeight = FontWeight.SemiBold,
                                 maxLines = 1,
@@ -546,9 +563,18 @@ fun SettingsScreen(
                             )
                             Spacer(Modifier.height(2.dp))
                             Text(
-                                text = "Source for Hi-Res FLAC and 320 kbps AAC",
+                                text = when (serverWorking) {
+                                    true -> "Connected${settings.losslessServer?.let { " • $it" }.orEmpty()}"
+                                    false -> "Not responding — check the URL or server"
+                                    null -> settings.losslessServer
+                                        ?.let { "Source for Hi-Res FLAC and 320 kbps AAC • $it" }
+                                        ?: "Source for Hi-Res FLAC and 320 kbps AAC"
+                                },
                                 style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                color = if (serverWorking == false) MaterialTheme.colorScheme.error
+                                else MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
                             )
                         }
                         Spacer(Modifier.width(8.dp))
@@ -811,6 +837,17 @@ fun SettingsScreen(
                     )
                     Spacer(Modifier.height(12.dp))
                     OutlinedTextField(
+                        value = serverNameDraft,
+                        onValueChange = { serverNameDraft = it },
+                        label = { Text("Server name") },
+                        placeholder = { Text("My lossless server") },
+                        leadingIcon = { Icon(Icons.Filled.Badge, contentDescription = null) },
+                        singleLine = true,
+                        shape = RoundedCornerShape(16.dp),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedTextField(
                         value = serverDraft,
                         onValueChange = { serverDraft = it },
                         label = { Text("Server URL") },
@@ -820,7 +857,36 @@ fun SettingsScreen(
                         shape = RoundedCornerShape(16.dp),
                         modifier = Modifier.fillMaxWidth(),
                     )
-                    Spacer(Modifier.height(6.dp))
+                    Spacer(Modifier.height(8.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        TextButton(
+                            onClick = {
+                                val value = serverDraft.trim()
+                                if (value.isBlank()) {
+                                    serverError = "Enter a server URL first"
+                                    return@TextButton
+                                }
+                                checkingServer = true
+                                scope.launch {
+                                    val error = app.container.streamResolver.checkServer(value)
+                                    checkingServer = false
+                                    serverError = error?.let { "Not working: $it" } ?: "Working"
+                                }
+                            },
+                            enabled = !checkingServer,
+                        ) { Text(if (checkingServer) "Testing…" else "Test connection") }
+                        if (serverError != null) {
+                            Text(
+                                text = serverError.orEmpty(),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = if (serverError == "Working") {
+                                    MaterialTheme.colorScheme.primary
+                                } else {
+                                    MaterialTheme.colorScheme.error
+                                },
+                            )
+                        }
+                    }
                     Text(
                         "Leave empty to turn it off and fall back to YouTube Music.",
                         style = MaterialTheme.typography.labelSmall,
@@ -839,7 +905,14 @@ fun SettingsScreen(
                             actions.showSnackbar("Enter a URL starting with http:// or https://")
                             return@TextButton
                         }
-                        app.container.settings.setLosslessServer(value)
+                        app.container.settings.setLosslessServer(value, serverNameDraft)
+                        if (value.isEmpty()) {
+                            serverWorking = null
+                        } else {
+                            scope.launch {
+                                serverWorking = app.container.streamResolver.checkServer(value) == null
+                            }
+                        }
                         showServerDialog = false
                         actions.showSnackbar(
                             if (value.isEmpty()) "Lossless server disabled" else "Lossless server saved",

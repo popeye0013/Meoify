@@ -72,7 +72,6 @@ import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.filled.VolumeOff
-import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
@@ -130,6 +129,8 @@ import com.meoify.music.data.remote.TrackLyrics
 import com.meoify.music.playback.PlayerUiState
 import com.meoify.music.ui.components.TrackRow
 import com.meoify.music.ui.components.VolumeSheet
+import com.meoify.music.ui.components.outputIcon
+import com.meoify.music.ui.components.outputLabel
 import com.meoify.music.ui.components.ArtworkImage
 import com.meoify.music.ui.components.rememberTrackCover
 import com.meoify.music.ui.navigation.AppActions
@@ -230,7 +231,12 @@ fun PlayerScreen(onClose: () -> Unit) {
     BackHandler(enabled = showLyrics) { showLyrics = false }
 
     if (showVolume) {
-        VolumeSheet(onDismiss = { showVolume = false })
+        VolumeSheet(
+            selectedOutputType = state.outputType,
+            selectedOutputDeviceId = state.outputDeviceId,
+            onSelectDevice = app.container.player::selectAudioDevice,
+            onDismiss = { showVolume = false },
+        )
     }
 
     if (showSleepTimer) {
@@ -869,12 +875,12 @@ private fun PlayerControls(
 
             PillButton(
                 active = state.muted,
-                contentDescription = "Volume and output device",
+                contentDescription = "Volume and output device: ${outputLabel(state.outputType)}",
                 onClick = onShowVolume,
                 modifier = Modifier.weight(1f),
             ) {
                 Icon(
-                    imageVector = if (state.muted) Icons.Filled.VolumeOff else Icons.Filled.VolumeUp,
+                    imageVector = if (state.muted) Icons.Filled.VolumeOff else outputIcon(state.outputType),
                     contentDescription = null,
                     tint = if (state.muted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.86f),
                     modifier = Modifier.size(22.dp),
