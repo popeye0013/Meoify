@@ -218,7 +218,7 @@ private fun SearchHeader(
             value = query,
             onValueChange = onQueryChange,
             placeholder = {
-                Text("Search YouTube Music…", maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text("Search", maxLines = 1, overflow = TextOverflow.Ellipsis)
             },
             leadingIcon = {
                 Icon(

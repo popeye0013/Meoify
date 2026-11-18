@@ -653,13 +653,7 @@ fun SettingsScreen(
                     }
                     Spacer(Modifier.height(12.dp))
                     Text(
-                        text = "An unofficial YouTube Music client built with Material 3 and Jetpack Compose. Search, stream and organise your music with a clean, modern interface.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Spacer(Modifier.height(8.dp))
-                    Text(
-                        text = "Not affiliated with YouTube or Google. All audio is streamed from YouTube Music.",
+                        text = "YouTube Music, the way you want it.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )

@@ -194,7 +194,7 @@ fun LibraryScreen(
                 if (signedIn) {
                     item {
                         SectionHeader(
-                            title = "YouTube Music playlists",
+                            title = "Playlists",
                             actionLabel = if (ytLoading) "Syncing…" else "Refresh",
                             onAction = { app.container.ytLibrary.refresh() },
                         )
