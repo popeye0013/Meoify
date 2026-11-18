@@ -18,6 +18,8 @@ sealed class Destination(val key: String) {
 
 data class AppActions(
     val playTracks: (List<Track>, Int, String) -> Unit,
+    /** Starts a search result, then queues its genre mix (or [fallback]). */
+    val playFromSearch: (Track, List<Track>) -> Unit,
     val playShuffled: (List<Track>, String) -> Unit,
     val playNext: (Track) -> Unit,
     val addToQueue: (Track) -> Unit,

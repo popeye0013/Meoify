@@ -559,7 +559,9 @@ private fun SearchResultsBody(
                             TrackCard(
                                 track = track,
                                 isCurrent = currentTrackId == track.id,
-                                onClick = { actions.playTracks(data.tracks, idx, "Search") },
+                                onClick = {
+                                    actions.playFromSearch(track, data.tracks.drop(idx + 1))
+                                },
                                 onMoreClick = { actions.openTrackMenu(track) },
                             )
                         }

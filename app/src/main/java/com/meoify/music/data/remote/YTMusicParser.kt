@@ -349,6 +349,81 @@ object YTMusicParser {
     }
 
     /**
+     * The radio queue that YouTube Music builds for a seed song.
+     *
+     * A `next` request with the seed's `RDAMVM` playlist returns a
+     * playlistPanelRenderer whose rows are the same genre, mood and era as the
+     * seed. They use a different renderer from normal song rows, so they need
+     * their own small parser.
+     */
+    fun parseRadioQueue(root: JsonObject): List<Track> {
+        val panel = root.findAll("playlistPanelRenderer").firstOrNull()
+            ?.asObjectOrNull() ?: return emptyList()
+        val items = panel["contents"]?.asArrayOrNull().orEmpty()
+        return items.mapNotNull { item ->
+            item.asObjectOrNull()
+                ?.get("playlistPanelVideoRenderer")
+                ?.asObjectOrNull()
+                ?.let(::parseQueueTrack)
+        }.distinctBy { it.id }
+    }
+
+    private fun parseQueueTrack(renderer: JsonObject): Track? {
+        val title = renderer["title"]?.readText()?.trim().orEmpty()
+        if (title.isBlank()) return null
+        val videoId = renderer["videoId"]?.readText()
+            ?: renderer["navigationEndpoint"]?.asObjectOrNull()
+                ?.findAll("watchEndpoint")
+                ?.firstOrNull()?.asObjectOrNull()
+                ?.get("videoId")?.readText()
+        if (videoId.isNullOrBlank()) return null
+
+        val shortRuns = renderer["shortBylineText"]?.asObjectOrNull()
+            ?.get("runs")?.asArrayOrNull().orEmpty()
+        val longRuns = renderer["longBylineText"]?.asObjectOrNull()
+            ?.get("runs")?.asArrayOrNull().orEmpty()
+
+        fun runText(run: JsonObject): String =
+            run["text"]?.readText()?.trim().orEmpty()
+
+        fun runIsArtist(run: JsonObject): Boolean {
+            val type = run["navigationEndpoint"]?.asObjectOrNull()?.browsePageType()
+            return type == "MUSIC_PAGE_TYPE_ARTIST" || type == "MUSIC_PAGE_TYPE_USER_CHANNEL"
+        }
+
+        // The short byline is just the artist. The long byline repeats it and
+        // adds view/like counts, which are useful in a queue row too.
+        val artist = shortRuns.mapNotNull { it.asObjectOrNull() }
+            .map(::runText)
+            .firstOrNull { it.isNotBlank() && it != "•" && !METADATA_REGEX.containsMatchIn(it) }
+            ?: longRuns.mapNotNull { it.asObjectOrNull() }
+                .firstOrNull(::runIsArtist)
+                ?.let(::runText)
+                .orEmpty()
+
+        val artistId = longRuns.mapNotNull { it.asObjectOrNull() }
+            .firstOrNull(::runIsArtist)
+            ?.findBrowseId()
+
+        val plays = longRuns.mapNotNull { it.asObjectOrNull() }
+            .map(::runText)
+            .firstOrNull { METADATA_REGEX.containsMatchIn(it) }
+
+        val durationMs = renderer["lengthText"]?.readText()?.let(::parseTimestamp) ?: 0L
+
+        return Track(
+            id = videoId,
+            title = title,
+            artist = artist,
+            artistId = artistId,
+            durationMs = durationMs,
+            thumbnailUrl = renderer.findThumbnail(),
+            plays = plays,
+            explicit = renderer.toString().contains("MUSIC_BADGE_STYLE_EXPLICIT"),
+        )
+    }
+
+    /**
      * Video ids on a History page, in page order.
      *
      * History rows are normal song rows, but the page also carries headings and

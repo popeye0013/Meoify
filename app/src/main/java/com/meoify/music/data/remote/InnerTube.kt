@@ -103,8 +103,14 @@ class InnerTube(private val client: OkHttpClient) {
         return post("music/get_search_suggestions", buildJsonObject { put("input", input) })
     }
 
-    suspend fun next(videoId: String): JsonObject {
-        return post("next", buildJsonObject { put("videoId", videoId) })
+    suspend fun next(videoId: String, playlistId: String? = null): JsonObject {
+        return post(
+            "next",
+            buildJsonObject {
+                put("videoId", videoId)
+                if (playlistId != null) put("playlistId", playlistId)
+            },
+        )
     }
 
     /**

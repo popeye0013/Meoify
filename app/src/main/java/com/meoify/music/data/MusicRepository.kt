@@ -352,6 +352,19 @@ class MusicRepository(private val settings: com.meoify.music.data.local.Settings
     }.getOrDefault(emptyList())
 
     /**
+     * Songs that belong with [track], taken from YouTube Music's own radio mix
+     * for that song. The seed is left out so the result can be appended
+     * directly as the "what plays next" queue after search playback.
+     */
+    suspend fun radioQueue(track: Track, limit: Int = 25): List<Track> = runCatching {
+        val root = innerTube.next(track.id, "RDAMVM${track.id}")
+        YTMusicParser.parseRadioQueue(root)
+            .filterNot { it.id == track.id }
+            .distinctBy { it.id }
+            .take(limit)
+    }.getOrDefault(emptyList())
+
+    /**
      * Reads the signed-in account from YouTube Music. Returns null when we
      * are not signed in or the response did not carry an account section.
      */

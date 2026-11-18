@@ -27,6 +27,7 @@ import com.meoify.music.ui.navigation.LocalSignedIn
 import com.meoify.music.ui.navigation.LocalYtLoading
 import com.meoify.music.ui.navigation.LocalYtPlaylists
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 
 enum class Tab { Home, Search, Library }
 
@@ -121,6 +122,25 @@ fun MeoifyApp(
                     container.library.addRecent(tracks.getOrNull(index) ?: tracks.first())
                 }
                 showPlayer = true
+            },
+            playFromSearch = { seed, fallback ->
+                // Start the song right away; the genre mix is appended as soon
+                // as YouTube Music returns it, so a slow lookup never delays
+                // playback and the next search result never plays by mistake.
+                container.player.playTracks(listOf(seed), 0, "Search")
+                container.library.addRecent(seed)
+                showPlayer = true
+                scope.launch {
+                    val mix = withTimeoutOrNull(7_000) {
+                        container.repository.radioQueue(seed)
+                    }.orEmpty()
+                    val next = mix.ifEmpty { fallback }
+                        .filterNot { it.id == seed.id }
+                        .distinctBy { it.id }
+                    if (next.isNotEmpty()) {
+                        container.player.addTracksToQueue(next, expectedTrackId = seed.id)
+                    }
+                }
             },
             playShuffled = { tracks, source ->
                 if (tracks.isNotEmpty()) {

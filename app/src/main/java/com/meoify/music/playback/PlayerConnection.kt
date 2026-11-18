@@ -749,6 +749,55 @@ class PlayerConnection(
         }
     }
 
+    /**
+     * Appends a group of follow-up songs without interrupting the current
+     * song. [expectedTrackId] guards against a late radio response landing
+     * after the listener already skipped or started something else.
+     */
+    fun addTracksToQueue(tracks: List<Track>, expectedTrackId: String? = null) {
+        val candidates = tracks.distinctBy { it.id }
+        if (candidates.isEmpty()) return
+        val myGeneration = generation
+        scope.launch {
+            val c = try {
+                awaitController()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                return@launch
+            }
+            if (c.mediaItemCount == 0) return@launch
+
+            var added = 0
+            for (track in candidates) {
+                if (generation != myGeneration) return@launch
+                if (expectedTrackId != null && _state.value.track?.id != expectedTrackId) {
+                    return@launch
+                }
+                if (queue.any { it.id == track.id }) continue
+                try {
+                    val audio = resolver.resolve(track.id)
+                    if (generation != myGeneration) return@launch
+                    if (expectedTrackId != null && _state.value.track?.id != expectedTrackId) {
+                        return@launch
+                    }
+                    c.addMediaItem(track.toMediaItem(audio))
+                    queue = queue + track
+                    _state.update { it.copy(queue = queue) }
+                    added++
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    // One unavailable song shouldn't drop the rest of the mix.
+                }
+            }
+            if (added > 0) {
+                persist(force = true)
+                _events.tryEmit(PlaybackEvent.Message("Added $added songs from this mix"))
+            }
+        }
+    }
+
     /** Moves an existing queue item, keeping the same song playing. */
     fun moveQueueItem(from: Int, to: Int) {
         if (from !in queue.indices || to !in queue.indices || from == to) return
