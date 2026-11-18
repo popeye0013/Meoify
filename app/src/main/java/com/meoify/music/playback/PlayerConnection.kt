@@ -510,13 +510,23 @@ class PlayerConnection(
             if (generation != myGeneration) return@launch
             val playTrack = queue.getOrNull(attempt) ?: return@launch
             val resumeAt = startPositionMs.coerceAtLeast(0)
-            c.setMediaItems(listOf(playTrack.toMediaItem(audio)), 0, resumeAt)
-            if (preservePlayback) {
-                c.playWhenReady = resumePlaying
-                c.prepare()
+            if (preservePlayback && c.currentMediaItem?.mediaId == playTrack.id) {
+                // A queue edit left the playing song in place. Replacing the
+                // MediaItems would tear down and re-prepare the player, which
+                // pauses the song. Keep the current item untouched and swap
+                // only the upcoming items that follow it.
+                val currentIndex = c.currentMediaItemIndex
+                val tailCount = c.mediaItemCount - currentIndex - 1
+                if (tailCount > 0) c.removeMediaItems(currentIndex + 1, tailCount)
             } else {
-                c.prepare()
-                c.play()
+                c.setMediaItems(listOf(playTrack.toMediaItem(audio)), 0, resumeAt)
+                if (preservePlayback) {
+                    c.playWhenReady = resumePlaying
+                    c.prepare()
+                } else {
+                    c.prepare()
+                    c.play()
+                }
             }
             _state.update {
                 it.copy(
