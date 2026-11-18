@@ -93,8 +93,9 @@ fun AudioQualitySheet(
 
             Spacer(Modifier.height(10.dp))
             Text(
-                text = "Meoify streams from YouTube Music, which tops out at " +
-                    "256 kbps AAC/Opus. The highest tiers use the best available stream.",
+                text = "Hi-Res FLAC and 320 kbps need a hifi-api server in " +
+                    "Settings → Playback → Lossless server. Without one, " +
+                    "those tiers fall back to YouTube Music's best stream.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = 6.dp),

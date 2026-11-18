@@ -143,17 +143,17 @@ enum class AudioQuality(
     HI_RES(
         title = "Lossless (Hi-Res)",
         shortLabel = "Hi-Res",
-        description = "Up to 24-bit / 192 kHz • Lossless FLAC",
+        description = "Up to 24-bit FLAC from your lossless server",
     ),
     STANDARD(
         title = "Standard quality (320 kbps)",
         shortLabel = "320 kbps",
-        description = "Up to 320 kbps MP3 / AAC",
+        description = "320 kbps AAC from your lossless server",
     ),
     YOUTUBE_MUSIC(
-        title = "YouTube Music",
-        shortLabel = "YouTube Music",
-        description = "128–256 kbps • YouTube Music AAC / Opus stream",
+        title = "Balanced (256 kbps)",
+        shortLabel = "256 kbps",
+        description = "256 kbps • YouTube Music AAC/Opus stream",
     ),
     SAVER(
         title = "Data Saver",
@@ -167,6 +167,8 @@ data class AppSettings(
     val dynamicColor: Boolean = false,
     val pureBlack: Boolean = false,
     val quality: AudioQuality = AudioQuality.AUTO,
+    /** Base URL of a hifi-api compatible server used for Lossless and 320 kbps. */
+    val losslessServer: String? = null,
     val historySync: Boolean = true,
     val ytCookies: String? = null,
     val accountName: String? = null,

@@ -42,6 +42,7 @@ import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Badge
 import androidx.compose.material.icons.filled.Backup
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.CloudSync
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.ColorLens
@@ -164,6 +165,8 @@ fun SettingsScreen(
 
     var editProfile by remember { mutableStateOf(false) }
     var showQualitySheet by remember { mutableStateOf(false) }
+    var showServerDialog by remember { mutableStateOf(false) }
+    var serverDraft by remember { mutableStateOf("") }
     var nameDraft by remember { mutableStateOf("") }
     var restoreUri by remember { mutableStateOf<Uri?>(null) }
     var checkingUpdate by remember { mutableStateOf(false) }
@@ -512,6 +515,53 @@ fun SettingsScreen(
                 }
             }
             item {
+                Surface(
+                    onClick = {
+                        serverDraft = settings.losslessServer.orEmpty()
+                        showServerDialog = true
+                    },
+                    shape = RoundedCornerShape(24.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerLow,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        SettingsIconTile(icon = Icons.Filled.Cloud)
+                        Spacer(Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Lossless server",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            Spacer(Modifier.height(2.dp))
+                            Text(
+                                text = settings.losslessServer ?: "Not set — use YouTube Music",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.SemiBold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            Spacer(Modifier.height(2.dp))
+                            Text(
+                                text = "Source for Hi-Res FLAC and 320 kbps AAC",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        Spacer(Modifier.width(8.dp))
+                        Icon(
+                            Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                            contentDescription = "Set lossless server",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(20.dp),
+                        )
+                    }
+                }
+            }
+            item {
                 SettingsCard {
                     ToggleRow(
                         icon = Icons.Filled.CloudSync,
@@ -742,6 +792,64 @@ fun SettingsScreen(
                 showQualitySheet = false
             },
             onDismiss = { showQualitySheet = false },
+        )
+    }
+
+    if (showServerDialog) {
+        AlertDialog(
+            onDismissRequest = { showServerDialog = false },
+            icon = { Icon(Icons.Filled.Cloud, contentDescription = null) },
+            title = { Text("Lossless server") },
+            text = {
+                Column {
+                    Text(
+                        "Base URL of a hifi-api compatible server. Hi-Res and " +
+                            "320 kbps are streamed from it; other modes keep " +
+                            "using YouTube Music.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = serverDraft,
+                        onValueChange = { serverDraft = it },
+                        label = { Text("Server URL") },
+                        placeholder = { Text("https://example.com") },
+                        leadingIcon = { Icon(Icons.Filled.Cloud, contentDescription = null) },
+                        singleLine = true,
+                        shape = RoundedCornerShape(16.dp),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        "Leave empty to turn it off and fall back to YouTube Music.",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val value = serverDraft.trim()
+                        if (value.isNotEmpty() &&
+                            !value.startsWith("http://", true) &&
+                            !value.startsWith("https://", true)
+                        ) {
+                            actions.showSnackbar("Enter a URL starting with http:// or https://")
+                            return@TextButton
+                        }
+                        app.container.settings.setLosslessServer(value)
+                        showServerDialog = false
+                        actions.showSnackbar(
+                            if (value.isEmpty()) "Lossless server disabled" else "Lossless server saved",
+                        )
+                    },
+                ) { Text("Save") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showServerDialog = false }) { Text("Cancel") }
+            },
         )
     }
 

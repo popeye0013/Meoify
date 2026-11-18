@@ -81,7 +81,7 @@ Meoify is distributed as a signed APK on GitHub Releases.
 - **Now Playing sheet** — the three-dot menu opens a modal sheet with queue, share, video and sleep actions plus full song details.
 - **Swipe to queue** — swipe a song right in any playlist or Liked Songs to add it to the queue without leaving the list.
 - **Background playback** — Media3 / ExoPlayer with lockscreen and notification controls.
-- **Five audio modes** — Auto, Lossless (Hi-Res), Standard (320 kbps), YouTube Music and Data Saver. See [Audio quality](#audio-quality).
+- **Five audio modes** — Auto, Lossless (Hi-Res), Standard (320 kbps), Balanced (256 kbps) and Data Saver. See [Audio quality](#audio-quality).
 - **Sleep timer** — stop playback after 5, 10, 15, 30, 45 or 60 minutes.
 - **Synced lyrics** — LRC from LRCLIB with auto-scroll and tap-to-seek, plus a plain-text fallback.
 - **Real album artwork** — covers from YouTube Music, Spotify and Apple's catalogue. Catalogue art is preferred; the video thumbnail is shown only when no album cover can be found, so a row is never left blank.
@@ -111,12 +111,12 @@ Pick a mode in **Settings → Playback**, or tap the quality pill on the Now Pla
 | Mode | What it does |
 |---|---|
 | **Auto** | Adapts to your connection — Wi-Fi keeps the best stream, mobile data stays balanced. |
-| **Lossless (Hi-Res)** | Requests up to 24-bit / 192 kHz lossless FLAC. |
-| **Standard (320 kbps)** | Requests up to 320 kbps MP3 / AAC. |
-| **YouTube Music** | 128–256 kbps AAC / Opus, the native YouTube Music stream. |
+| **Lossless (Hi-Res)** | Up to 24-bit FLAC from a hifi-api / Tidal-compatible server. |
+| **Standard (320 kbps)** | 320 kbps AAC from the same lossless server. |
+| **Balanced (256 kbps)** | 256 kbps AAC / Opus, the native YouTube Music stream. |
 | **Data Saver** | Low-bitrate audio to reduce mobile data use. |
 
-> YouTube Music tops out at 256 kbps AAC/Opus. The Hi-Res and 320 kbps modes therefore use the best stream the catalogue offers — Meoify does not upsample or fake lossless audio. A new mode applies from the next track.
+> YouTube Music itself tops out at 256 kbps AAC/Opus. To make Hi-Res and 320 kbps real, add the base URL of a [hifi-api](https://github.com/binimum/hifi-api) compatible server under **Settings → Playback → Lossless server**. Meoify searches that server for a matching Tidal track, then streams FLAC (via BTS manifest or DASH) or 320 kbps AAC. When no server is set or the server fails, those tiers fall back to the best YouTube Music stream. Meoify never upsamples or fakes lossless audio. A new mode applies from the next track.
 
 ---
 
@@ -207,7 +207,7 @@ No. Meoify works with a local profile and local library. Signing in is optional 
 <details>
 <summary><strong>Does Lossless really play FLAC?</strong></summary>
 
-Only if the catalogue serves a lossless stream. YouTube Music currently caps at 256 kbps AAC/Opus, so Hi-Res and 320 kbps modes play the best available stream. Meoify never upsamples audio.
+Yes — if you configure a hifi-api compatible server in **Settings → Playback → Lossless server**. Hi-Res streams FLAC (up to 24-bit) and Standard streams 320 kbps AAC from that server, matched by title, artist and duration. Without a server, YouTube Music is capped at 256 kbps AAC/Opus, so those tiers fall back to its best stream. Meoify never upsamples audio.
 
 </details>
 

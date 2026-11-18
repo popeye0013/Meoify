@@ -31,6 +31,7 @@ class SettingsStore(private val context: Context) {
         val dynamic = booleanPreferencesKey("dynamic_color")
         val pureBlack = booleanPreferencesKey("pure_black")
         val quality = stringPreferencesKey("quality")
+        val losslessServer = stringPreferencesKey("lossless_server")
         val historySync = booleanPreferencesKey("history_sync")
         val onboarding = booleanPreferencesKey("onboarding_completed")
         val ytCookies = stringPreferencesKey("yt_cookies")
@@ -57,6 +58,7 @@ class SettingsStore(private val context: Context) {
                     else -> runCatching { AudioQuality.valueOf(prefs[Keys.quality] ?: "") }
                         .getOrDefault(AudioQuality.AUTO)
                 },
+                losslessServer = prefs[Keys.losslessServer]?.takeIf { it.isNotBlank() },
                 historySync = prefs[Keys.historySync] ?: true,
                 onboardingCompleted = prefs[Keys.onboarding] ?: false,
                 ytCookies = prefs[Keys.ytCookies],
@@ -83,6 +85,13 @@ class SettingsStore(private val context: Context) {
 
     fun setQuality(quality: AudioQuality) = scope.launch {
         context.settingsStore.edit { it[Keys.quality] = quality.name }
+    }
+
+    fun setLosslessServer(url: String?) = scope.launch {
+        context.settingsStore.edit {
+            val clean = url?.trim()?.trimEnd('/')?.takeIf { it.isNotBlank() }
+            if (clean == null) it.remove(Keys.losslessServer) else it[Keys.losslessServer] = clean
+        }
     }
 
     fun setHistorySync(enabled: Boolean) = scope.launch {

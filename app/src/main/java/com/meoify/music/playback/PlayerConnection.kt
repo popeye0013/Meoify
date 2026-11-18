@@ -170,7 +170,7 @@ class PlayerConnection(
                 _events.tryEmit(PlaybackEvent.Message("Reconnecting to “${failedTrack.title}”…"))
                 scope.launch {
                     val audio = try {
-                        resolver.resolve(failedTrack.id, force = true)
+                        resolver.resolve(failedTrack, force = true)
                     } catch (e: CancellationException) {
                         throw e
                     } catch (e: Exception) {
@@ -479,7 +479,7 @@ class PlayerConnection(
                 if (generation != myGeneration) return@launch
                 val track = queue.getOrNull(attempt) ?: break
                 try {
-                    audio = resolver.resolve(track.id)
+                    audio = resolver.resolve(track)
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
@@ -547,7 +547,7 @@ class PlayerConnection(
                 if (generation != myGeneration) break
                 val track = queue.getOrNull(index) ?: break
                 try {
-                    val nextAudio = resolver.resolve(track.id)
+                    val nextAudio = resolver.resolve(track)
                     if (generation == myGeneration) {
                         c.addMediaItem(track.toMediaItem(nextAudio))
                     }
@@ -738,7 +738,7 @@ class PlayerConnection(
         }
         scope.launch {
             try {
-                val audio = resolver.resolve(track.id)
+                val audio = resolver.resolve(track)
                 val item = track.toMediaItem(audio)
                 if (playNext) {
                     c.addMediaItem(c.currentMediaItemIndex + 1, item)
@@ -798,7 +798,7 @@ class PlayerConnection(
                 }
                 if (queue.any { it.id == track.id }) continue
                 try {
-                    val audio = resolver.resolve(track.id)
+                    val audio = resolver.resolve(track)
                     if (generation != myGeneration) return@launch
                     if (expectedTrackId != null && _state.value.track?.id != expectedTrackId) {
                         return@launch
@@ -1040,6 +1040,7 @@ class PlayerConnection(
         return MediaItem.Builder()
             .setMediaId(id)
             .setUri(audio.url)
+            .apply { audio.mimeType?.let { setMimeType(it) } }
             .setMediaMetadata(metadata)
             .build()
     }
