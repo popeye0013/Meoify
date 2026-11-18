@@ -4,6 +4,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.shrinkHorizontally
@@ -287,7 +288,13 @@ fun MeoifyScaffold(
                                 LaunchedEffect(tab) {
                                     val page = tab.ordinal
                                     if (pagerState.currentPage != page) {
-                                        pagerState.animateScrollToPage(page)
+                                        pagerState.animateScrollToPage(
+                                            page = page,
+                                            animationSpec = tween(
+                                                durationMillis = 280,
+                                                easing = FastOutSlowInEasing,
+                                            ),
+                                        )
                                     }
                                 }
                                 // Only commit the tab after a swipe settles, so
@@ -302,6 +309,10 @@ fun MeoifyScaffold(
                                     state = pagerState,
                                     modifier = Modifier.fillMaxSize(),
                                     userScrollEnabled = showNavBar,
+                                    // Compose the neighbouring tab before the
+                                    // finger moves, so the first swipe frame is
+                                    // not spent building a heavy screen.
+                                    beyondViewportPageCount = 1,
                                 ) { page ->
                                     when (tabs[page]) {
                                         Tab.Home -> HomeScreen()
