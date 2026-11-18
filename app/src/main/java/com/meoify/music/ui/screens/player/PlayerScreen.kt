@@ -125,13 +125,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import androidx.core.view.WindowCompat
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.meoify.music.data.model.AudioQuality
 import com.meoify.music.data.model.Track
 import com.meoify.music.data.remote.TrackLyrics
 import com.meoify.music.playback.PlayerUiState
 import com.meoify.music.ui.components.TrackRow
-import com.meoify.music.ui.components.AudioQualitySheet
+import com.meoify.music.ui.components.VolumeSheet
 import com.meoify.music.ui.components.ArtworkImage
 import com.meoify.music.ui.components.rememberTrackCover
 import com.meoify.music.ui.navigation.AppActions
@@ -152,7 +150,6 @@ fun PlayerScreen(onClose: () -> Unit) {
     val state = LocalPlayerState.current
     val activity = LocalContext.current as? Activity
     val app = (LocalContext.current.applicationContext as com.meoify.music.MeoifyApplication)
-    val settings by app.container.settings.settings.collectAsStateWithLifecycle()
     val actions = LocalAppActions.current
     val context = LocalContext.current
     val track = state.track
@@ -169,6 +166,7 @@ fun PlayerScreen(onClose: () -> Unit) {
     var showQueue by remember { mutableStateOf(false) }
     var menuOpen by remember { mutableStateOf(false) }
     var showSleepTimer by remember { mutableStateOf(false) }
+    var showVolume by remember { mutableStateOf(false) }
     var lyrics by remember { mutableStateOf<TrackLyrics?>(null) }
     var lyricsLoading by remember { mutableStateOf(false) }
 
@@ -230,6 +228,10 @@ fun PlayerScreen(onClose: () -> Unit) {
     }
 
     BackHandler(enabled = showLyrics) { showLyrics = false }
+
+    if (showVolume) {
+        VolumeSheet(onDismiss = { showVolume = false })
+    }
 
     if (showSleepTimer) {
         SleepTimerDialog(
@@ -345,13 +347,11 @@ fun PlayerScreen(onClose: () -> Unit) {
                     PlayerMainContent(
                         state = state,
                         track = track,
-                        quality = settings.quality,
                         actions = actions,
                         accent = accent,
                         onShowLyrics = { showLyrics = true },
                         onShowQueue = { showQueue = true },
-                        onToggleMute = { app.container.player.toggleMute() },
-                        onQualityChange = { app.container.settings.setQuality(it) },
+                        onShowVolume = { showVolume = true },
                         artworkSwipeModifier = Modifier.pointerInput(Unit) {
                             detectVerticalDragGestures(
                                 onDragStart = { dismissTriggered = false },
@@ -550,13 +550,11 @@ private fun PlayerMenuItem(
 private fun PlayerMainContent(
     state: PlayerUiState,
     track: Track?,
-    quality: AudioQuality,
     actions: AppActions,
     accent: Color,
     onShowLyrics: () -> Unit,
     onShowQueue: () -> Unit,
-    onToggleMute: () -> Unit,
-    onQualityChange: (AudioQuality) -> Unit,
+    onShowVolume: () -> Unit,
     artworkSwipeModifier: Modifier = Modifier,
 ) {
     val cover = rememberTrackCover(track)
@@ -589,12 +587,10 @@ private fun PlayerMainContent(
             PlayerControls(
                 state = state,
                 track = track,
-                quality = quality,
                 actions = actions,
                 accent = accent,
                 onShowLyrics = onShowLyrics,
-                onToggleMute = onToggleMute,
-                onQualityChange = onQualityChange,
+                onShowVolume = onShowVolume,
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxHeight()
@@ -629,12 +625,10 @@ private fun PlayerMainContent(
             PlayerControls(
                 state = state,
                 track = track,
-                quality = quality,
                 actions = actions,
                 accent = accent,
                 onShowLyrics = onShowLyrics,
-                onToggleMute = onToggleMute,
-                onQualityChange = onQualityChange,
+                onShowVolume = onShowVolume,
             )
             QueueSwipeHandle(
                 queueSize = state.queue.size,
@@ -708,12 +702,10 @@ private fun QueueSwipeHandle(
 private fun PlayerControls(
     state: PlayerUiState,
     track: Track?,
-    quality: AudioQuality,
     actions: AppActions,
     accent: Color,
     onShowLyrics: () -> Unit,
-    onToggleMute: () -> Unit,
-    onQualityChange: (AudioQuality) -> Unit,
+    onShowVolume: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val liked = track != null && actions.isLiked(track.id)
@@ -788,10 +780,6 @@ private fun PlayerControls(
                 fontWeight = FontWeight.Medium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-        }
-
-        Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-            AudioPill(quality = quality, onQualityChange = onQualityChange)
         }
 
         Spacer(Modifier.height(12.dp))
@@ -881,8 +869,8 @@ private fun PlayerControls(
 
             PillButton(
                 active = state.muted,
-                contentDescription = if (state.muted) "Unmute" else "Mute",
-                onClick = onToggleMute,
+                contentDescription = "Volume and output device",
+                onClick = onShowVolume,
                 modifier = Modifier.weight(1f),
             ) {
                 Icon(
@@ -915,59 +903,6 @@ private fun PlayerControls(
                 )
             }
         }
-    }
-}
-
-@Composable
-private fun AudioPill(
-    quality: AudioQuality,
-    onQualityChange: (AudioQuality) -> Unit,
-) {
-    var open by remember { mutableStateOf(false) }
-    val haptic = LocalHapticFeedback.current
-    Surface(
-        onClick = {
-            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-            open = true
-        },
-        shape = RoundedCornerShape(50),
-        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 15.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(
-                Icons.Filled.GraphicEq,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(15.dp),
-            )
-            Spacer(Modifier.width(7.dp))
-            Text(
-                text = quality.shortLabel,
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.92f),
-            )
-            Spacer(Modifier.width(2.dp))
-            Icon(
-                Icons.Filled.KeyboardArrowRight,
-                contentDescription = "Audio quality: ${quality.title}",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(17.dp),
-            )
-        }
-    }
-    if (open) {
-        AudioQualitySheet(
-            quality = quality,
-            onSelect = { option ->
-                open = false
-                onQualityChange(option)
-            },
-            onDismiss = { open = false },
-        )
     }
 }
 

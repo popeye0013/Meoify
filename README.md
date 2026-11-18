@@ -98,7 +98,7 @@ Meoify is distributed as a signed APK on GitHub Releases.
 ### Design & details
 
 - **Material 3 Expressive** — light, dark and pure-black themes, dynamic colour on Android 12+, rounded surfaces and Google Sans Flex.
-- **Quality pill on Now Playing** — shows the active mode and opens the same picker used in Settings.
+- **Volume & output popup** — the speaker button on Now Playing opens a media volume slider, connected output devices and a Bluetooth connection shortcut.
 - **Sharing** — share songs or jump to album and artist pages from the track menu.
 - **In-app updates** — release notes in Settings and an optional home-screen prompt.
 
