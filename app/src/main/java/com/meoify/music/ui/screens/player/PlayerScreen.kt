@@ -388,6 +388,8 @@ fun PlayerScreen(onClose: () -> Unit) {
                 showQueue = false
                 actions.openTrackMenu(track)
             },
+            onMove = { from, to -> actions.moveQueueItem(from, to) },
+            onRemove = { index -> actions.removeFromQueue(index) },
         )
     }
 
@@ -1381,7 +1383,17 @@ private fun QueueSheet(
     onDismiss: () -> Unit,
     onPlayAt: (Int) -> Unit,
     onMore: (Track) -> Unit,
+    onMove: (Int, Int) -> Unit,
+    onRemove: (Int) -> Unit,
 ) {
+    var draggingIndex by remember { mutableStateOf(-1) }
+    var dragDistance by remember { mutableStateOf(0f) }
+    val listState = rememberLazyListState()
+    val haptic = LocalHapticFeedback.current
+    val density = LocalDensity.current
+    val fallbackRowHeight = with(density) { 72.dp.toPx() }
+    var rowHeight by remember { mutableStateOf(fallbackRowHeight) }
+
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(
             modifier = Modifier
@@ -1413,15 +1425,114 @@ private fun QueueSheet(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 520.dp)) {
+            if (state.queue.isNotEmpty()) {
+                Text(
+                    text = "Hold a song to reorder · Swipe right to remove",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(start = 20.dp, end = 20.dp, bottom = 8.dp),
+                )
+            }
+            LazyColumn(
+                state = listState,
+                modifier = Modifier.fillMaxWidth().heightIn(max = 520.dp),
+            ) {
                 items(state.queue.size) { index ->
                     val track = state.queue[index]
-                    TrackRow(
-                        track = track,
-                        isCurrent = track.id == state.track?.id,
-                        onClick = { onPlayAt(index) },
-                        onMoreClick = { onMore(track) },
+                    val dismissState = rememberSwipeToDismissBoxState(
+                        confirmValueChange = { value ->
+                            if (value == SwipeToDismissBoxValue.StartToEnd) {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                onRemove(index)
+                            }
+                            // Stay settled: removing the entry is the feedback, so the
+                            // next row must not inherit a half-dismissed state.
+                            false
+                        },
                     )
+                    val rowModifier = Modifier
+                        .zIndex(if (draggingIndex == index) 1f else 0f)
+                        .graphicsLayer {
+                            translationY = if (draggingIndex == index) dragDistance else 0f
+                        }
+                    SwipeToDismissBox(
+                        state = dismissState,
+                        modifier = rowModifier,
+                        enableDismissFromStartToEnd = true,
+                        enableDismissFromEndToStart = false,
+                        backgroundContent = {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(MaterialTheme.colorScheme.errorContainer),
+                                contentAlignment = Alignment.CenterStart,
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(start = 22.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Filled.Delete,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.onErrorContainer,
+                                    )
+                                    Spacer(Modifier.width(10.dp))
+                                    Text(
+                                        text = "Remove",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.onErrorContainer,
+                                    )
+                                }
+                            }
+                        },
+                    ) {
+                        TrackRow(
+                            track = track,
+                            index = index,
+                            isCurrent = track.id == state.track?.id,
+                            onClick = { onPlayAt(index) },
+                            onMoreClick = { onMore(track) },
+                            modifier = Modifier.pointerInput(index) {
+                                // Hold the song, then drag up or down to change play order.
+                                detectDragGesturesAfterLongPress(
+                                    onDragStart = {
+                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        draggingIndex = index
+                                        dragDistance = 0f
+                                        rowHeight = listState.layoutInfo.visibleItemsInfo
+                                            .firstOrNull { it.index == index }
+                                            ?.size?.toFloat()
+                                            ?.takeIf { it > 0f }
+                                            ?: fallbackRowHeight
+                                    },
+                                    onDrag = { change, dragAmount ->
+                                        change.consume()
+                                        dragDistance += dragAmount.y
+                                        val steps = (dragDistance / rowHeight).roundToInt()
+                                        if (steps != 0) {
+                                            val current = draggingIndex
+                                            val max = listState.layoutInfo.totalItemsCount - 1
+                                            val target = (current + steps).coerceIn(0, max)
+                                            if (current >= 0 && target != current) {
+                                                onMove(current, target)
+                                                draggingIndex = target
+                                            }
+                                            dragDistance -= steps * rowHeight
+                                        }
+                                    },
+                                    onDragEnd = {
+                                        draggingIndex = -1
+                                        dragDistance = 0f
+                                    },
+                                    onDragCancel = {
+                                        draggingIndex = -1
+                                        dragDistance = 0f
+                                    },
+                                )
+                            },
+                        )
+                    }
                 }
             }
         }
