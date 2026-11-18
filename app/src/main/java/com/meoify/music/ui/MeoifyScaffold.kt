@@ -110,7 +110,6 @@ import com.meoify.music.ui.screens.player.PlayerScreen
 import com.meoify.music.ui.screens.search.SearchScreen
 import com.meoify.music.ui.screens.settings.SettingsScreen
 import com.meoify.music.util.openUrl
-import kotlin.math.absoluteValue
 import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
 
@@ -330,48 +329,17 @@ fun MeoifyScaffold(
                                     // not spent building a heavy screen.
                                     beyondViewportPageCount = 1,
                                 ) { page ->
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxSize()
-                                            .graphicsLayer {
-                                                // Read the scroll state inside the
-                                                // layer block so sliding only
-                                                // invalidates the layer instead of
-                                                // recomposing the whole page.
-                                                val pageOffset =
-                                                    (pagerState.currentPage - page) +
-                                                        pagerState.currentPageOffsetFraction
-                                                val distance = pageOffset
-                                                    .absoluteValue
-                                                    .coerceIn(0f, 1f)
-                                                val eased =
-                                                    FastOutSlowInEasing.transform(distance)
-                                                // Neighbouring pages drift slower than
-                                                // the pager itself and fade/shrink a
-                                                // little, which adds depth without
-                                                // making the content hard to read.
-                                                alpha = 1f - 0.28f * eased
-                                                val direction =
-                                                    if (pageOffset >= 0f) 1f else -1f
-                                                translationX =
-                                                    size.width * 0.12f * eased * direction
-                                                val scale = 1f - 0.045f * eased
-                                                scaleX = scale
-                                                scaleY = scale
-                                            },
-                                    ) {
-                                        when (tabs[page]) {
-                                            Tab.Home -> HomeScreen()
-                                            Tab.Search -> SearchScreen(
-                                                pendingSearch = pendingSearch,
-                                                onConsumedPending = onConsumedPending,
-                                                onBack = { onTabChange(Tab.Home) },
-                                            )
-                                            Tab.Library -> LibraryScreen(
-                                                onShowCreatePlaylist = onShowCreatePlaylist,
-                                                onAddToPlaylist = onAddToPlaylist,
-                                            )
-                                        }
+                                    when (tabs[page]) {
+                                        Tab.Home -> HomeScreen()
+                                        Tab.Search -> SearchScreen(
+                                            pendingSearch = pendingSearch,
+                                            onConsumedPending = onConsumedPending,
+                                            onBack = { onTabChange(Tab.Home) },
+                                        )
+                                        Tab.Library -> LibraryScreen(
+                                            onShowCreatePlaylist = onShowCreatePlaylist,
+                                            onAddToPlaylist = onAddToPlaylist,
+                                        )
                                     }
                                 }
                             }
