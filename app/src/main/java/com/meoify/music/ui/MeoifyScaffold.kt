@@ -39,6 +39,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.QueueMusic
@@ -63,6 +65,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -194,6 +197,14 @@ fun MeoifyScaffold(
         else -> navigationBarInset
     }
 
+    val screenTarget = when {
+        loginOpen -> "login"
+        !settings.onboardingCompleted -> "onboarding"
+        settingsOpen -> "settings"
+        detailStack.isNotEmpty() -> detailStack.last().key
+        else -> "tabs"
+    }
+
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
             containerColor = MaterialTheme.colorScheme.background,
@@ -232,23 +243,13 @@ fun MeoifyScaffold(
                         .padding(contentPadding),
                 ) {
                     AnimatedContent(
-                        targetState = if (loginOpen) {
-                            "login"
-                        } else if (!settings.onboardingCompleted) {
-                            "onboarding"
-                        } else if (settingsOpen) {
-                            "settings"
-                        } else if (detailStack.isNotEmpty()) {
-                            detailStack.last().key
-                        } else {
-                            "tab:${tab.name}"
-                        },
+                        targetState = screenTarget,
                         transitionSpec = {
                             (fadeIn(tween(220)) + slideInHorizontally(tween(260)) { it / 10 })
                                 .togetherWith(fadeOut(tween(180)) + slideOutHorizontally(tween(240)) { -it / 12 })
                         },
                         label = "screen",
-                    ) { target ->
+                    ) { _ ->
                         when {
                             // Login wins over onboarding: tapping "Sign in" on the
                             // welcome screen must actually open the sign-in page.
@@ -277,18 +278,45 @@ fun MeoifyScaffold(
                                 destination = detailStack.last(),
                                 onBack = { closeDetail() },
                             )
-                            target == "tab:${Tab.Home.name}" -> HomeScreen()
 
-                            target == "tab:${Tab.Search.name}" -> SearchScreen(
-                                pendingSearch = pendingSearch,
-                                onConsumedPending = onConsumedPending,
-                                onBack = { onTabChange(Tab.Home) },
-                            )
-
-                            target == "tab:${Tab.Library.name}" -> LibraryScreen(
-                                onShowCreatePlaylist = onShowCreatePlaylist,
-                                onAddToPlaylist = onAddToPlaylist,
-                            )
+                            else -> {
+                                val tabs = Tab.values()
+                                val pagerState = rememberPagerState(
+                                    initialPage = tab.ordinal,
+                                ) { tabs.size }
+                                LaunchedEffect(tab) {
+                                    val page = tab.ordinal
+                                    if (pagerState.currentPage != page) {
+                                        pagerState.animateScrollToPage(page)
+                                    }
+                                }
+                                // Only commit the tab after a swipe settles, so
+                                // swiping several pages does not fight the
+                                // pager's own animation.
+                                LaunchedEffect(pagerState) {
+                                    snapshotFlow { pagerState.settledPage }.collect { page ->
+                                        tabs.getOrNull(page)?.let(onTabChange)
+                                    }
+                                }
+                                HorizontalPager(
+                                    state = pagerState,
+                                    modifier = Modifier.fillMaxSize(),
+                                    userScrollEnabled = showNavBar,
+                                ) { page ->
+                                    when (tabs[page]) {
+                                        Tab.Home -> HomeScreen()
+                                        Tab.Search -> SearchScreen(
+                                            pendingSearch = pendingSearch,
+                                            onConsumedPending = onConsumedPending,
+                                            onBack = { onTabChange(Tab.Home) },
+                                        )
+                                        Tab.Library -> LibraryScreen(
+                                            onShowCreatePlaylist = onShowCreatePlaylist,
+                                            onAddToPlaylist = onAddToPlaylist,
+                                        )
+                                    }
+                                }
+                            }
                         }
                     }
                 }
