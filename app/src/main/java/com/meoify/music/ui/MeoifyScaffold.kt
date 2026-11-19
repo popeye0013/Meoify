@@ -95,6 +95,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.meoify.music.BuildConfig
 import com.meoify.music.data.UpdateChecker
 import com.meoify.music.data.model.Track
+import com.meoify.music.ui.components.ChangelogSheet
 import com.meoify.music.ui.components.MiniPlayer
 import com.meoify.music.ui.navigation.Destination
 import com.meoify.music.ui.navigation.LocalAppActions
@@ -181,6 +182,7 @@ fun MeoifyScaffold(
     var latestRelease by remember { mutableStateOf<UpdateChecker.Release?>(null) }
     var pendingUpdate by remember { mutableStateOf<UpdateChecker.Release?>(null) }
     var promptShown by remember { mutableStateOf(false) }
+    var showChangelog by remember { mutableStateOf(false) }
 
     LaunchedEffect(settings.onboardingCompleted) {
         if (!settings.onboardingCompleted) return@LaunchedEffect
@@ -510,6 +512,9 @@ fun MeoifyScaffold(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
+                    TextButton(onClick = { showChangelog = true }) {
+                        Text("View all updates")
+                    }
                 }
             },
             confirmButton = {
@@ -529,6 +534,10 @@ fun MeoifyScaffold(
                 ) { Text("Skip") }
             },
         )
+    }
+
+    if (showChangelog) {
+        ChangelogSheet(onDismiss = { showChangelog = false })
     }
 }
 

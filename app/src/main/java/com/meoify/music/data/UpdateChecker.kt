@@ -5,7 +5,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import okhttp3.OkHttpClient
@@ -28,6 +30,8 @@ object UpdateChecker {
         val apkUrl: String? = null,
         /** Changelog bullets, newest release first. */
         val notes: List<String> = emptyList(),
+        /** ISO publish date from GitHub or the manifest, when available. */
+        val published: String? = null,
     )
 
     private const val MANIFEST_URL =
@@ -69,6 +73,7 @@ object UpdateChecker {
                     ?.map { it.trim() }
                     ?.filter { it.isNotEmpty() }
                     .orEmpty(),
+                published = root["published"]?.jsonPrimitive?.contentOrNull,
             )
         }
     }.getOrNull()
@@ -82,21 +87,45 @@ object UpdateChecker {
         client.newCall(request).execute().use { response ->
             if (!response.isSuccessful) return@runCatching null
             val root = json.parseToJsonElement(response.body?.string().orEmpty()).jsonObject
-            val tag = root["tag_name"]?.jsonPrimitive?.contentOrNull.orEmpty().trim()
-            if (tag.isBlank()) return@runCatching null
-            val assets = root["assets"]
-                ?.let { it as? kotlinx.serialization.json.JsonArray }
-                ?.mapNotNull { asset ->
-                    asset.jsonObject["browser_download_url"]?.jsonPrimitive?.contentOrNull
-                }
-            Release(
-                version = tag.removePrefix("v").removePrefix("V"),
-                url = root["html_url"]?.jsonPrimitive?.contentOrNull ?: DeveloperInfo.REPO_URL,
-                apkUrl = assets?.firstOrNull { it.endsWith(".apk", ignoreCase = true) },
-                notes = parseNotes(root["body"]?.jsonPrimitive?.contentOrNull),
-            )
+            parseGithubRelease(root)
         }
     }.getOrNull()
+
+    /**
+     * Fetches the [limit] most recent GitHub releases (newest first) with their
+     * changelogs, so people can read what changed across updates before they
+     * decide to download. The releases endpoint is public for this repository.
+     */
+    suspend fun history(limit: Int = 10): List<Release> = withContext(Dispatchers.IO) {
+        runCatching {
+            val request = Request.Builder()
+                .url("https://api.github.com/repos/${DeveloperInfo.HANDLE}/Meoify/releases?per_page=$limit")
+                .header("Accept", "application/vnd.github+json")
+                .header("User-Agent", "Meoify-Android")
+                .build()
+            client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) return@runCatching emptyList()
+                json.parseToJsonElement(response.body?.string().orEmpty())
+                    .jsonArray
+                    .mapNotNull { (it as? JsonObject)?.let(::parseGithubRelease) }
+            }
+        }.getOrElse { emptyList() }
+    }
+
+    private fun parseGithubRelease(root: JsonObject): Release? {
+        val tag = root["tag_name"]?.jsonPrimitive?.contentOrNull.orEmpty().trim()
+        if (tag.isBlank()) return null
+        val assets = (root["assets"] as? JsonArray)?.mapNotNull { asset ->
+            asset.jsonObject["browser_download_url"]?.jsonPrimitive?.contentOrNull
+        }
+        return Release(
+            version = tag.removePrefix("v").removePrefix("V"),
+            url = root["html_url"]?.jsonPrimitive?.contentOrNull ?: DeveloperInfo.REPO_URL,
+            apkUrl = assets?.firstOrNull { it.endsWith(".apk", ignoreCase = true) },
+            notes = parseNotes(root["body"]?.jsonPrimitive?.contentOrNull),
+            published = root["published_at"]?.jsonPrimitive?.contentOrNull,
+        )
+    }
 
     /** True when [candidate] is a newer dotted version than [current]. */
     fun isNewer(candidate: String, current: String): Boolean {

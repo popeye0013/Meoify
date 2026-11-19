@@ -46,6 +46,7 @@ import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.CloudSync
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.ColorLens
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.CurrencyRupee
 import androidx.compose.material.icons.filled.DeleteSweep
@@ -110,6 +111,7 @@ import com.meoify.music.data.model.AudioQuality
 import com.meoify.music.data.model.DeveloperInfo
 import com.meoify.music.data.model.ThemeMode
 import com.meoify.music.ui.components.AudioQualitySheet
+import com.meoify.music.ui.components.ChangelogSheet
 import com.meoify.music.ui.components.ProfileAvatar
 import com.meoify.music.ui.navigation.LocalAppActions
 import com.meoify.music.ui.navigation.LocalBottomContentInset
@@ -184,6 +186,7 @@ fun SettingsScreen(
     var restoreUri by remember { mutableStateOf<Uri?>(null) }
     var checkingUpdate by remember { mutableStateOf(false) }
     var updateRelease by remember { mutableStateOf<UpdateChecker.Release?>(null) }
+    var showChangelog by remember { mutableStateOf(false) }
     val versionName = remember {
         runCatching {
             context.packageManager.getPackageInfo(context.packageName, 0).versionName
@@ -273,7 +276,10 @@ fun SettingsScreen(
     val backupKeys = arrayOf("Backup", "restore", "export", "import", "json", "file")
     val supportKeys = arrayOf("Support", "donate", "UPI", "Google Pay", "contribution", "money")
     val developerKeys = arrayOf("Developer", "telegram", "contact", "github", "source")
-    val aboutKeys = arrayOf("About", "version", "update", "release", "app", "Meoify")
+    val aboutKeys = arrayOf(
+        "About", "version", "update", "release", "app", "Meoify",
+        "changelog", "recent", "what's new", "notes",
+    )
     val anyMatch = listOf(
         accountKeys, appearanceKeys, playbackKeys, libraryKeys,
         backupKeys, supportKeys, developerKeys, aboutKeys,
@@ -759,6 +765,12 @@ fun SettingsScreen(
                         },
                     )
                     ActionRow(
+                        icon = Icons.Filled.History,
+                        title = "Recent updates",
+                        subtitle = "Changelogs for the last 10 releases",
+                        onClick = { showChangelog = true },
+                    )
+                    ActionRow(
                         icon = Icons.Filled.Code,
                         title = "Source Code",
                         subtitle = "github.com/${DeveloperInfo.HANDLE}/Meoify",
@@ -794,6 +806,9 @@ fun SettingsScreen(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
+                    TextButton(onClick = { showChangelog = true }) {
+                        Text("View all updates")
+                    }
                 }
             },
             confirmButton = {
@@ -808,6 +823,10 @@ fun SettingsScreen(
                 TextButton(onClick = { updateRelease = null }) { Text("Later") }
             },
         )
+    }
+
+    if (showChangelog) {
+        ChangelogSheet(onDismiss = { showChangelog = false })
     }
 
     if (showQualitySheet) {
