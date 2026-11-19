@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/logo.svg" width="116" alt="Meoify logo" />
+  <img src="docs/logo.svg" width="128" alt="Meoify logo" style="border-radius: 28px;" />
 </p>
 
 <h1 align="center">Meoify</h1>
@@ -12,115 +12,68 @@
 
 <p align="center">
   <a href="https://github.com/popeye0013/Meoify/releases/latest">
-    <img src="https://img.shields.io/github/v/release/popeye0013/Meoify?style=for-the-badge&color=FF4D67&labelColor=0D0D0F" alt="Latest release" />
+    <img src="https://img.shields.io/github/v/release/popeye0013/Meoify?style=for-the-badge&color=FF4D67&labelColor=0D0D0F&logo=android&logoColor=white" alt="Latest release" />
   </a>
   <a href="https://github.com/popeye0013/Meoify/releases">
-    <img src="https://img.shields.io/github/downloads/popeye0013/Meoify/total?style=for-the-badge&color=FF4D67&labelColor=0D0D0F" alt="Total downloads" />
+    <img src="https://img.shields.io/github/downloads/popeye0013/Meoify/total?style=for-the-badge&color=7C3AED&labelColor=0D0D0F&logo=github&logoColor=white" alt="Total downloads" />
   </a>
   <a href="https://github.com/popeye0013/Meoify/stargazers">
-    <img src="https://img.shields.io/github/stars/popeye0013/Meoify?style=for-the-badge&color=7C3AED&labelColor=0D0D0F" alt="Stars" />
+    <img src="https://img.shields.io/github/stars/popeye0013/Meoify?style=for-the-badge&color=FFB020&labelColor=0D0D0F&logo=github&logoColor=white" alt="Stars" />
   </a>
   <a href="LICENSE">
-    <img src="https://img.shields.io/github/license/popeye0013/Meoify?style=for-the-badge&color=7C3AED&labelColor=0D0D0F" alt="GPL-3.0 license" />
-  </a>
-  <img src="https://img.shields.io/badge/Android-8.0%2B-3DDC84?style=for-the-badge&logo=android&logoColor=white&labelColor=0D0D0F" alt="Android 8.0+" />
-</p>
-
-<p align="center">
-  <a href="https://github.com/popeye0013/Meoify/releases/latest">
-    <img src="https://img.shields.io/badge/Download_the_latest_APK-FF4D67?style=for-the-badge&logo=android&logoColor=white&labelColor=0D0D0F" alt="Download the latest APK" />
+    <img src="https://img.shields.io/github/license/popeye0013/Meoify?style=for-the-badge&color=34D399&labelColor=0D0D0F" alt="License" />
   </a>
 </p>
 
 <p align="center">
-  <a href="#download">Download</a> ·
-  <a href="#features">Features</a> ·
-  <a href="#audio-quality">Audio quality</a> ·
-  <a href="#build-from-source">Build</a> ·
-  <a href="#tech-stack">Stack</a> ·
-  <a href="#faq">FAQ</a>
+  <img src="https://img.shields.io/badge/Platform-Android-3DDC84?style=flat-square&logo=android&logoColor=white" alt="Platform" />
+  <img src="https://img.shields.io/badge/UI-Material%203%20Expressive-6750A4?style=flat-square" alt="UI" />
+  <img src="https://img.shields.io/badge/Min%20SDK-26-FF4D67?style=flat-square" alt="Min SDK" />
+  <img src="https://img.shields.io/badge/Refresh%20Rate-Up%20to%20120Hz-00C2FF?style=flat-square" alt="Refresh rate" />
 </p>
 
 ---
 
-## Download
+## ✨ Features
 
-Meoify is distributed as a signed APK on GitHub Releases.
-
-| | |
-|---|---|
-| **Latest release** | [github.com/popeye0013/Meoify/releases/latest](https://github.com/popeye0013/Meoify/releases/latest) |
-| **Requirements** | Android 8.0 (API 26) or newer |
-| **Price** | Free and open source (GPL-3.0) |
-| **Play Store** | Not available — side-load the APK |
-
-**Install**
-
-1. Download `Meoify-<version>.apk` from the latest release.
-2. Open the file on your phone.
-3. If Android asks, allow installs from your browser or file manager.
-4. Open Meoify. Updates install over the top and keep your data.
-
-> Meoify also checks for updates from **Settings → About**.
+- 🎵 **Background playback** — keep listening with the screen off, plus a sleep timer.
+- 🎨 **Material 3 Expressive** — light, dark and pure-black themes, dynamic colour on Android 12+, rounded surfaces and Google Sans Flex.
+- 🖼️ **Real artwork** — album covers pulled from YouTube Music, shown in notifications and on the lock screen.
+- 📝 **Synced lyrics** — word-by-word highlighting with auto-scroll.
+- 🔊 **Volume & output popup** — media volume slider, one-tap switching between phone speaker, Bluetooth, wired and USB, with a Bluetooth battery badge.
+- 📤 **Sharing** — share songs or jump to album and artist pages from the track menu.
+- 🔄 **In-app updates** — release notes in Settings and an optional home-screen prompt.
 
 ---
 
-## Features
+## 🎚️ Audio quality
 
-### Discover
-
-- **Personalised home** — greeting, quick picks, made-for-you mixes, trending songs, new releases, top artists and charts.
-- **Search that stays out of the way** — pill search field, voice input, live suggestions, recent searches and genre shortcuts.
-- **Filters that persist** — switch between Tracks, Albums, Artists and Playlists without losing your query.
-- **Pull to refresh** everywhere the catalogue can change.
-
-### Play
-
-- **Full player** — square artwork, wavy seek bar, shuffle, repeat, mute, queue management and a floating mini player.
-- **Queue gestures** — hold a song to reorder the queue, or swipe it right to remove it.
-- **Now Playing sheet** — the three-dot menu opens a modal sheet with queue, share, video and sleep actions plus full song details.
-- **Swipe to queue** — swipe a song right in any playlist or Liked Songs to add it to the queue without leaving the list.
-- **Background playback** — Media3 / ExoPlayer with lockscreen and notification controls.
-- **Five audio modes** — Auto, Lossless (Hi-Res), Standard (320 kbps), Balanced (256 kbps) and Data Saver. See [Audio quality](#audio-quality).
-- **Sleep timer** — stop playback after 5, 10, 15, 30, 45 or 60 minutes.
-- **Synced lyrics** — LRC from LRCLIB with auto-scroll and tap-to-seek, plus a plain-text fallback.
-- **Real album artwork** — covers from YouTube Music, Spotify and Apple's catalogue. Catalogue art is preferred; the video thumbnail is shown only when no album cover can be found, so a row is never left blank.
-
-### Library & accounts
-
-- **Liked songs, playlists, saved albums and history** — with list and grid layouts.
-- **YouTube Music playlists** — your account playlists appear in Library and open straight in the player.
-- **Optional sign-in** — web sign-in for a personalised feed and account library; likes and playlists sync back.
-- **Listening history sync** — real listens are reported with the same tracking ping YouTube's web player uses.
-- **Local profile** — use Meoify without an account and pick a name and avatar shown across the app.
-- **Backup & restore** — export playlists and your profile to a readable `.json` file.
-
-### Design & details
-
-- **Material 3 Expressive** — light, dark and pure-black themes, dynamic colour on Android 12+, rounded surfaces and Google Sans Flex.
-- **Volume & output popup** — the speaker button on Now Playing opens a media volume slider, deduplicated connected outputs with one-tap switching (phone speaker, Bluetooth, wired or USB), and a Bluetooth connection shortcut. The button shows a speaker or Bluetooth icon to match the active output.
-- **Sharing** — share songs or jump to album and artist pages from the track menu.
-- **In-app updates** — release notes in Settings and an optional home-screen prompt.
-
----
-
-## Audio quality
-
-Pick a mode in **Settings → Playback**, or tap the quality pill on the Now Playing card.
+Pick a mode in **Settings → Playback**. The selected mode applies from the next track.
 
 | Mode | What it does |
 |---|---|
 | **Auto** | Adapts to your connection — Wi-Fi keeps the best stream, mobile data stays balanced. |
-| **Lossless (Hi-Res)** | Up to 24-bit FLAC from a hifi-api / Tidal-compatible server. |
-| **Standard (320 kbps)** | 320 kbps AAC from the same lossless server. |
+| **Lossless (Hi-Res)** | Up to 24-bit FLAC from a hifi-api / Tidal-compatible server. With a 320 kbps server, Meoify uses its best available AAC stream. |
+| **Standard (320 kbps)** | 320 kbps AAC from either supported server type. |
 | **Balanced (256 kbps)** | 256 kbps AAC / Opus, the native YouTube Music stream. |
 | **Data Saver** | Low-bitrate audio to reduce mobile data use. |
 
-> YouTube Music itself tops out at 256 kbps AAC/Opus. To make Hi-Res and 320 kbps real, add the base URL of a [hifi-api](https://github.com/binimum/hifi-api) compatible server under **Settings → Playback → Lossless server**. Meoify searches that server for a matching Tidal track, then streams FLAC (via BTS manifest or DASH) or 320 kbps AAC. When no server is set or the server fails, those tiers fall back to the best YouTube Music stream. You can give the server a custom name and test it before saving; Settings shows whether the saved server is responding. Meoify never upsamples or fakes lossless audio. A new mode applies from the next track.
+YouTube Music itself tops out at 256 kbps AAC/Opus. Add a server under **Settings → Playback → Lossless server** to go higher. Meoify supports two server formats in the same field and detects which one you pasted:
+
+| Server | What you get | Best for |
+|---|---|---|
+| [hifi-api](https://github.com/binimum/hifi-api) / Tidal | FLAC up to 24-bit, or 320 kbps AAC | True **Lossless (Hi-Res)** |
+| 320 kbps Worker (JioSaavn) | AAC up to 320 kbps | **Standard (320 kbps)** and catalogue matches |
+
+Meoify searches the server for a matching track, verifies the response, and streams the real URL it returns. When no server is set or the server fails, those tiers fall back to the best YouTube Music stream. Meoify never upsamples or fakes lossless audio.
+
+Give the server a custom name and tap **Test connection** before saving. Settings shows the saved name and whether the server is responding.
+
+The 320 kbps Worker is based on [EchoMusicApp/320kbs-extension](https://github.com/EchoMusicApp/320kbs-extension) (MIT). hifi-api/Tidal is required for true Hi-Res.
 
 ---
 
-## Build from source
+## 🛠️ Build from source
 
 **Requirements:** JDK 17 and Android SDK 36.
 
@@ -142,120 +95,56 @@ For a debug build:
 gradle assembleDebug
 ```
 
-### Patched NewPipeExtractor
+---
 
-Streaming uses [NewPipeExtractor](https://github.com/TeamNewPipe/NewPipeExtractor) `v0.27.1`, patched for Android 8–12. The upstream jar calls APIs that only exist on Android 13+; without the patch, playback crashes with `NoSuchMethodError`.
+## 🧰 Tech stack
 
-The patched jar lives in `app/libs/` and can be regenerated offline:
-
-```bash
-tools/patch-newpipe-extractor/patch.sh
-```
-
-See [`tools/patch-newpipe-extractor/README.md`](tools/patch-newpipe-extractor/README.md) for the full list of rewrites.
-
-### Tests
-
-```bash
-gradle testDebugUnitTest
-```
+- **Kotlin** + **Jetpack Compose** (Material 3)
+- **Media3 / ExoPlayer** for playback
+- **NewPipeExtractor** for YouTube Music streams
+- **OkHttp** + **kotlinx.serialization** for networking
+- **Coil** for image loading
 
 ---
 
-## Tech stack
-
-| Layer | Technology |
-|---|---|
-| Language | Kotlin 2.4 |
-| UI | Jetpack Compose 1.9, Material 3 1.4 |
-| Playback | Media3 / ExoPlayer 1.8 |
-| Networking | OkHttp 4.12, InnerTube (WEB_REMIX) |
-| Streaming | NewPipeExtractor 0.27.1 (patched) |
-| Images | Coil 3 |
-| Storage | DataStore, kotlinx.serialization |
-| Lyrics | LRCLIB |
-| Artwork | YouTube Music, Spotify, Apple iTunes |
-
-### Project layout
-
-```text
-app/src/main/java/com/meoify/music/
-├── data/        # InnerTube, stream resolution, artwork, settings, backup
-├── playback/    # Media3 service, queue and player state
-├── ui/          # Compose screens, components, navigation and theme
-└── util/        # Intents, formatting and small helpers
-```
-
----
-
-## FAQ
+## ❓ FAQ
 
 <details>
-<summary><strong>Is Meoify affiliated with YouTube or Google?</strong></summary>
+<summary><strong>Is this an official YouTube Music app?</strong></summary>
 
-No. Meoify is an independent, unofficial project. It is not endorsed by or sponsored by YouTube, Google or any music catalogue provider.
-
-</details>
-
-<details>
-<summary><strong>Do I need a YouTube Music account?</strong></summary>
-
-No. Meoify works with a local profile and local library. Signing in is optional and only needed for a personalised home feed, account playlists and history sync.
-
+No. Meoify is an unofficial, independent client. It is not affiliated with, endorsed by, or sponsored by Google or YouTube.
 </details>
 
 <details>
 <summary><strong>Does Lossless really play FLAC?</strong></summary>
 
-Yes — if you configure a hifi-api compatible server in **Settings → Playback → Lossless server**. Hi-Res streams FLAC (up to 24-bit) and Standard streams 320 kbps AAC from that server, matched by title, artist and duration. Without a server, YouTube Music is capped at 256 kbps AAC/Opus, so those tiers fall back to its best stream. Meoify never upsamples audio.
-
+Yes — if you configure a hifi-api / Tidal-compatible server in **Settings → Playback → Lossless server**. Hi-Res streams FLAC (up to 24-bit) and Standard streams 320 kbps AAC, matched by title, artist and duration. The 320 kbps Worker is a Saavn server and is not lossless; it provides up to 320 kbps AAC. Without a suitable server, YouTube Music is capped at 256 kbps AAC/Opus, so those tiers fall back to its best stream. Meoify never upsamples audio.
 </details>
 
 <details>
-<summary><strong>Where does the audio come from?</strong></summary>
+<summary><strong>Why does the in-app update checker need a manifest file?</strong></summary>
 
-Audio is streamed from YouTube Music through NewPipeExtractor. Meoify does not host, store or redistribute any audio.
-
+The Meoify repository is private, so anonymous GitHub API calls return 404. A tiny public manifest in the profile repository is read first; the GitHub API is still tried as a fallback.
 </details>
 
 <details>
-<summary><strong>Is my data collected?</strong></summary>
+<summary><strong>How do I report a bug?</strong></summary>
 
-No analytics or tracking SDKs. Settings, playlists and history live on your device. Optional YouTube Music sign-in talks directly to YouTube Music.
-
-</details>
-
-<details>
-<summary><strong>Why is the APK not on the Play Store?</strong></summary>
-
-A third-party YouTube Music client is not permitted there. Releases are published on GitHub instead.
-
-</details>
-
-<details>
-<summary><strong>How do I update?</strong></summary>
-
-Use **Settings → About → Check for updates**, or install the newer APK over the current one. Your data is kept.
-
+Open an issue on [GitHub](https://github.com/popeye0013/Meoify/issues) with your device, Android version, and steps to reproduce. Logs from `adb logcat` are very helpful.
 </details>
 
 ---
 
-## Contributing
+## 🤝 Contributing
 
-Issues and pull requests are welcome.
+Contributions are welcome. Fork the repo, create a feature branch, and open a pull request. Please keep commits focused and follow the existing code style.
 
-- Keep changes focused and match the existing Kotlin / Compose style.
-- Run `gradle testDebugUnitTest` before opening a PR.
-- For a bug report, include your Android version, Meoify version and steps to reproduce.
+## ⚖️ Legal disclaimer
+
+Audio is streamed from YouTube Music through NewPipeExtractor. If you configure a lossless or 320 kbps server, those higher-quality modes stream from the server you chose. Meoify does not host, store or redistribute any audio.
 
 ---
 
-## Legal disclaimer
-
-Meoify is an **unofficial, independent project**. It is not affiliated with, endorsed by, or sponsored by YouTube, Google or any music catalogue provider.
-
-- Meoify does **not** host, store or redistribute audio. Audio is streamed from YouTube Music.
-- All trademarks, logos and content belong to their respective owners.
-
-If you are a rights holder and have a concern, please open an issue or contact me
+<p align="center">
+  <sub>Built with ❤️ for music lovers.</sub>
+</p>
