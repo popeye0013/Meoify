@@ -15,8 +15,8 @@ android {
         applicationId = "com.meoify.music"
         minSdk = 26
         targetSdk = 36
-        versionCode = 56
-        versionName = "2.0.21"
+        versionCode = 57
+        versionName = "2.0.22"
     }
 
     buildFeatures {
