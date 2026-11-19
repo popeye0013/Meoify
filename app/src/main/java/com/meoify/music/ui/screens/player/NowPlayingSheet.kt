@@ -21,6 +21,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.QueueMusic
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.Lyrics
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
@@ -73,6 +74,7 @@ internal fun NowPlayingSheet(
     onShare: () -> Unit,
     onShowQueue: () -> Unit,
     onToggleLyricsPreview: () -> Unit,
+    onListenTogether: () -> Unit,
     onOpenVideo: () -> Unit,
     onSleepTimer: () -> Unit,
 ) {
@@ -212,6 +214,13 @@ internal fun NowPlayingSheet(
                 supporting = "Watch on YouTube Music",
             ) {
                 closeThen(onOpenVideo)
+            }
+            SheetAction(
+                icon = Icons.Filled.Group,
+                label = "Listen Together",
+                supporting = "Invite friends to listen along",
+            ) {
+                closeThen(onListenTogether)
             }
             SheetAction(
                 icon = Icons.Filled.Lyrics,

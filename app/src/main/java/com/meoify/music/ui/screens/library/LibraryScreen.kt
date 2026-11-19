@@ -110,7 +110,6 @@ fun LibraryScreen(
     var menuTarget by remember { mutableStateOf<PlaylistTarget?>(null) }
     var renameTarget by remember { mutableStateOf<PlaylistTarget?>(null) }
     var deleteTarget by remember { mutableStateOf<PlaylistTarget?>(null) }
-    var showPlaylistSearch by remember { mutableStateOf(false) }
     var renameValue by remember { mutableStateOf("") }
 
     val listState = rememberLazyListState()
@@ -156,15 +155,6 @@ fun LibraryScreen(
                         tint = MaterialTheme.colorScheme.onSurface,
                     )
                 }
-                if (filter == LibraryFilter.Playlists) {
-                    IconButton(onClick = { showPlaylistSearch = !showPlaylistSearch }) {
-                        Icon(
-                            Icons.Filled.Search,
-                            contentDescription = "Search playlists",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
             }
         }
 
@@ -194,7 +184,7 @@ fun LibraryScreen(
                         )
                     }
                 }
-                if (showPlaylistSearch && filter == LibraryFilter.Playlists) {
+                if (filter == LibraryFilter.Playlists) {
                     OutlinedTextField(
                         value = playlistQuery,
                         onValueChange = { playlistQuery = it },

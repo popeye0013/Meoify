@@ -178,6 +178,7 @@ fun PlayerScreen(onClose: () -> Unit) {
     var menuOpen by remember { mutableStateOf(false) }
     var showSleepTimer by remember { mutableStateOf(false) }
     var showVolume by remember { mutableStateOf(false) }
+    var showListenTogether by remember { mutableStateOf(false) }
     var lyrics by remember { mutableStateOf<TrackLyrics?>(null) }
     var lyricsLoading by remember { mutableStateOf(false) }
 
@@ -397,6 +398,10 @@ fun PlayerScreen(onClose: () -> Unit) {
         }
     }
 
+    if (showListenTogether) {
+        ListenTogetherSheet(onDismiss = { showListenTogether = false })
+    }
+
     if (showQueue) {
         QueueSheet(
             state = state,
@@ -424,6 +429,7 @@ fun PlayerScreen(onClose: () -> Unit) {
             onShowQueue = { showQueue = true },
             lyricsPreviewEnabled = showLyricsPreview,
             onToggleLyricsPreview = { showLyricsPreview = !showLyricsPreview },
+            onListenTogether = { showListenTogether = true },
             onOpenVideo = ::openVideo,
             onSleepTimer = { showSleepTimer = true },
         )
