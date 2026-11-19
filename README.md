@@ -137,14 +137,14 @@ Give the server a custom name and tap **Test connection** before saving. Setting
 Meoify's recommended 320 kbps server is a free Cloudflare Worker that connects to the JioSaavn catalogue. It needs no API key, secrets or bindings.
 
 <p align="center">
-  <a href="https://deploy.workers.cloudflare.com/?url=https://github.com/popeye0013/saavn-extension-320kbps">
+  <a href="https://deploy.workers.cloudflare.com/?url=https://github.com/popeye0013/Hi-fi">
     <img src="https://deploy.workers.cloudflare.com/button" alt="Deploy to Cloudflare Workers" />
   </a>
 </p>
 
 1. Click **Deploy to Cloudflare Workers**.
 2. Sign in to Cloudflare and connect your GitHub account when prompted.
-3. Let Cloudflare create your copy of [`popeye0013/saavn-extension-320kbps`](https://github.com/popeye0013/saavn-extension-320kbps).
+3. Let Cloudflare create your copy of [`popeye0013/Hi-fi`](https://github.com/popeye0013/Hi-fi).
 4. If Cloudflare asks for commands, use:
 
    | Setting | Command |
