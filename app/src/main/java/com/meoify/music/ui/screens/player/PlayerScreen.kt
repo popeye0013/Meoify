@@ -221,14 +221,13 @@ fun PlayerScreen(onClose: () -> Unit) {
         }
     }
 
-    // One effect owns both the reset and the fetch. Splitting them left the
-    // view empty after a track change: the load effect saw the previous track's
-    // lyrics and returned early, then the reset effect cleared them.
-    LaunchedEffect(track?.id, showLyrics) {
+    // Load lyrics for the current track so the Now Playing preview (and the
+    // full lyrics view) can show synced text in real time.
+    LaunchedEffect(track?.id) {
         lyrics = null
         lyricsLoading = false
-        if (!showLyrics || track == null) return@LaunchedEffect
-        lyricsLoading = true
+        if (track == null) return@LaunchedEffect
+        if (showLyrics) lyricsLoading = true
         val loaded = withContext(Dispatchers.IO) {
             runCatching { app.container.repository.trackLyrics(track) }.getOrNull()
         }
@@ -363,6 +362,7 @@ fun PlayerScreen(onClose: () -> Unit) {
                     PlayerMainContent(
                         state = state,
                         track = track,
+                        lyrics = lyrics,
                         actions = actions,
                         accent = accent,
                         onShowLyrics = { showLyrics = true },
@@ -566,6 +566,7 @@ private fun PlayerMenuItem(
 private fun PlayerMainContent(
     state: PlayerUiState,
     track: Track?,
+    lyrics: TrackLyrics?,
     actions: AppActions,
     accent: Color,
     onShowLyrics: () -> Unit,
@@ -599,6 +600,14 @@ private fun PlayerMainContent(
                     cornerRadius = 28.dp,
                 )
             }
+            LyricsPreview(
+                lyrics = lyrics,
+                positionMs = state.positionMs,
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .padding(start = 12.dp),
+            )
             Spacer(Modifier.width(20.dp))
             PlayerControls(
                 state = state,
@@ -638,6 +647,13 @@ private fun PlayerMainContent(
                     cornerRadius = 28.dp,
                 )
             }
+            LyricsPreview(
+                lyrics = lyrics,
+                positionMs = state.positionMs,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 8.dp),
+            )
             PlayerControls(
                 state = state,
                 track = track,
@@ -1188,6 +1204,51 @@ private fun PillButton(
             ) {
                 content()
             }
+        }
+    }
+}
+
+@Composable
+private fun LyricsPreview(
+    lyrics: TrackLyrics?,
+    positionMs: Long,
+    modifier: Modifier = Modifier,
+) {
+    val currentIndex = remember(lyrics, positionMs) {
+        if (lyrics == null || !lyrics.synced || lyrics.lines.isEmpty()) -1
+        else lyrics.lines.indexOfLast { it.timeMs <= positionMs }
+    }
+    val current = lyrics?.lines?.getOrNull(currentIndex)?.text?.trim().orEmpty()
+    val next = lyrics?.lines?.getOrNull(currentIndex + 1)?.text?.trim().orEmpty()
+
+    if (current.isBlank() && next.isBlank()) return
+
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        if (current.isNotBlank()) {
+            Text(
+                text = current,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface,
+                textAlign = TextAlign.Center,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        if (next.isNotBlank()) {
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = next,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f),
+                textAlign = TextAlign.Center,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
     }
 }

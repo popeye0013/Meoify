@@ -148,7 +148,7 @@ enum class AudioQuality(
     STANDARD(
         title = "Standard quality (320 kbps)",
         shortLabel = "320 kbps",
-        description = "320 kbps AAC from a hifi-api or Meoify 320 server",
+        description = "320 kbps AAC from a hifi-api or 320 kbps server",
     ),
     YOUTUBE_MUSIC(
         title = "Balanced (256 kbps)",

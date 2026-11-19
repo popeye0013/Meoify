@@ -162,11 +162,10 @@ fun HomeScreen() {
                 is UiState.Success -> {
                     val feed = s.value
                     val quickTracks = (library.recent + feed.quickPicks).distinctBy { it.id }.take(6)
-                    val featured = feed.communityPlaylists.firstOrNull()
-                    val madeForYou = feed.communityPlaylists.let { playlists ->
-                        // The first playlist is already the featured card above.
-                        if (featured != null && playlists.size > 1) playlists.drop(1) else playlists
-                    }
+                    val featured = feed.communityPlaylists.firstOrNull { playlist ->
+                        !playlist.title.contains("liked", ignoreCase = true)
+                    } ?: feed.communityPlaylists.firstOrNull()
+                    val madeForYou = feed.communityPlaylists.filterNot { it === featured }
                     val quickPicks = feed.quickPicks.take(6)
                     val trendingTracks = if (feed.quickPicks.size > quickPicks.size) {
                         feed.quickPicks.drop(quickPicks.size).take(10)

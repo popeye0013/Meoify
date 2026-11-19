@@ -94,7 +94,7 @@ fun AudioQualitySheet(
             Spacer(Modifier.height(10.dp))
             Text(
                 text = "Add a hifi-api (Tidal) server for Hi-Res FLAC, or a " +
-                    "Meoify 320 kbps Cloudflare Worker, in Settings → Playback → " +
+                    "320 kbps server for AAC streaming, in Settings → Playback → " +
                     "Lossless server. Without one, those tiers fall back to " +
                     "YouTube Music's best stream.",
                 style = MaterialTheme.typography.bodySmall,

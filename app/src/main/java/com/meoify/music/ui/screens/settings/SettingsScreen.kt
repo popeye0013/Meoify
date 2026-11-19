@@ -568,7 +568,7 @@ fun SettingsScreen(
                                     false -> "Not responding — check the URL or server"
                                     null -> settings.losslessServer
                                         ?.let { "hifi-api or 320 kbps server • $it" }
-                                        ?: "Add a hifi-api or Meoify 320 kbps server"
+                                        ?: "Add a hifi-api (Tidal) server for Hi-Res FLAC or a 320 kbps server for AAC streaming"
                                 },
                                 style = MaterialTheme.typography.bodySmall,
                                 color = if (serverWorking == false) MaterialTheme.colorScheme.error
@@ -829,10 +829,10 @@ fun SettingsScreen(
             text = {
                 Column {
                     Text(
-                        "Meoify streams Hi-Res FLAC from a hifi-api/Tidal server, or up " +
-                            "to 320 kbps AAC from a Cloudflare Worker (JioSaavn). Paste " +
-                            "either URL — Meoify detects the server type automatically. " +
-                            "Other quality modes keep using YouTube Music.",
+                        "Stream Hi-Res FLAC via Tidal or up to 320 kbps AAC via " +
+                            "JioSaavn. Enter your Tidal API or JioSaavn Worker URL " +
+                            "for automatic server detection. Other quality modes use " +
+                            "YouTube Music.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -841,7 +841,7 @@ fun SettingsScreen(
                         value = serverNameDraft,
                         onValueChange = { serverNameDraft = it },
                         label = { Text("Server name") },
-                        placeholder = { Text("Meoify 320") },
+                        placeholder = { Text("Meoify") },
                         leadingIcon = { Icon(Icons.Filled.Badge, contentDescription = null) },
                         singleLine = true,
                         shape = RoundedCornerShape(16.dp),
