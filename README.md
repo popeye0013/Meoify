@@ -5,9 +5,7 @@
 <h1 align="center">Meoify</h1>
 
 <p align="center">
-  <strong>YouTube Music, the way you want it.</strong><br/>
-  A native, unofficial YouTube Music client for Android.<br/>
-  Material 3 Expressive · Background playback · Real album artwork · Synced lyrics
+  <img src="https://readme-typing-svg.demolab.com?font=Google+Sans&weight=600&size=22&pause=1000&color=FF4D67&center=true&vCenter=true&width=520&lines=YouTube+Music%2C+the+way+you+want+it.;Material+3+Expressive+%C2%B7+Lossless+%C2%B7+Lyrics;Background+playback+%C2%B7+Real+artwork" alt="Typing animation" />
 </p>
 
 <p align="center">
@@ -40,41 +38,6 @@
   <a href="#tech-stack">Stack</a> ·
   <a href="#faq">FAQ</a>
 </p>
-
----
-
-## Download
-
-Meoify is distributed as a signed APK on GitHub Releases.
-
-| | |
-|---|---|
-| **Latest release** | [github.com/popeye0013/Meoify/releases/latest](https://github.com/popeye0013/Meoify/releases/latest) |
-| **Requirements** | Android 8.0 (API 26) or newer |
-| **Price** | Free and open source (GPL-3.0) |
-| **Play Store** | Not available — side-load the APK |
-
-**Install**
-
-1. Download `Meoify-<version>.apk` from the latest release.
-2. Open the file on your phone.
-3. If Android asks, allow installs from your browser or file manager.
-4. Open Meoify. Updates install over the top and keep your data.
-
-> Meoify also checks for updates from **Settings → About**.
-
----
-
-## What's new
-
-- **2.0.26** — Real-time synced lyrics preview under the album art; lossless server dialog rewritten; skips liked-songs-only in "Picked for you".
-- **2.0.25** — High refresh rate (up to 120 Hz) support; redesigned README.
-- **2.0.24** — Simplified "Volume & output" sheet (volume + Bluetooth battery badge); Now Playing shows Bluetooth icon only over Bluetooth.
-- **2.0.23** — Deduplicates Bluetooth outputs by MAC address; filters the phone's own Bluetooth routing entry.
-- **2.0.22** — Collapses same-named audio outputs; Material 3 Bluetooth battery badge.
-- **2.0.21** — Filters phantom/OEM audio outputs; redesigned Bluetooth battery indicator.
-- **2.0.20** — Improved Bluetooth battery detection and audio device tracking.
-- **2.0.19** — Lossless server now also accepts the Meoify 320 kbps Cloudflare Worker (auto-detected); speaker dedupe; Bluetooth battery in Now Playing.
 
 ---
 
