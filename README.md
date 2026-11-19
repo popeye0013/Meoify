@@ -65,6 +65,19 @@ Meoify is distributed as a signed APK on GitHub Releases.
 
 ---
 
+## What's new
+
+- **2.0.26** — Real-time synced lyrics preview under the album art; lossless server dialog rewritten; skips liked-songs-only in "Picked for you".
+- **2.0.25** — High refresh rate (up to 120 Hz) support; redesigned README.
+- **2.0.24** — Simplified "Volume & output" sheet (volume + Bluetooth battery badge); Now Playing shows Bluetooth icon only over Bluetooth.
+- **2.0.23** — Deduplicates Bluetooth outputs by MAC address; filters the phone's own Bluetooth routing entry.
+- **2.0.22** — Collapses same-named audio outputs; Material 3 Bluetooth battery badge.
+- **2.0.21** — Filters phantom/OEM audio outputs; redesigned Bluetooth battery indicator.
+- **2.0.20** — Improved Bluetooth battery detection and audio device tracking.
+- **2.0.19** — Lossless server now also accepts the Meoify 320 kbps Cloudflare Worker (auto-detected); speaker dedupe; Bluetooth battery in Now Playing.
+
+---
+
 ## Features
 
 ### Discover
@@ -84,6 +97,9 @@ Meoify is distributed as a signed APK on GitHub Releases.
 - **Five audio modes** — Auto, Lossless (Hi-Res), Standard (320 kbps), Balanced (256 kbps) and Data Saver. See [Audio quality](#audio-quality).
 - **Sleep timer** — stop playback after 5, 10, 15, 30, 45 or 60 minutes.
 - **Synced lyrics** — LRC from LRCLIB with auto-scroll and tap-to-seek, plus a plain-text fallback.
+- **Lyrics preview** — real-time synced lyrics under the album art on Now Playing.
+- **Volume & output** — media volume slider with a Bluetooth battery badge; switch outputs from the system.
+- **High refresh rate** — uses up to 120 Hz where the display supports it.
 - **Real album artwork** — covers from YouTube Music, Spotify and Apple's catalogue. Catalogue art is preferred; the video thumbnail is shown only when no album cover can be found, so a row is never left blank.
 
 ### Library & accounts
@@ -98,7 +114,7 @@ Meoify is distributed as a signed APK on GitHub Releases.
 ### Design & details
 
 - **Material 3 Expressive** — light, dark and pure-black themes, dynamic colour on Android 12+, rounded surfaces and Google Sans Flex.
-- **Volume & output popup** — the speaker button on Now Playing opens a media volume slider, deduplicated connected outputs with one-tap switching (phone speaker, Bluetooth, wired or USB), and a Bluetooth connection shortcut. The button shows a speaker or Bluetooth icon to match the active output.
+- **Volume & output popup** — the speaker button on Now Playing opens a media volume slider with a Bluetooth battery badge. Output switching happens via the system. The button shows a speaker or Bluetooth icon to match the active output.
 - **Sharing** — share songs or jump to album and artist pages from the track menu.
 - **In-app updates** — release notes in Settings and an optional home-screen prompt.
 
@@ -116,7 +132,7 @@ Pick a mode in **Settings → Playback**, or tap the quality pill on the Now Pla
 | **Balanced (256 kbps)** | 256 kbps AAC / Opus, the native YouTube Music stream. |
 | **Data Saver** | Low-bitrate audio to reduce mobile data use. |
 
-> YouTube Music itself tops out at 256 kbps AAC/Opus. To make Hi-Res and 320 kbps real, add the base URL of a [hifi-api](https://github.com/binimum/hifi-api) compatible server under **Settings → Playback → Lossless server**. Meoify searches that server for a matching Tidal track, then streams FLAC (via BTS manifest or DASH) or 320 kbps AAC. When no server is set or the server fails, those tiers fall back to the best YouTube Music stream. You can give the server a custom name and test it before saving; Settings shows whether the saved server is responding. Meoify never upsamples or fakes lossless audio. A new mode applies from the next track.
+> YouTube Music itself tops out at 256 kbps AAC/Opus. To go higher, add a server under **Settings → Playback → Lossless server**. Meoify supports two formats in the same field and detects which one you pasted: a [hifi-api](https://github.com/binimum/hifi-api) / Tidal server for Hi-Res FLAC, or a 320 kbps Cloudflare Worker (JioSaavn) for AAC up to 320 kbps. Meoify searches the server for a matching track and streams the real URL it returns. When no server is set or it fails, those tiers fall back to the best YouTube Music stream. You can give the server a custom name and test it before saving; Settings shows whether the saved server is responding. Meoify never upsamples or fakes lossless audio. The 320 kbps Worker is based on [EchoMusicApp/320kbs-extension](https://github.com/EchoMusicApp/320kbs-extension) (MIT). A new mode applies from the next track.
 
 ---
 
