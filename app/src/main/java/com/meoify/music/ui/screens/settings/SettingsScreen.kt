@@ -829,10 +829,10 @@ fun SettingsScreen(
             text = {
                 Column {
                     Text(
-                        "Paste a hifi-api (Tidal) server for Hi-Res FLAC, or the " +
-                            "Meoify 320 kbps Cloudflare Worker. Meoify detects the " +
-                            "server type automatically; other modes keep using " +
-                            "YouTube Music.",
+                        "Meoify streams Hi-Res FLAC from a hifi-api/Tidal server, or up " +
+                            "to 320 kbps AAC from a Cloudflare Worker (JioSaavn). Paste " +
+                            "either URL — Meoify detects the server type automatically. " +
+                            "Other quality modes keep using YouTube Music.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -897,7 +897,7 @@ fun SettingsScreen(
                     TextButton(
                         onClick = {
                             context.openUrl(
-                                "https://github.com/popeye0013/Meoify#deploy-your-own-320-kbps-server",
+                                "https://github.com/EchoMusicApp/320kbs-extension",
                             )
                         },
                         contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp),
@@ -910,6 +910,12 @@ fun SettingsScreen(
                         Spacer(Modifier.width(6.dp))
                         Text("Deploy your own server on Cloudflare")
                     }
+                    Text(
+                        "The 320 kbps Worker is based on EchoMusicApp/320kbs-extension " +
+                            "(MIT). hifi-api/Tidal is required for true Hi-Res.",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
             },
             confirmButton = {

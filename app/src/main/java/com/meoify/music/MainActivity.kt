@@ -34,6 +34,23 @@ class MainActivity : ComponentActivity() {
         installSplashScreen()
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+        // Prefer the highest refresh rate the display supports for smooth UI.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            val current = display?.mode
+            val bestMode = display?.supportedModes
+                ?.filter { mode ->
+                    current == null ||
+                        (mode.physicalWidth == current.physicalWidth &&
+                            mode.physicalHeight == current.physicalHeight)
+                }
+                ?.maxByOrNull { it.refreshRate }
+                ?: display?.supportedModes?.maxByOrNull { it.refreshRate }
+            if (bestMode != null) {
+                window.attributes = window.attributes.apply {
+                    preferredDisplayModeId = bestMode.modeId
+                }
+            }
+        }
         pendingLink = intent?.dataString
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
