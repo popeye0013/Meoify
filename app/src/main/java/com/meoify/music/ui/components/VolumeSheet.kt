@@ -17,6 +17,15 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Battery0Bar
+import androidx.compose.material.icons.filled.Battery1Bar
+import androidx.compose.material.icons.filled.Battery2Bar
+import androidx.compose.material.icons.filled.Battery3Bar
+import androidx.compose.material.icons.filled.Battery4Bar
+import androidx.compose.material.icons.filled.Battery5Bar
+import androidx.compose.material.icons.filled.Battery6Bar
+import androidx.compose.material.icons.filled.BatteryFull
+import androidx.compose.material.icons.filled.BatteryUnknown
 import androidx.compose.material.icons.filled.Bluetooth
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Headset
@@ -45,6 +54,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.meoify.music.playback.isBluetoothAudio
 
 /** Android-style volume and output-device picker opened from the player speaker button. */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -52,6 +62,7 @@ import androidx.compose.ui.unit.dp
 fun VolumeSheet(
     selectedOutputType: Int,
     selectedOutputDeviceId: Int?,
+    bluetoothBattery: Int?,
     onSelectDevice: (AudioDeviceInfo) -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -189,7 +200,27 @@ fun VolumeSheet(
                                     else MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                             }
+                            if (output.device.type.isBluetoothAudio()) {
+                                Spacer(Modifier.width(8.dp))
+                                Icon(
+                                    imageVector = batteryIcon(bluetoothBattery),
+                                    contentDescription = null,
+                                    tint = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer
+                                    else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(17.dp),
+                                )
+                                if (bluetoothBattery != null) {
+                                    Spacer(Modifier.width(2.dp))
+                                    Text(
+                                        text = "$bluetoothBattery%",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer
+                                        else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                            }
                             if (isSelected) {
+                                Spacer(Modifier.width(6.dp))
                                 Icon(
                                     Icons.Filled.Check,
                                     contentDescription = "Active output",
@@ -265,7 +296,10 @@ private fun outputDevices(audio: AudioManager): List<AudioOutput> {
 
 private fun AudioDeviceInfo.isBuiltInSpeaker(): Boolean =
     type == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER ||
-        type == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER_SAFE
+        type == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER_SAFE ||
+        // Some OEMs also expose the earpiece as an output. Media uses the
+        // loudspeaker, so showing both creates duplicate "Phone speaker" rows.
+        type == AudioDeviceInfo.TYPE_BUILTIN_EARPIECE
 
 private fun AudioDeviceInfo.outputKey(): String = "${type}|${productName().lowercase()}"
 
@@ -278,6 +312,19 @@ fun outputIcon(type: Int): ImageVector = when (type) {
     AudioDeviceInfo.TYPE_WIRED_HEADSET, AudioDeviceInfo.TYPE_WIRED_HEADPHONES -> Icons.Filled.Headset
     AudioDeviceInfo.TYPE_USB_DEVICE, AudioDeviceInfo.TYPE_USB_HEADSET, AudioDeviceInfo.TYPE_USB_ACCESSORY -> Icons.Filled.Usb
     else -> Icons.Filled.Speaker
+}
+
+/** Battery glyph matched to the last level reported by the Bluetooth stack. */
+fun batteryIcon(level: Int?): ImageVector = when {
+    level == null -> Icons.Filled.BatteryUnknown
+    level >= 95 -> Icons.Filled.BatteryFull
+    level >= 80 -> Icons.Filled.Battery6Bar
+    level >= 65 -> Icons.Filled.Battery5Bar
+    level >= 50 -> Icons.Filled.Battery4Bar
+    level >= 35 -> Icons.Filled.Battery3Bar
+    level >= 20 -> Icons.Filled.Battery2Bar
+    level >= 10 -> Icons.Filled.Battery1Bar
+    else -> Icons.Filled.Battery0Bar
 }
 
 /** Short label used for now-playing accessibility text. */

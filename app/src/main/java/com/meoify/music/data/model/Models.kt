@@ -143,12 +143,12 @@ enum class AudioQuality(
     HI_RES(
         title = "Lossless (Hi-Res)",
         shortLabel = "Hi-Res",
-        description = "Up to 24-bit FLAC from your lossless server",
+        description = "Up to 24-bit FLAC from a hifi-api/Tidal server",
     ),
     STANDARD(
         title = "Standard quality (320 kbps)",
         shortLabel = "320 kbps",
-        description = "320 kbps AAC from your lossless server",
+        description = "320 kbps AAC from a hifi-api or Meoify 320 server",
     ),
     YOUTUBE_MUSIC(
         title = "Balanced (256 kbps)",
@@ -167,7 +167,7 @@ data class AppSettings(
     val dynamicColor: Boolean = false,
     val pureBlack: Boolean = false,
     val quality: AudioQuality = AudioQuality.AUTO,
-    /** Base URL of a hifi-api compatible server used for Lossless and 320 kbps. */
+    /** Base URL of a hifi-api or Meoify 320 kbps server. */
     val losslessServer: String? = null,
     /** User-defined label shown for the lossless server in Settings. */
     val losslessServerName: String? = null,

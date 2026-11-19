@@ -36,6 +36,7 @@
   <a href="#download">Download</a> ·
   <a href="#features">Features</a> ·
   <a href="#audio-quality">Audio quality</a> ·
+  <a href="#server-setup">Server setup</a> ·
   <a href="#build-from-source">Build</a> ·
   <a href="#tech-stack">Stack</a> ·
   <a href="#faq">FAQ</a>
@@ -98,7 +99,7 @@ Meoify is distributed as a signed APK on GitHub Releases.
 ### Design & details
 
 - **Material 3 Expressive** — light, dark and pure-black themes, dynamic colour on Android 12+, rounded surfaces and Google Sans Flex.
-- **Volume & output popup** — the speaker button on Now Playing opens a media volume slider, deduplicated connected outputs with one-tap switching (phone speaker, Bluetooth, wired or USB), and a Bluetooth connection shortcut. The button shows a speaker or Bluetooth icon to match the active output.
+- **Volume & output popup** — the speaker button on Now Playing opens a media volume slider, deduplicated connected outputs with one-tap switching (phone speaker, Bluetooth, wired or USB), and a Bluetooth connection shortcut. The button shows a speaker or Bluetooth icon to match the active output, with the Bluetooth battery level when the headset reports one.
 - **Sharing** — share songs or jump to album and artist pages from the track menu.
 - **In-app updates** — release notes in Settings and an optional home-screen prompt.
 
@@ -106,17 +107,62 @@ Meoify is distributed as a signed APK on GitHub Releases.
 
 ## Audio quality
 
-Pick a mode in **Settings → Playback**, or tap the quality pill on the Now Playing card.
+Pick a mode in **Settings → Playback**. The selected mode applies from the next track.
 
 | Mode | What it does |
 |---|---|
 | **Auto** | Adapts to your connection — Wi-Fi keeps the best stream, mobile data stays balanced. |
-| **Lossless (Hi-Res)** | Up to 24-bit FLAC from a hifi-api / Tidal-compatible server. |
-| **Standard (320 kbps)** | 320 kbps AAC from the same lossless server. |
+| **Lossless (Hi-Res)** | Up to 24-bit FLAC from a hifi-api / Tidal-compatible server. With a 320 kbps server, Meoify uses its best available AAC stream. |
+| **Standard (320 kbps)** | 320 kbps AAC from either supported server type. |
 | **Balanced (256 kbps)** | 256 kbps AAC / Opus, the native YouTube Music stream. |
 | **Data Saver** | Low-bitrate audio to reduce mobile data use. |
 
-> YouTube Music itself tops out at 256 kbps AAC/Opus. To make Hi-Res and 320 kbps real, add the base URL of a [hifi-api](https://github.com/binimum/hifi-api) compatible server under **Settings → Playback → Lossless server**. Meoify searches that server for a matching Tidal track, then streams FLAC (via BTS manifest or DASH) or 320 kbps AAC. When no server is set or the server fails, those tiers fall back to the best YouTube Music stream. You can give the server a custom name and test it before saving; Settings shows whether the saved server is responding. Meoify never upsamples or fakes lossless audio. A new mode applies from the next track.
+YouTube Music itself tops out at 256 kbps AAC/Opus. Add a server under **Settings → Playback → Lossless server** to go higher. Meoify supports two server formats in the same field and detects which one you pasted:
+
+| Server | What you get | Best for |
+|---|---|---|
+| [hifi-api](https://github.com/binimum/hifi-api) / Tidal | FLAC up to 24-bit, or 320 kbps AAC | True **Lossless (Hi-Res)** |
+| Meoify 320 kbps Worker (Saavn) | AAC up to 320 kbps | **Standard (320 kbps)** and catalogue matches |
+
+Meoify searches the server for a matching track, verifies the response, and streams the real URL it returns. When no server is set or the server fails, those tiers fall back to the best YouTube Music stream. Meoify never upsamples or fakes lossless audio.
+
+Give the server a custom name and tap **Test connection** before saving. Settings shows the saved name and whether the server is responding.
+
+---
+
+## Server setup
+
+### Deploy your own 320 kbps server
+
+Meoify's recommended 320 kbps server is a free Cloudflare Worker that connects to the JioSaavn catalogue. It needs no API key, secrets or bindings.
+
+<p align="center">
+  <a href="https://deploy.workers.cloudflare.com/?url=https://github.com/popeye0013/saavn-extension-320kbps">
+    <img src="https://deploy.workers.cloudflare.com/button" alt="Deploy to Cloudflare Workers" />
+  </a>
+</p>
+
+1. Click **Deploy to Cloudflare Workers**.
+2. Sign in to Cloudflare and connect your GitHub account when prompted.
+3. Let Cloudflare create your copy of [`popeye0013/saavn-extension-320kbps`](https://github.com/popeye0013/saavn-extension-320kbps).
+4. If Cloudflare asks for commands, use:
+
+   | Setting | Command |
+   |---|---|
+   | Build command | `npm run check && npm run test:echo` |
+   | Deploy command | `npx wrangler deploy` |
+
+5. Wait for the deployment to finish, then open **Workers & Pages** in the Cloudflare dashboard and copy your Worker's public URL:
+
+   ```text
+   https://saavn-extension-320kbps.your-account.workers.dev
+   ```
+
+6. Open Meoify → **Settings → Playback → Lossless server**.
+7. Enter a name such as `Meoify 320`, paste the Worker URL, tap **Test connection**, then **Save**.
+8. Choose **Standard (320 kbps)** for the 320 kbps stream.
+
+> The Worker uses the unofficial JioSaavn catalogue. Tracks that do not offer 320 kbps use the best available quality. It is not a FLAC server: use hifi-api / Tidal when you need true Hi-Res lossless. Cloudflare free-plan limits apply, and this server is not affiliated with JioSaavn.
 
 ---
 
@@ -207,14 +253,14 @@ No. Meoify works with a local profile and local library. Signing in is optional 
 <details>
 <summary><strong>Does Lossless really play FLAC?</strong></summary>
 
-Yes — if you configure a hifi-api compatible server in **Settings → Playback → Lossless server**. Hi-Res streams FLAC (up to 24-bit) and Standard streams 320 kbps AAC from that server, matched by title, artist and duration. Without a server, YouTube Music is capped at 256 kbps AAC/Opus, so those tiers fall back to its best stream. Meoify never upsamples audio.
+Yes — if you configure a hifi-api / Tidal-compatible server in **Settings → Playback → Lossless server**. Hi-Res streams FLAC (up to 24-bit) and Standard streams 320 kbps AAC, matched by title, artist and duration. The Meoify 320 kbps Worker is a Saavn server and is not lossless; it provides up to 320 kbps AAC. Without a suitable server, YouTube Music is capped at 256 kbps AAC/Opus, so those tiers fall back to its best stream. Meoify never upsamples audio.
 
 </details>
 
 <details>
 <summary><strong>Where does the audio come from?</strong></summary>
 
-Audio is streamed from YouTube Music through NewPipeExtractor. Meoify does not host, store or redistribute any audio.
+Audio is streamed from YouTube Music through NewPipeExtractor. If you configure a lossless or 320 kbps server, those higher-quality modes stream from the server you chose. Meoify does not host, store or redistribute any audio.
 
 </details>
 

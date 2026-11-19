@@ -93,9 +93,10 @@ fun AudioQualitySheet(
 
             Spacer(Modifier.height(10.dp))
             Text(
-                text = "Hi-Res FLAC and 320 kbps need a hifi-api server in " +
-                    "Settings → Playback → Lossless server. Without one, " +
-                    "those tiers fall back to YouTube Music's best stream.",
+                text = "Add a hifi-api (Tidal) server for Hi-Res FLAC, or a " +
+                    "Meoify 320 kbps Cloudflare Worker, in Settings → Playback → " +
+                    "Lossless server. Without one, those tiers fall back to " +
+                    "YouTube Music's best stream.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = 6.dp),

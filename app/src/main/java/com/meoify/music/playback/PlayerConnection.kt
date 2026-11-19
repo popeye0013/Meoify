@@ -1,8 +1,11 @@
 package com.meoify.music.playback
 
+import android.bluetooth.BluetoothManager
+import android.content.BroadcastReceiver
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.media.AudioDeviceInfo
 import android.media.AudioManager
 import android.net.Uri
@@ -63,6 +66,8 @@ data class PlayerUiState(
     /** Audio output chosen in the volume sheet, used for the player icon. */
     val outputType: Int = AudioDeviceInfo.TYPE_BUILTIN_SPEAKER,
     val outputDeviceId: Int? = null,
+    /** Reported by the Bluetooth stack when the connected audio device supports it. */
+    val bluetoothBattery: Int? = null,
     /** Epoch millis when the sleep timer pauses playback, or null when off. */
     val sleepEndsAtMs: Long? = null,
 ) {
@@ -76,6 +81,38 @@ sealed interface PlaybackEvent {
     data class Message(val text: String) : PlaybackEvent
     data class Failure(val text: String) : PlaybackEvent
 }
+
+private const val ACTION_BLUETOOTH_BATTERY =
+    "android.bluetooth.device.action.BATTERY_LEVEL_CHANGED"
+private const val EXTRA_BLUETOOTH_BATTERY =
+    "android.bluetooth.device.extra.BATTERY_LEVEL"
+
+internal fun Int.isBluetoothAudio(): Boolean =
+    this == AudioDeviceInfo.TYPE_BLUETOOTH_A2DP || this == AudioDeviceInfo.TYPE_BLUETOOTH_SCO
+
+/**
+ * The public SDK does not expose headset battery. The system's protected
+ * broadcast and BluetoothDevice.getBatteryLevel() reflection are the only
+ * sources; both are best-effort, and many headsets report no level at all.
+ */
+@Suppress("PrivateApi")
+private fun readBluetoothBattery(context: Context, deviceName: String? = null): Int? =
+    runCatching {
+        val adapter = (context.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager)?.adapter
+            ?: return@runCatching null
+        fun levelOf(device: android.bluetooth.BluetoothDevice): Int? =
+            runCatching { device.javaClass.getMethod("getBatteryLevel").invoke(device) as Int }
+                .getOrNull()
+                ?.takeIf { it in 0..100 }
+
+        val bonded = adapter.bondedDevices.toList()
+        // Prefer the headset that is actually routed; fall back to any bonded
+        // device that reports a level so the pill still has something useful.
+        val named = deviceName?.takeIf { it.isNotBlank() }?.let { name ->
+            bonded.firstOrNull { it.name?.equals(name, ignoreCase = true) == true }
+        }
+        named?.let(::levelOf) ?: bonded.firstNotNullOfOrNull(::levelOf)
+    }.getOrNull()
 
 /** Best-effort initial route so the player icon matches a connected device on startup. */
 @Suppress("DEPRECATION")
@@ -121,8 +158,19 @@ class PlayerConnection(
         PlayerUiState(
             outputType = initialOutput.first,
             outputDeviceId = initialOutput.second,
+            bluetoothBattery = readBluetoothBattery(context),
         ),
     )
+
+    private val bluetoothBatteryReceiver = object : BroadcastReceiver() {
+        override fun onReceive(receiverContext: Context, intent: Intent) {
+            if (intent.action != ACTION_BLUETOOTH_BATTERY) return
+            val level = intent.getIntExtra(EXTRA_BLUETOOTH_BATTERY, -1)
+            if (level in 0..100) {
+                _state.update { it.copy(bluetoothBattery = level) }
+            }
+        }
+    }
     val state: StateFlow<PlayerUiState> = _state.asStateFlow()
 
     private val _events = MutableSharedFlow<PlaybackEvent>(extraBufferCapacity = 12)
@@ -275,6 +323,14 @@ class PlayerConnection(
     private var controllerFuture: ListenableFuture<MediaController> = buildController()
 
     init {
+        runCatching {
+            ContextCompat.registerReceiver(
+                context,
+                bluetoothBatteryReceiver,
+                IntentFilter(ACTION_BLUETOOTH_BATTERY),
+                ContextCompat.RECEIVER_EXPORTED,
+            )
+        }
         scope.launch { restoreLastPlayback() }
 
         scope.launch {
@@ -696,6 +752,13 @@ class PlayerConnection(
             )
         }
         _state.update { it.copy(outputType = device.type, outputDeviceId = device.id) }
+        if (device.type.isBluetoothAudio()) {
+            scope.launch(Dispatchers.IO) {
+                readBluetoothBattery(context, device.productName?.toString())?.let { level ->
+                    _state.update { it.copy(bluetoothBattery = level) }
+                }
+            }
+        }
     }
 
     fun seekTo(positionMs: Long) {

@@ -567,8 +567,8 @@ fun SettingsScreen(
                                     true -> "Connected${settings.losslessServer?.let { " • $it" }.orEmpty()}"
                                     false -> "Not responding — check the URL or server"
                                     null -> settings.losslessServer
-                                        ?.let { "Source for Hi-Res FLAC and 320 kbps AAC • $it" }
-                                        ?: "Source for Hi-Res FLAC and 320 kbps AAC"
+                                        ?.let { "hifi-api or 320 kbps server • $it" }
+                                        ?: "Add a hifi-api or Meoify 320 kbps server"
                                 },
                                 style = MaterialTheme.typography.bodySmall,
                                 color = if (serverWorking == false) MaterialTheme.colorScheme.error
@@ -829,9 +829,10 @@ fun SettingsScreen(
             text = {
                 Column {
                     Text(
-                        "Base URL of a hifi-api compatible server. Hi-Res and " +
-                            "320 kbps are streamed from it; other modes keep " +
-                            "using YouTube Music.",
+                        "Paste a hifi-api (Tidal) server for Hi-Res FLAC, or the " +
+                            "Meoify 320 kbps Cloudflare Worker. Meoify detects the " +
+                            "server type automatically; other modes keep using " +
+                            "YouTube Music.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -840,7 +841,7 @@ fun SettingsScreen(
                         value = serverNameDraft,
                         onValueChange = { serverNameDraft = it },
                         label = { Text("Server name") },
-                        placeholder = { Text("My lossless server") },
+                        placeholder = { Text("Meoify 320") },
                         leadingIcon = { Icon(Icons.Filled.Badge, contentDescription = null) },
                         singleLine = true,
                         shape = RoundedCornerShape(16.dp),
@@ -851,7 +852,7 @@ fun SettingsScreen(
                         value = serverDraft,
                         onValueChange = { serverDraft = it },
                         label = { Text("Server URL") },
-                        placeholder = { Text("https://example.com") },
+                        placeholder = { Text("https://…workers.dev or hifi-api URL") },
                         leadingIcon = { Icon(Icons.Filled.Cloud, contentDescription = null) },
                         singleLine = true,
                         shape = RoundedCornerShape(16.dp),
@@ -892,6 +893,23 @@ fun SettingsScreen(
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                    Spacer(Modifier.height(4.dp))
+                    TextButton(
+                        onClick = {
+                            context.openUrl(
+                                "https://github.com/popeye0013/Meoify#deploy-your-own-320-kbps-server",
+                            )
+                        },
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp),
+                    ) {
+                        Icon(
+                            Icons.Filled.Cloud,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp),
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text("Deploy your own server on Cloudflare")
+                    }
                 }
             },
             confirmButton = {

@@ -127,8 +127,10 @@ import androidx.core.view.WindowCompat
 import com.meoify.music.data.model.Track
 import com.meoify.music.data.remote.TrackLyrics
 import com.meoify.music.playback.PlayerUiState
+import com.meoify.music.playback.isBluetoothAudio
 import com.meoify.music.ui.components.TrackRow
 import com.meoify.music.ui.components.VolumeSheet
+import com.meoify.music.ui.components.batteryIcon
 import com.meoify.music.ui.components.outputIcon
 import com.meoify.music.ui.components.outputLabel
 import com.meoify.music.ui.components.ArtworkImage
@@ -234,6 +236,7 @@ fun PlayerScreen(onClose: () -> Unit) {
         VolumeSheet(
             selectedOutputType = state.outputType,
             selectedOutputDeviceId = state.outputDeviceId,
+            bluetoothBattery = state.bluetoothBattery,
             onSelectDevice = app.container.player::selectAudioDevice,
             onDismiss = { showVolume = false },
         )
@@ -885,6 +888,23 @@ private fun PlayerControls(
                     tint = if (state.muted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.86f),
                     modifier = Modifier.size(22.dp),
                 )
+                if (!state.muted && state.outputType.isBluetoothAudio()) {
+                    Spacer(Modifier.width(4.dp))
+                    Icon(
+                        imageVector = batteryIcon(state.bluetoothBattery),
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.70f),
+                        modifier = Modifier.size(17.dp),
+                    )
+                    state.bluetoothBattery?.let { level ->
+                        Spacer(Modifier.width(2.dp))
+                        Text(
+                            text = "$level%",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.70f),
+                        )
+                    }
+                }
             }
 
             PillButton(

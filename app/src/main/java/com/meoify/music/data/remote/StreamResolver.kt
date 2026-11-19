@@ -50,10 +50,10 @@ class StreamUnavailableException(message: String, cause: Throwable? = null) : Ex
  * Resolves a playable audio URL for a track.
  *
  * YouTube extraction is delegated to NewPipeExtractor. For the two higher
- * quality tiers, a configured hifi-api (Tidal-compatible) server is tried
- * first so "320 kbps" and "Lossless" are genuinely 320 kbps AAC and FLAC;
- * when no server is configured or it fails, playback falls back to the best
- * YouTube Music stream instead of erroring out.
+ * quality tiers, a configured hifi-api (Tidal-compatible) or Echo/Saavn
+ * 320 kbps server is tried first so "320 kbps" and "Lossless" are real
+ * server streams; when no server is configured or it fails, playback falls
+ * back to the best YouTube Music stream instead of erroring out.
  */
 class StreamResolver(
     context: Context,
@@ -71,6 +71,7 @@ class StreamResolver(
 
     private val cache = ConcurrentHashMap<String, CachedAudio>()
     private val locks = ConcurrentHashMap<String, Mutex>()
+    private val serverKinds = ConcurrentHashMap<String, ServerKind>()
 
     init {
         NewPipe.init(
@@ -101,7 +102,7 @@ class StreamResolver(
             val audio = if (server != null &&
                 (quality == AudioQuality.HI_RES || quality == AudioQuality.STANDARD)
             ) {
-                runCatching { resolveFromHifiApi(server, track, quality) }
+                runCatching { resolveFromServer(server, track, quality) }
                     .getOrElse { e ->
                         if (e is kotlinx.coroutines.CancellationException) throw e
                         extract(track.id, quality)
@@ -116,13 +117,50 @@ class StreamResolver(
 
     /** Returns null when the server answers a valid catalogue search, or an error message. */
     suspend fun checkServer(server: String): String? = withContext(Dispatchers.IO) {
-        runCatching {
-            val response = getJson(server, "search", "s" to "test", "limit" to "1")
-            response["data"]?.jsonObject?.get("items")?.jsonArray
-                ?: throw StreamUnavailableException("The server returned an unexpected response.")
-        }.exceptionOrNull()
+        runCatching { detectServer(server, force = true) }
+            .exceptionOrNull()
             ?.message
             ?.takeIf { it.isNotBlank() }
+    }
+
+    private suspend fun resolveFromServer(
+        server: String,
+        track: Track,
+        quality: AudioQuality,
+    ): ResolvedAudio = when (detectServer(server)) {
+        ServerKind.HIFI -> resolveFromHifiApi(server, track, quality)
+        ServerKind.SAAVN -> resolveFromSaavn(server, track)
+    }
+
+    /**
+     * Auto-detects the server API so one Settings field works with both the
+     * hifi-api/Tidal format and the Echo/Saavn 320 kbps worker format.
+     */
+    private suspend fun detectServer(server: String, force: Boolean = false): ServerKind {
+        if (!force) serverKinds[server]?.let { return it }
+
+        val hifi = runCatching {
+            val response = getJson(server, "search", "s" to "test", "limit" to "1")
+            if (response["data"]?.jsonObject?.get("items")?.jsonArray != null) {
+                ServerKind.HIFI
+            } else {
+                null
+            }
+        }.getOrNull()
+        if (hifi != null) {
+            serverKinds[server] = hifi
+            return hifi
+        }
+
+        val saavn = runCatching {
+            val response = getJson(server, "search", "q" to "test")
+            if (response["tracks"]?.jsonArray != null) ServerKind.SAAVN else null
+        }.getOrNull()
+            ?: throw StreamUnavailableException(
+                "The server didn't respond like a hifi-api or 320 kbps server.",
+            )
+        serverKinds[server] = saavn
+        return saavn
     }
 
     private fun cacheKey(videoId: String, quality: AudioQuality, server: String?): String {
@@ -260,12 +298,51 @@ class StreamResolver(
         )
     }
 
+    // ---------------------------------------------------------------------
+    // Echo / Saavn 320 kbps
+    // ---------------------------------------------------------------------
+
+    /** Searches the Echo worker's Saavn catalogue and resolves its best AAC stream. */
+    private suspend fun resolveFromSaavn(server: String, track: Track): ResolvedAudio {
+        val query = listOf(track.title.trim(), track.artist.trim())
+            .filter { it.isNotEmpty() }
+            .joinToString(" ")
+            .ifBlank { throw StreamUnavailableException("This track has no searchable title.") }
+
+        val results = getJson(server, "search", "q" to query)
+        val items = results["tracks"]?.jsonArray.orEmpty()
+        val match = items.mapNotNull { it as? JsonObject }
+            .map { it to matchScore(it, track) }
+            .filter { it.second > 0 }
+            .maxByOrNull { it.second }
+            ?.first
+            ?: throw StreamUnavailableException("This track wasn't found on the 320 kbps server.")
+
+        val id = match.string("id")?.takeIf { it.isNotBlank() }
+            ?: throw StreamUnavailableException("The 320 kbps server returned an invalid track.")
+        val stream = getJson(server, "stream", "id" to id)
+        val url = stream.string("url")?.takeIf { it.startsWith("http") }
+            ?: throw StreamUnavailableException("The 320 kbps server returned no stream.")
+        val kbps = Regex("(\\d+)\\s*kbps", RegexOption.IGNORE_CASE)
+            .find(stream.string("quality").orEmpty())
+            ?.groupValues
+            ?.getOrNull(1)
+            ?.toIntOrNull()
+            ?: 0
+        return ResolvedAudio(
+            url = url,
+            bitrate = kbps,
+            format = stream.string("format")?.uppercase().orEmpty().ifBlank { "AAC" },
+        )
+    }
+
     /** Returns a positive score when a search result plausibly matches the track. */
     private fun matchScore(item: JsonObject, track: Track): Int {
         val title = item.string("title").orEmpty()
-        val artist = item["artist"]?.jsonObject?.string("name")
+        val artist = item.string("artist")
+            ?: item["artist"]?.jsonObject?.string("name")
             ?: item["artists"]?.jsonArray?.firstOrNull()?.jsonObject?.string("name")
-            .orEmpty()
+            ?: ""
         if (title.isBlank()) return 0
 
         val wantedTitle = tokens(track.title)
@@ -396,6 +473,8 @@ class StreamResolver(
     }
 
     private class CachedAudio(val audio: ResolvedAudio, val createdAt: Long)
+
+    private enum class ServerKind { HIFI, SAAVN }
 
     private companion object {
         const val CACHE_TTL_MS = 20 * 60 * 1000L
