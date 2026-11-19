@@ -38,7 +38,7 @@
   <a href="#tech-stack">Stack</a> ·
   <a href="#faq">FAQ</a>
 </p>
-# Purring along to the music? Toss a ⭐ our way!
+
 ---
 
 ## Features
