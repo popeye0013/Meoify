@@ -291,11 +291,11 @@ private fun outputDevices(audio: AudioManager): List<AudioOutput> {
     val devices = runCatching { audio.getDevices(AudioManager.GET_DEVICES_OUTPUTS) }
         .getOrDefault(emptyArray())
         .toList()
+        .distinctBy { it.id }
     val builtIn = devices.filter { it.isBuiltInSpeaker() }
         .minByOrNull { if (it.type == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER_SAFE) 1 else 0 }
     val others = devices.filterNot { it.isBuiltInSpeaker() }
-        .groupBy { it.outputKey() }
-        .map { (_, group) -> group.first() }
+        .distinctBy { it.outputKey() }
 
     return listOfNotNull(builtIn?.let { device ->
         AudioOutput(

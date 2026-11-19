@@ -8,11 +8,14 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
+import android.media.AudioDeviceCallback
 import android.media.AudioDeviceInfo
 import android.media.AudioManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.os.SystemClock
 import androidx.core.content.ContextCompat
 import androidx.media3.common.C
@@ -180,6 +183,54 @@ class PlayerConnection(
             }
         }
     }
+
+    private var batteryPollingJob: Job? = null
+
+    private val audioDeviceCallback = object : AudioDeviceCallback() {
+        override fun onAudioDevicesAdded(addedDevices: Array<out AudioDeviceInfo>) {
+            refreshAudioOutput()
+        }
+
+        override fun onAudioDevicesRemoved(removedDevices: Array<out AudioDeviceInfo>) {
+            refreshAudioOutput()
+        }
+    }
+
+    private fun detectBluetoothOutputName(): String? {
+        val devices = audioManager?.getDevices(AudioManager.GET_DEVICES_OUTPUTS) ?: return null
+        val device = devices.firstOrNull { it.type.isBluetoothAudio() } ?: return null
+        val name = runCatching { device.productName?.toString()?.trim() }.getOrNull().orEmpty()
+        return name.takeIf { it.isNotBlank() }
+    }
+
+    private fun refreshAudioOutput() {
+        val (type, id) = detectAudioOutput(audioManager)
+        val name = if (type.isBluetoothAudio()) detectBluetoothOutputName() else null
+        _state.update { it.copy(outputType = type, outputDeviceId = id) }
+        if (type.isBluetoothAudio()) {
+            startBatteryPolling(name)
+            refreshBluetoothBattery(name)
+        } else {
+            stopBatteryPolling()
+        }
+    }
+
+    private fun startBatteryPolling(deviceName: String?) {
+        batteryPollingJob?.cancel()
+        batteryPollingJob = scope.launch {
+            while (isActive) {
+                readBluetoothBattery(context, deviceName)?.let { level ->
+                    _state.update { it.copy(bluetoothBattery = level) }
+                }
+                delay(30_000)
+            }
+        }
+    }
+
+    private fun stopBatteryPolling() {
+        batteryPollingJob?.cancel()
+        batteryPollingJob = null
+    }
     val state: StateFlow<PlayerUiState> = _state.asStateFlow()
 
     private val _events = MutableSharedFlow<PlaybackEvent>(extraBufferCapacity = 12)
@@ -339,6 +390,13 @@ class PlayerConnection(
                 IntentFilter(ACTION_BLUETOOTH_BATTERY),
                 ContextCompat.RECEIVER_EXPORTED,
             )
+        }
+        runCatching {
+            audioManager?.registerAudioDeviceCallback(audioDeviceCallback, Handler(Looper.getMainLooper()))
+        }
+        if (initialOutput.first.isBluetoothAudio()) {
+            startBatteryPolling(detectBluetoothOutputName())
+            refreshBluetoothBattery(detectBluetoothOutputName())
         }
         scope.launch { restoreLastPlayback() }
 
@@ -762,7 +820,10 @@ class PlayerConnection(
         }
         _state.update { it.copy(outputType = device.type, outputDeviceId = device.id) }
         if (device.type.isBluetoothAudio()) {
+            startBatteryPolling(device.productName?.toString())
             refreshBluetoothBattery(device.productName?.toString())
+        } else {
+            stopBatteryPolling()
         }
     }
 
