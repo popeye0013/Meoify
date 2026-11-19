@@ -52,6 +52,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Bluetooth
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
@@ -73,6 +74,8 @@ import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.filled.VolumeOff
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -80,9 +83,11 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.rememberSwipeToDismissBoxState
-import androidx.compose.material3.Surface
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
@@ -884,39 +889,43 @@ private fun PlayerControls(
                 onClick = onShowVolume,
                 modifier = Modifier.weight(1f),
             ) {
-                Icon(
-                    imageVector = if (state.muted) Icons.Filled.VolumeOff else outputIcon(state.outputType),
-                    contentDescription = null,
-                    tint = if (state.muted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.86f),
-                    modifier = Modifier.size(22.dp),
-                )
-                if (!state.muted && state.outputType.isBluetoothAudio()) {
-                    Spacer(Modifier.width(6.dp))
-                    Box(
-                        contentAlignment = Alignment.Center,
-                        modifier = Modifier
-                            .size(26.dp)
-                            .background(
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
-                                shape = RoundedCornerShape(50),
-                            ),
+                if (state.muted) {
+                    Icon(
+                        imageVector = Icons.Filled.VolumeOff,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(22.dp),
+                    )
+                } else if (state.outputType.isBluetoothAudio()) {
+                    BadgedBox(
+                        badge = {
+                            if (state.bluetoothBattery != null) {
+                                Badge(
+                                    containerColor = batteryColor(state.bluetoothBattery),
+                                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                                ) {
+                                    Text(
+                                        text = "${state.bluetoothBattery}%",
+                                        style = MaterialTheme.typography.labelSmall,
+                                    )
+                                }
+                            }
+                        },
                     ) {
                         Icon(
-                            imageVector = batteryIcon(state.bluetoothBattery),
+                            imageVector = Icons.Filled.Bluetooth,
                             contentDescription = null,
-                            tint = batteryColor(state.bluetoothBattery),
-                            modifier = Modifier.size(16.dp),
+                            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.86f),
+                            modifier = Modifier.size(22.dp),
                         )
                     }
-                    state.bluetoothBattery?.let { level ->
-                        Spacer(Modifier.width(4.dp))
-                        Text(
-                            text = "$level%",
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.SemiBold,
-                            color = batteryColor(level),
-                        )
-                    }
+                } else {
+                    Icon(
+                        imageVector = outputIcon(state.outputType),
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.86f),
+                        modifier = Modifier.size(22.dp),
+                    )
                 }
             }
 

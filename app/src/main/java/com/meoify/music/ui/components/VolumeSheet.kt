@@ -298,6 +298,10 @@ private fun outputDevices(audio: AudioManager): List<AudioOutput> {
     val builtIn = devices.filter { it.isBuiltInSpeaker() }
         .minByOrNull { if (it.type == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER_SAFE) 1 else 0 }
     val others = devices.filterNot { it.isBuiltInSpeaker() }
+        // Collapse OEM ghost entries that share a product name with a real
+        // output (e.g. a "Phone speaker" row named like the Bluetooth device).
+        .sortedBy { if (it.type.isBluetoothAudio()) 0 else 1 }
+        .distinctBy { it.productName().lowercase().ifBlank { it.outputKey() } }
         .distinctBy { it.outputKey() }
 
     return listOfNotNull(builtIn?.let { device ->
