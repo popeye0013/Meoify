@@ -79,7 +79,7 @@ fun VolumeSheet(
     val max = audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC).coerceAtLeast(1)
     var volume by remember { mutableStateOf(audio.getStreamVolume(AudioManager.STREAM_MUSIC).coerceIn(0, max)) }
     var lastVolume by remember { mutableStateOf(volume.coerceAtLeast(1)) }
-    val outputs = remember { outputDevices(audio) }
+    val outputs = remember { outputDevices(context, audio) }
     val selected = remember(selectedOutputType, selectedOutputDeviceId, outputs) {
         outputs.firstOrNull {
             it.device.id == selectedOutputDeviceId && it.device.type == selectedOutputType
@@ -144,7 +144,7 @@ fun VolumeSheet(
                         fontWeight = FontWeight.ExtraBold,
                     )
                     Text(
-                        text = selected?.title ?: "Phone speaker",
+                        text = "Tap a device to switch output",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -287,7 +287,7 @@ private data class AudioOutput(
 )
 
 /** One entry per physical output; phone speaker variants are merged into one. */
-private fun outputDevices(audio: AudioManager): List<AudioOutput> {
+private fun outputDevices(context: Context, audio: AudioManager): List<AudioOutput> {
     val devices = runCatching { audio.getDevices(AudioManager.GET_DEVICES_OUTPUTS) }
         .getOrDefault(emptyArray())
         .toList()
@@ -295,14 +295,20 @@ private fun outputDevices(audio: AudioManager): List<AudioOutput> {
         // Drop OEM/phantom routing entries (e.g. a "Phone speaker" row whose
         // product name is the device model) by keeping only known output types.
         .filter { it.isKnownOutputType() }
-    val builtIn = devices.filter { it.isBuiltInSpeaker() }
+
+    val localBtAddress = localBluetoothAddress(context)
+    val filtered = devices.filterNot { d ->
+        d.type.isBluetoothAudio() && localBtAddress != null &&
+            d.address.equals(localBtAddress, ignoreCase = true)
+    }
+
+    val builtIn = filtered.filter { it.isBuiltInSpeaker() }
         .minByOrNull { if (it.type == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER_SAFE) 1 else 0 }
-    val others = devices.filterNot { it.isBuiltInSpeaker() }
-        // Collapse OEM ghost entries that share a product name with a real
-        // output (e.g. a "Phone speaker" row named like the Bluetooth device).
+    val others = filtered.filterNot { it.isBuiltInSpeaker() }
+        // Collapse Classic/BLE/SCO profiles of the same physical device by MAC
+        // address, and prefer the Bluetooth entry when names collide.
         .sortedBy { if (it.type.isBluetoothAudio()) 0 else 1 }
-        .distinctBy { it.productName().lowercase().ifBlank { it.outputKey() } }
-        .distinctBy { it.outputKey() }
+        .distinctBy { it.bluetoothKey() }
 
     return listOfNotNull(builtIn?.let { device ->
         AudioOutput(
@@ -348,6 +354,27 @@ private fun AudioDeviceInfo.isBuiltInSpeaker(): Boolean =
         // Some OEMs also expose the earpiece as an output. Media uses the
         // loudspeaker, so showing both creates duplicate "Phone speaker" rows.
         type == AudioDeviceInfo.TYPE_BUILTIN_EARPIECE
+
+private fun AudioDeviceInfo.bluetoothKey(): String {
+    val addr = runCatching { address }.getOrNull()?.trim().orEmpty()
+    return if (type.isBluetoothAudio() && addr.isNotBlank()) "bt|$addr" else outputKey()
+}
+
+private fun localBluetoothAddress(context: Context): String? = try {
+    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+        val mgr = context.getSystemService(Context.BLUETOOTH_SERVICE) as? android.bluetooth.BluetoothManager
+        if (androidx.core.content.ContextCompat.checkSelfPermission(
+                context, android.Manifest.permission.BLUETOOTH_CONNECT
+            ) != android.content.pm.PackageManager.PERMISSION_GRANTED
+        ) return null
+        mgr?.adapter?.address
+    } else {
+        @Suppress("DEPRECATION")
+        (context.getSystemService(Context.BLUETOOTH_SERVICE) as? android.bluetooth.BluetoothManager)?.adapter?.address
+    }
+} catch (e: Exception) {
+    null
+}
 
 private fun AudioDeviceInfo.outputKey(): String = "${type}|${productName().lowercase()}"
 
