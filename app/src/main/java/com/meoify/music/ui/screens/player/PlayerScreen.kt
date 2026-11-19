@@ -420,6 +420,7 @@ fun PlayerScreen(onClose: () -> Unit) {
             onDismiss = { menuOpen = false },
             onShare = ::shareTrack,
             onShowQueue = { showQueue = true },
+            onShowLyrics = { showLyrics = true },
             onOpenVideo = ::openVideo,
             onSleepTimer = { showSleepTimer = true },
         )

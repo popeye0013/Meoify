@@ -21,6 +21,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.QueueMusic
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Lyrics
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
@@ -70,6 +71,7 @@ internal fun NowPlayingSheet(
     onDismiss: () -> Unit,
     onShare: () -> Unit,
     onShowQueue: () -> Unit,
+    onShowLyrics: () -> Unit,
     onOpenVideo: () -> Unit,
     onSleepTimer: () -> Unit,
 ) {
@@ -142,18 +144,6 @@ internal fun NowPlayingSheet(
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
-                IconButton(
-                    onClick = {
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        actions.toggleLike(track)
-                    },
-                ) {
-                    Icon(
-                        imageVector = if (liked) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
-                        contentDescription = if (liked) "Remove from Liked Songs" else "Add to Liked Songs",
-                        tint = if (liked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
             }
 
             Row(
@@ -221,6 +211,13 @@ internal fun NowPlayingSheet(
                 supporting = "Watch on YouTube Music",
             ) {
                 closeThen(onOpenVideo)
+            }
+            SheetAction(
+                icon = Icons.Filled.Lyrics,
+                label = "Lyrics",
+                supporting = "Show synced lyrics for this song",
+            ) {
+                closeThen(onShowLyrics)
             }
             SheetAction(
                 icon = Icons.Filled.Timer,
