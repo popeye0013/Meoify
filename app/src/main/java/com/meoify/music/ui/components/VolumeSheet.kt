@@ -292,6 +292,9 @@ private fun outputDevices(audio: AudioManager): List<AudioOutput> {
         .getOrDefault(emptyArray())
         .toList()
         .distinctBy { it.id }
+        // Drop OEM/phantom routing entries (e.g. a "Phone speaker" row whose
+        // product name is the device model) by keeping only known output types.
+        .filter { it.isKnownOutputType() }
     val builtIn = devices.filter { it.isBuiltInSpeaker() }
         .minByOrNull { if (it.type == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER_SAFE) 1 else 0 }
     val others = devices.filterNot { it.isBuiltInSpeaker() }
@@ -319,6 +322,22 @@ private fun outputDevices(audio: AudioManager): List<AudioOutput> {
     }
 }
 
+private fun AudioDeviceInfo.isKnownOutputType(): Boolean = when (type) {
+    AudioDeviceInfo.TYPE_BUILTIN_SPEAKER,
+    AudioDeviceInfo.TYPE_BUILTIN_SPEAKER_SAFE,
+    AudioDeviceInfo.TYPE_BUILTIN_EARPIECE,
+    AudioDeviceInfo.TYPE_BLUETOOTH_A2DP,
+    AudioDeviceInfo.TYPE_BLUETOOTH_SCO,
+    AudioDeviceInfo.TYPE_WIRED_HEADSET,
+    AudioDeviceInfo.TYPE_WIRED_HEADPHONES,
+    AudioDeviceInfo.TYPE_USB_DEVICE,
+    AudioDeviceInfo.TYPE_USB_HEADSET,
+    AudioDeviceInfo.TYPE_USB_ACCESSORY,
+    AudioDeviceInfo.TYPE_HDMI,
+    AudioDeviceInfo.TYPE_LINE_ANALOG,
+    AudioDeviceInfo.TYPE_LINE_DIGITAL -> true
+    else -> false
+}
 private fun AudioDeviceInfo.isBuiltInSpeaker(): Boolean =
     type == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER ||
         type == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER_SAFE ||
@@ -352,7 +371,15 @@ fun batteryIcon(level: Int?): ImageVector = when {
     else -> Icons.Filled.Battery0Bar
 }
 
-/** Short label used for now-playing accessibility text. */
+/** Tint for the battery glyph based on the reported level. */
+fun batteryColor(level: Int?): androidx.compose.ui.graphics.Color {
+    return when {
+        level == null -> androidx.compose.ui.graphics.Color.Gray
+        level < 20 -> androidx.compose.ui.graphics.Color(0xFFEF4444)
+        level < 50 -> androidx.compose.ui.graphics.Color(0xFFF59E0B)
+        else -> androidx.compose.ui.graphics.Color(0xFF22C55E)
+    }
+}
 fun outputLabel(type: Int): String = when (type) {
     AudioDeviceInfo.TYPE_BLUETOOTH_A2DP, AudioDeviceInfo.TYPE_BLUETOOTH_SCO -> "Bluetooth device"
     AudioDeviceInfo.TYPE_WIRED_HEADSET -> "Wired headset"

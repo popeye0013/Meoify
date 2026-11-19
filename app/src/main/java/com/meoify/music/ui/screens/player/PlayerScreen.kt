@@ -130,6 +130,7 @@ import com.meoify.music.playback.PlayerUiState
 import com.meoify.music.playback.isBluetoothAudio
 import com.meoify.music.ui.components.TrackRow
 import com.meoify.music.ui.components.VolumeSheet
+import com.meoify.music.ui.components.batteryColor
 import com.meoify.music.ui.components.batteryIcon
 import com.meoify.music.ui.components.outputIcon
 import com.meoify.music.ui.components.outputLabel
@@ -890,19 +891,30 @@ private fun PlayerControls(
                     modifier = Modifier.size(22.dp),
                 )
                 if (!state.muted && state.outputType.isBluetoothAudio()) {
-                    Spacer(Modifier.width(4.dp))
-                    Icon(
-                        imageVector = batteryIcon(state.bluetoothBattery),
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.70f),
-                        modifier = Modifier.size(17.dp),
-                    )
+                    Spacer(Modifier.width(6.dp))
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier
+                            .size(26.dp)
+                            .background(
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
+                                shape = RoundedCornerShape(50),
+                            ),
+                    ) {
+                        Icon(
+                            imageVector = batteryIcon(state.bluetoothBattery),
+                            contentDescription = null,
+                            tint = batteryColor(state.bluetoothBattery),
+                            modifier = Modifier.size(16.dp),
+                        )
+                    }
                     state.bluetoothBattery?.let { level ->
-                        Spacer(Modifier.width(2.dp))
+                        Spacer(Modifier.width(4.dp))
                         Text(
                             text = "$level%",
                             style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.70f),
+                            fontWeight = FontWeight.SemiBold,
+                            color = batteryColor(level),
                         )
                     }
                 }

@@ -36,7 +36,6 @@
   <a href="#download">Download</a> ·
   <a href="#features">Features</a> ·
   <a href="#audio-quality">Audio quality</a> ·
-  <a href="#server-setup">Server setup</a> ·
   <a href="#build-from-source">Build</a> ·
   <a href="#tech-stack">Stack</a> ·
   <a href="#faq">FAQ</a>
@@ -127,42 +126,6 @@ YouTube Music itself tops out at 256 kbps AAC/Opus. Add a server under **Setting
 Meoify searches the server for a matching track, verifies the response, and streams the real URL it returns. When no server is set or the server fails, those tiers fall back to the best YouTube Music stream. Meoify never upsamples or fakes lossless audio.
 
 Give the server a custom name and tap **Test connection** before saving. Settings shows the saved name and whether the server is responding.
-
----
-
-## Server setup
-
-### Deploy your own 320 kbps server
-
-Meoify's recommended 320 kbps server is a free Cloudflare Worker that connects to the JioSaavn catalogue. It needs no API key, secrets or bindings.
-
-<p align="center">
-  <a href="https://deploy.workers.cloudflare.com/?url=https://github.com/popeye0013/Hi-fi">
-    <img src="https://deploy.workers.cloudflare.com/button" alt="Deploy to Cloudflare Workers" />
-  </a>
-</p>
-
-1. Click **Deploy to Cloudflare Workers**.
-2. Sign in to Cloudflare and connect your GitHub account when prompted.
-3. Let Cloudflare create your copy of [`popeye0013/Hi-fi`](https://github.com/popeye0013/Hi-fi).
-4. If Cloudflare asks for commands, use:
-
-   | Setting | Command |
-   |---|---|
-   | Build command | `npm run check && npm run test:echo` |
-   | Deploy command | `npx wrangler deploy` |
-
-5. Wait for the deployment to finish, then open **Workers & Pages** in the Cloudflare dashboard and copy your Worker's public URL:
-
-   ```text
-   https://saavn-extension-320kbps.your-account.workers.dev
-   ```
-
-6. Open Meoify → **Settings → Playback → Lossless server**.
-7. Enter a name such as `Meoify 320`, paste the Worker URL, tap **Test connection**, then **Save**.
-8. Choose **Standard (320 kbps)** for the 320 kbps stream.
-
-> The Worker uses the unofficial JioSaavn catalogue. Tracks that do not offer 320 kbps use the best available quality. It is not a FLAC server: use hifi-api / Tidal when you need true Hi-Res lossless. Cloudflare free-plan limits apply, and this server is not affiliated with JioSaavn.
 
 ---
 
