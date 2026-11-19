@@ -79,24 +79,14 @@ fun VolumeSheet(
     val max = audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC).coerceAtLeast(1)
     var volume by remember { mutableStateOf(audio.getStreamVolume(AudioManager.STREAM_MUSIC).coerceIn(0, max)) }
     var lastVolume by remember { mutableStateOf(volume.coerceAtLeast(1)) }
-    val outputs = remember { outputDevices(context, audio) }
-    val selected = remember(selectedOutputType, selectedOutputDeviceId, outputs) {
-        outputs.firstOrNull {
-            it.device.id == selectedOutputDeviceId && it.device.type == selectedOutputType
-        } ?: outputs.firstOrNull { it.device.type == selectedOutputType }
-        ?: outputs.firstOrNull { it.isBuiltIn }
-        ?: outputs.firstOrNull()
-    }
-    val bluetoothOutput = remember(outputs) {
-        outputs.firstOrNull { it.device.type.isBluetoothAudio() }
-    }
+    val isBluetooth = selectedOutputType.isBluetoothAudio()
     val batteryPermission = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
     ) { granted ->
-        if (granted) onRefreshBattery(bluetoothOutput?.device?.productName())
+        if (granted) onRefreshBattery(null)
     }
-    LaunchedEffect(bluetoothOutput) {
-        if (bluetoothOutput != null &&
+    LaunchedEffect(isBluetooth) {
+        if (isBluetooth &&
             Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
             ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) !=
             PackageManager.PERMISSION_GRANTED
@@ -176,106 +166,56 @@ fun VolumeSheet(
             }
 
             Spacer(Modifier.height(14.dp))
-            Text(
-                text = "Connected devices",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Spacer(Modifier.height(6.dp))
-            if (outputs.isEmpty()) {
-                Text(
-                    text = "Only the phone speaker is available.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            } else {
-                outputs.forEach { output ->
-                    val isSelected = selected?.key == output.key
-                    Surface(
-                        onClick = { onSelectDevice(output.device) },
-                        shape = RoundedCornerShape(16.dp),
-                        color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 3.dp),
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 10.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Icon(
-                                imageVector = output.icon,
-                                contentDescription = null,
-                                tint = if (isSelected) MaterialTheme.colorScheme.primary
-                                else MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(20.dp),
-                            )
-                            Spacer(Modifier.width(12.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = output.title,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer
-                                    else MaterialTheme.colorScheme.onSurface,
-                                )
-                                Text(
-                                    text = output.subtitle,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.75f)
-                                    else MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                            if (output.device.type.isBluetoothAudio()) {
-                                Spacer(Modifier.width(8.dp))
-                                Icon(
-                                    imageVector = batteryIcon(bluetoothBattery),
-                                    contentDescription = null,
-                                    tint = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer
-                                    else MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.size(17.dp),
-                                )
-                                if (bluetoothBattery != null) {
-                                    Spacer(Modifier.width(2.dp))
-                                    Text(
-                                        text = "$bluetoothBattery%",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer
-                                        else MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
-                                }
-                            }
-                            if (isSelected) {
-                                Spacer(Modifier.width(6.dp))
-                                Icon(
-                                    Icons.Filled.Check,
-                                    contentDescription = "Active output",
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(18.dp),
-                                )
-                            }
-                        }
+            if (selectedOutputType.isBluetoothAudio()) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Filled.Bluetooth,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp),
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        text = "Bluetooth output",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    if (bluetoothBattery != null) {
+                        Spacer(Modifier.width(8.dp))
+                        Icon(
+                            imageVector = batteryIcon(bluetoothBattery),
+                            contentDescription = null,
+                            tint = batteryColor(bluetoothBattery),
+                            modifier = Modifier.size(18.dp),
+                        )
+                        Spacer(Modifier.width(2.dp))
+                        Text(
+                            text = "$bluetoothBattery%",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = batteryColor(bluetoothBattery),
+                        )
                     }
                 }
-            }
-
-            Spacer(Modifier.height(12.dp))
-            FilledTonalButton(
-                onClick = {
-                    runCatching {
-                        context.startActivity(Intent(Settings.ACTION_BLUETOOTH_SETTINGS))
-                    }
-                    onDismiss()
-                },
-                shape = RoundedCornerShape(50),
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Icon(Icons.Filled.Bluetooth, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(8.dp))
-                Text("Connect a Bluetooth device")
+            } else {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Filled.Speaker,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp),
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        text = "Phone speaker",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                }
             }
         }
     }
 }
+
 
 private data class AudioOutput(
     val key: String,
