@@ -68,10 +68,11 @@ internal fun NowPlayingSheet(
     track: Track,
     source: String,
     sleepLeftMinutes: Int?,
+    lyricsPreviewEnabled: Boolean,
     onDismiss: () -> Unit,
     onShare: () -> Unit,
     onShowQueue: () -> Unit,
-    onShowLyrics: () -> Unit,
+    onToggleLyricsPreview: () -> Unit,
     onOpenVideo: () -> Unit,
     onSleepTimer: () -> Unit,
 ) {
@@ -214,10 +215,10 @@ internal fun NowPlayingSheet(
             }
             SheetAction(
                 icon = Icons.Filled.Lyrics,
-                label = "Lyrics",
-                supporting = "Show synced lyrics for this song",
+                label = if (lyricsPreviewEnabled) "Lyrics on" else "Lyrics off",
+                supporting = "Show synced lyrics on Now Playing",
             ) {
-                closeThen(onShowLyrics)
+                closeThen(onToggleLyricsPreview)
             }
             SheetAction(
                 icon = Icons.Filled.Timer,

@@ -37,6 +37,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -92,6 +93,11 @@ fun LibraryScreen(
     val app = context.applicationContext as MeoifyApplication
     val settings by app.container.settings.settings.collectAsStateWithLifecycle()
     val ytPlaylists = LocalYtPlaylists.current
+    var playlistQuery by remember { mutableStateOf("") }
+    val filteredPlaylists = remember(ytPlaylists, playlistQuery) {
+        if (playlistQuery.isBlank()) ytPlaylists
+        else ytPlaylists.filter { it.title.contains(playlistQuery, ignoreCase = true) }
+    }
     val ytLoading = LocalYtLoading.current
     val signedIn = LocalSignedIn.current
     val currentTrackId = LocalPlayerState.current.track?.id
@@ -104,6 +110,7 @@ fun LibraryScreen(
     var menuTarget by remember { mutableStateOf<PlaylistTarget?>(null) }
     var renameTarget by remember { mutableStateOf<PlaylistTarget?>(null) }
     var deleteTarget by remember { mutableStateOf<PlaylistTarget?>(null) }
+    var showPlaylistSearch by remember { mutableStateOf(false) }
     var renameValue by remember { mutableStateOf("") }
 
     val listState = rememberLazyListState()
@@ -149,6 +156,15 @@ fun LibraryScreen(
                         tint = MaterialTheme.colorScheme.onSurface,
                     )
                 }
+                if (filter == LibraryFilter.Playlists) {
+                    IconButton(onClick = { showPlaylistSearch = !showPlaylistSearch }) {
+                        Icon(
+                            Icons.Filled.Search,
+                            contentDescription = "Search playlists",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
             }
         }
 
@@ -178,6 +194,20 @@ fun LibraryScreen(
                         )
                     }
                 }
+                if (showPlaylistSearch && filter == LibraryFilter.Playlists) {
+                    OutlinedTextField(
+                        value = playlistQuery,
+                        onValueChange = { playlistQuery = it },
+                        placeholder = { Text("Search playlists") },
+                        leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
+                        singleLine = true,
+                        shape = RoundedCornerShape(16.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                    )
+                }
+
                 Spacer(Modifier.height(8.dp))
             }
         }
@@ -201,11 +231,11 @@ fun LibraryScreen(
                     }
 
                     when {
-                        ytPlaylists.isEmpty() && ytLoading -> items(3) {
+                        filteredPlaylists.isEmpty() && ytLoading -> items(3) {
                             YtPlaylistSkeleton()
                         }
 
-                        ytPlaylists.isEmpty() -> item {
+                        filteredPlaylists.isEmpty() -> item {
                             EmptyLibrary(
                                 title = "No playlists on this account",
                                 message = "Playlists you create in Meoify are saved straight to your YouTube Music account.",
@@ -215,13 +245,13 @@ fun LibraryScreen(
                         }
 
                         gridView -> items(
-                            items = ytPlaylists.chunked(2).toList(),
+                            items = filteredPlaylists.chunked(2).toList(),
                             key = { row -> "yt_" + row.joinToString("|") { it.id } },
                         ) { row ->
                             PlaylistGridRow(row = row, onOpen = { actions.openPlaylist(it.id) })
                         }
 
-                        else -> items(ytPlaylists, key = { it.id }) { card ->
+                        else -> items(filteredPlaylists, key = { it.id }) { card ->
                             PlaylistListCard(
                                 card = card,
                                 onClick = { actions.openPlaylist(card.id) },

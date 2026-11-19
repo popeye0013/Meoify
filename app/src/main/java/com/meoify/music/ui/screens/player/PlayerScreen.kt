@@ -173,6 +173,7 @@ fun PlayerScreen(onClose: () -> Unit) {
     LaunchedEffect(cover, track?.title) { accent = ArtworkColorCache.extract(cover, track?.title ?: "meoify") }
 
     var showLyrics by remember { mutableStateOf(false) }
+    var showLyricsPreview by remember { mutableStateOf(true) }
     var showQueue by remember { mutableStateOf(false) }
     var menuOpen by remember { mutableStateOf(false) }
     var showSleepTimer by remember { mutableStateOf(false) }
@@ -364,6 +365,7 @@ fun PlayerScreen(onClose: () -> Unit) {
                         state = state,
                         track = track,
                         lyrics = lyrics,
+                        lyricsPreviewEnabled = showLyricsPreview,
                         actions = actions,
                         accent = accent,
                         onShowLyrics = { showLyrics = true },
@@ -420,7 +422,8 @@ fun PlayerScreen(onClose: () -> Unit) {
             onDismiss = { menuOpen = false },
             onShare = ::shareTrack,
             onShowQueue = { showQueue = true },
-            onShowLyrics = { showLyrics = true },
+            lyricsPreviewEnabled = showLyricsPreview,
+            onToggleLyricsPreview = { showLyricsPreview = !showLyricsPreview },
             onOpenVideo = ::openVideo,
             onSleepTimer = { showSleepTimer = true },
         )
@@ -569,6 +572,7 @@ private fun PlayerMainContent(
     state: PlayerUiState,
     track: Track?,
     lyrics: TrackLyrics?,
+    lyricsPreviewEnabled: Boolean,
     actions: AppActions,
     accent: Color,
     onShowLyrics: () -> Unit,
@@ -602,14 +606,16 @@ private fun PlayerMainContent(
                     cornerRadius = 28.dp,
                 )
             }
-            LyricsPreview(
-                lyrics = lyrics,
-                positionMs = state.positionMs,
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxHeight()
-                    .padding(start = 12.dp),
-            )
+            if (lyricsPreviewEnabled) {
+                LyricsPreview(
+                    lyrics = lyrics,
+                    positionMs = state.positionMs,
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .padding(start = 12.dp),
+                )
+            }
             Spacer(Modifier.width(20.dp))
             PlayerControls(
                 state = state,
@@ -649,13 +655,15 @@ private fun PlayerMainContent(
                     cornerRadius = 28.dp,
                 )
             }
-            LyricsPreview(
-                lyrics = lyrics,
-                positionMs = state.positionMs,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 8.dp),
-            )
+            if (lyricsPreviewEnabled) {
+                LyricsPreview(
+                    lyrics = lyrics,
+                    positionMs = state.positionMs,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 8.dp),
+                )
+            }
             PlayerControls(
                 state = state,
                 track = track,
