@@ -1,6 +1,8 @@
 package com.meoify.music.ui.components
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -37,6 +39,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.meoify.music.BuildConfig
 import com.meoify.music.data.UpdateChecker
 import com.meoify.music.util.openUrl
 
@@ -49,6 +52,7 @@ import com.meoify.music.util.openUrl
 @Composable
 fun ChangelogSheet(onDismiss: () -> Unit) {
     val context = LocalContext.current
+    val installedVersion = BuildConfig.VERSION_NAME
     var releases by remember { mutableStateOf<List<UpdateChecker.Release>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
 
@@ -83,8 +87,13 @@ fun ChangelogSheet(onDismiss: () -> Unit) {
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.ExtraBold,
                     )
+                    val latestVersion = releases.firstOrNull()?.version
                     Text(
-                        text = "Changelogs for the latest releases",
+                        text = if (latestVersion == null) {
+                            "Installed: $installedVersion"
+                        } else {
+                            "Installed: $installedVersion  •  Latest: $latestVersion"
+                        },
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -124,6 +133,8 @@ fun ChangelogSheet(onDismiss: () -> Unit) {
                     items(releases, key = { it.version }) { release ->
                         ChangelogEntry(
                             release = release,
+                            isInstalled = release.version == installedVersion,
+                            isLatest = release.version == releases.firstOrNull()?.version,
                             onDownload = { context.openUrl(release.apkUrl ?: release.url) },
                         )
                     }
@@ -136,13 +147,31 @@ fun ChangelogSheet(onDismiss: () -> Unit) {
 @Composable
 private fun ChangelogEntry(
     release: UpdateChecker.Release,
+    isInstalled: Boolean,
+    isLatest: Boolean,
     onDownload: () -> Unit,
 ) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+            .background(
+                if (isInstalled) {
+                    MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
+                } else {
+                    MaterialTheme.colorScheme.surfaceContainerHigh
+                }
+            )
+            .then(
+                if (isInstalled) {
+                    Modifier.border(
+                        BorderStroke(1.dp, MaterialTheme.colorScheme.primary),
+                        RoundedCornerShape(16.dp),
+                    )
+                } else {
+                    Modifier
+                }
+            )
             .padding(16.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -159,6 +188,18 @@ private fun ChangelogEntry(
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+            }
+        }
+
+        if (isInstalled || isLatest) {
+            Spacer(Modifier.height(6.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                if (isInstalled) {
+                    VersionBadge(text = "Installed", filled = true)
+                }
+                if (isLatest) {
+                    VersionBadge(text = "Latest", filled = false)
+                }
             }
         }
 
@@ -188,4 +229,28 @@ private fun ChangelogEntry(
             Text("Download this version")
         }
     }
+}
+
+@Composable
+private fun VersionBadge(text: String, filled: Boolean) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.labelSmall,
+        fontWeight = FontWeight.Bold,
+        color = if (filled) {
+            MaterialTheme.colorScheme.onPrimary
+        } else {
+            MaterialTheme.colorScheme.primary
+        },
+        modifier = Modifier
+            .clip(RoundedCornerShape(50))
+            .background(
+                if (filled) {
+                    MaterialTheme.colorScheme.primary
+                } else {
+                    MaterialTheme.colorScheme.primaryContainer
+                }
+            )
+            .padding(horizontal = 10.dp, vertical = 4.dp),
+    )
 }
