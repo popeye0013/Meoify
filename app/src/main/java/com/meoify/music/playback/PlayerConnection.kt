@@ -1,14 +1,17 @@
 package com.meoify.music.playback
 
+import android.Manifest
 import android.bluetooth.BluetoothManager
 import android.content.BroadcastReceiver
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.pm.PackageManager
 import android.media.AudioDeviceInfo
 import android.media.AudioManager
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.os.SystemClock
 import androidx.core.content.ContextCompat
@@ -98,6 +101,12 @@ internal fun Int.isBluetoothAudio(): Boolean =
 @Suppress("PrivateApi")
 private fun readBluetoothBattery(context: Context, deviceName: String? = null): Int? =
     runCatching {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) !=
+            PackageManager.PERMISSION_GRANTED
+        ) {
+            return@runCatching null
+        }
         val adapter = (context.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager)?.adapter
             ?: return@runCatching null
         fun levelOf(device: android.bluetooth.BluetoothDevice): Int? =
@@ -753,10 +762,15 @@ class PlayerConnection(
         }
         _state.update { it.copy(outputType = device.type, outputDeviceId = device.id) }
         if (device.type.isBluetoothAudio()) {
-            scope.launch(Dispatchers.IO) {
-                readBluetoothBattery(context, device.productName?.toString())?.let { level ->
-                    _state.update { it.copy(bluetoothBattery = level) }
-                }
+            refreshBluetoothBattery(device.productName?.toString())
+        }
+    }
+
+    /** Re-reads the headset level, for example after the permission is granted. */
+    fun refreshBluetoothBattery(deviceName: String? = null) {
+        scope.launch(Dispatchers.IO) {
+            readBluetoothBattery(context, deviceName)?.let { level ->
+                _state.update { it.copy(bluetoothBattery = level) }
             }
         }
     }

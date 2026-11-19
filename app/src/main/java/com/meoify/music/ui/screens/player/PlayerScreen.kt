@@ -238,6 +238,7 @@ fun PlayerScreen(onClose: () -> Unit) {
             selectedOutputDeviceId = state.outputDeviceId,
             bluetoothBattery = state.bluetoothBattery,
             onSelectDevice = app.container.player::selectAudioDevice,
+            onRefreshBattery = app.container.player::refreshBluetoothBattery,
             onDismiss = { showVolume = false },
         )
     }

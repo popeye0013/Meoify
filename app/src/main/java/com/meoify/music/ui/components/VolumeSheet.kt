@@ -1,10 +1,15 @@
 package com.meoify.music.ui.components
 
+import android.Manifest
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.media.AudioDeviceInfo
 import android.media.AudioManager
+import android.os.Build
 import android.provider.Settings
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -43,6 +48,7 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -54,6 +60,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import com.meoify.music.playback.isBluetoothAudio
 
 /** Android-style volume and output-device picker opened from the player speaker button. */
@@ -64,6 +71,7 @@ fun VolumeSheet(
     selectedOutputDeviceId: Int?,
     bluetoothBattery: Int?,
     onSelectDevice: (AudioDeviceInfo) -> Unit,
+    onRefreshBattery: (String?) -> Unit,
     onDismiss: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -78,6 +86,23 @@ fun VolumeSheet(
         } ?: outputs.firstOrNull { it.device.type == selectedOutputType }
         ?: outputs.firstOrNull { it.isBuiltIn }
         ?: outputs.firstOrNull()
+    }
+    val bluetoothOutput = remember(outputs) {
+        outputs.firstOrNull { it.device.type.isBluetoothAudio() }
+    }
+    val batteryPermission = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        if (granted) onRefreshBattery(bluetoothOutput?.device?.productName())
+    }
+    LaunchedEffect(bluetoothOutput) {
+        if (bluetoothOutput != null &&
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) !=
+            PackageManager.PERMISSION_GRANTED
+        ) {
+            batteryPermission.launch(Manifest.permission.BLUETOOTH_CONNECT)
+        }
     }
 
     fun setVolume(value: Int) {

@@ -8,6 +8,14 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
+    <!-- Reading a connected headset's battery level. The legacy permission is
+         install-time; Android 12+ gates the same data behind BLUETOOTH_CONNECT,
+         which Meoify asks for the first time the output sheet sees a headset. -->
+    <uses-permission
+        android:name="android.permission.BLUETOOTH"
+        android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+
     <!-- Android 11+ filters package visibility. Declaring both the scheme and
          the upi://pay host keeps every installed UPI app visible to the
          donation chooser, including Paytm-style intent filters. -->
