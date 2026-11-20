@@ -32,11 +32,47 @@
 
 <p align="center">
   <a href="#download">Download</a> ·
+  <a href="#screenshots">Screenshots</a> ·
   <a href="#features">Features</a> ·
   <a href="#audio-quality">Audio quality</a> ·
   <a href="#build-from-source">Build</a> ·
   <a href="#tech-stack">Stack</a> ·
   <a href="#faq">FAQ</a>
+</p>
+
+---
+
+## Screenshots
+
+<table align="center">
+  <tr>
+    <td align="center">
+      <img src="https://raw.githubusercontent.com/popeye0013/Dotfiles/main/Meoify/1000010759.png" width="190" alt="Meoify screenshot 1" />
+      <br /><sub>01</sub>
+    </td>
+    <td align="center">
+      <img src="https://raw.githubusercontent.com/popeye0013/Dotfiles/main/Meoify/1000010760.png" width="190" alt="Meoify screenshot 2" />
+      <br /><sub>02</sub>
+    </td>
+    <td align="center">
+      <img src="https://raw.githubusercontent.com/popeye0013/Dotfiles/main/Meoify/1000010761.png" width="190" alt="Meoify screenshot 3" />
+      <br /><sub>03</sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="https://raw.githubusercontent.com/popeye0013/Dotfiles/main/Meoify/1000010762.png" width="190" alt="Meoify screenshot 4" />
+      <br /><sub>04</sub>
+    </td>
+    <td align="center" colspan="2">
+      <img src="https://raw.githubusercontent.com/popeye0013/Dotfiles/main/Meoify/1000010763.png" width="190" alt="Meoify screenshot 5" />
+      <br /><sub>05</sub>
+    </td>
+  </tr>
+</table>
+
+<p align="center">
+  <sub>Tap a screenshot in GitHub to view it full size.</sub>
 </p>
 
 ---
