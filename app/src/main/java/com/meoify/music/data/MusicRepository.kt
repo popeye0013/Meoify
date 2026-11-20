@@ -1,9 +1,12 @@
 package com.meoify.music.data
 
+import com.meoify.music.data.local.LibraryStore
 import com.meoify.music.data.model.DetailPage
 import com.meoify.music.data.model.HomeFeed
+import com.meoify.music.data.model.HomeShelf
 import com.meoify.music.data.model.ImportedPlaylist
 import com.meoify.music.data.model.MediaCard
+import com.meoify.music.data.model.MediaKind
 import com.meoify.music.data.model.SearchResults
 import com.meoify.music.data.model.Track
 import com.meoify.music.data.remote.Artwork
@@ -35,7 +38,10 @@ import kotlinx.coroutines.launch
 import com.meoify.music.data.local.SettingsStore
 import java.util.concurrent.TimeUnit
 
-class MusicRepository(private val settings: com.meoify.music.data.local.SettingsStore? = null) {
+class MusicRepository(
+    private val settings: com.meoify.music.data.local.SettingsStore? = null,
+    private val library: LibraryStore? = null,
+) {
 
     private val http = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
@@ -91,6 +97,7 @@ class MusicRepository(private val settings: com.meoify.music.data.local.Settings
 
             val homeRoot = homeDeferred.await()
             val (quickPicks, communityPlaylists) = YTMusicParser.parseHome(homeRoot)
+            val shelves = YTMusicParser.parseHomeShelves(homeRoot)
             val newReleases = extras.getOrNull(0)?.let { YTMusicParser.parseNewReleases(it) }.orEmpty()
             val chartRoot = extras.getOrNull(1)
             val charts = chartRoot?.let { YTMusicParser.parseCharts(it) }
@@ -101,23 +108,117 @@ class MusicRepository(private val settings: com.meoify.music.data.local.Settings
             val resolvedQuickPicks = (quickPicks + chartTracks)
                 .distinctBy { it.id }
                 .take(30)
+            val libraryData = library?.current()
+            val personalShelves = buildPersonalShelves(
+                recent = libraryData?.recent.orEmpty(),
+                liked = libraryData?.liked.orEmpty(),
+                quickPicks = resolvedQuickPicks,
+                community = communityPlaylists,
+                chartTracks = chartTracks,
+                artists = charts?.first.orEmpty(),
+                existing = shelves,
+            )
             HomeFeed(
                 quickPicks = resolvedQuickPicks,
                 communityPlaylists = communityPlaylists,
                 newReleases = newReleases,
                 topArtists = charts?.first.orEmpty(),
                 chartPlaylists = charts?.second.orEmpty(),
+                shelves = shelves,
+                personalShelves = personalShelves,
             )
         }
 
         if (feed.quickPicks.isEmpty() && feed.communityPlaylists.isEmpty() &&
-            feed.newReleases.isEmpty() && feed.topArtists.isEmpty()
+            feed.newReleases.isEmpty() && feed.topArtists.isEmpty() &&
+            feed.shelves.isEmpty() && feed.personalShelves.isEmpty()
         ) {
             throw MusicApiException("YouTube Music didn't return any content. Pull down to try again.")
         }
 
         cachedHome = feed to System.currentTimeMillis()
         return feed
+    }
+
+    /**
+     * Builds Meoify's own titled shelves from listening history and YouTube
+     * Music search. Each one is a normal HomeShelf so the UI renders every
+     * title the same way, without any hidden or duplicate hardcoded sections.
+     */
+    private suspend fun buildPersonalShelves(
+        recent: List<Track>,
+        liked: List<Track>,
+        quickPicks: List<Track>,
+        community: List<MediaCard>,
+        chartTracks: List<Track>,
+        artists: List<MediaCard>,
+        existing: List<HomeShelf>,
+    ): List<HomeShelf> = supervisorScope {
+        val seeds = (recent + liked).distinctBy { it.id }
+        val primary = seeds.firstOrNull() ?: quickPicks.firstOrNull()
+        val hits = if (chartTracks.isNotEmpty()) {
+            chartTracks.take(10)
+        } else {
+            runCatching { search("today's biggest hits", SearchFilter.SONGS) }
+                .getOrNull()?.tracks.orEmpty().take(10)
+        }
+
+        val because = async {
+            primary?.let { runCatching { relatedTracks(it) }.getOrDefault(emptyList()) }.orEmpty().take(10)
+        }
+        val more = async {
+            primary?.let { runCatching { radioQueue(it) }.getOrDefault(emptyList()) }.orEmpty().take(10)
+        }
+        val mixes = async {
+            community.filter { it.kind == MediaKind.MIX }.ifEmpty {
+                runCatching { search("mixes", SearchFilter.PLAYLISTS) }
+                    .getOrNull()?.playlists.orEmpty()
+            }.take(12)
+        }
+        val radio = async {
+            runCatching { search("popular radio", SearchFilter.PLAYLISTS) }
+                .getOrNull()?.playlists.orEmpty().take(12)
+        }
+        val throwback = async {
+            runCatching { search("throwback hits", SearchFilter.SONGS) }
+                .getOrNull()?.tracks.orEmpty().take(10)
+        }
+        val bestArtists = async {
+            runCatching { search("best of artists", SearchFilter.PLAYLISTS) }
+                .getOrNull()?.playlists.orEmpty().take(12)
+        }
+
+        val alreadyShown = existing.map { it.title.trim().lowercase() }.toSet()
+        buildList {
+            fun addShelf(
+                title: String,
+                subtitle: String? = null,
+                tracks: List<Track> = emptyList(),
+                items: List<MediaCard> = emptyList(),
+            ) {
+                if (title.lowercase() in alreadyShown) return
+                if (tracks.isNotEmpty() || items.isNotEmpty()) {
+                    add(HomeShelf(title, subtitle, tracks, items))
+                }
+            }
+
+            addShelf(
+                "Because you listened to...",
+                primary?.let { "Inspired by ${it.title}" },
+                because.await(),
+            )
+            addShelf("Your top mixes", items = mixes.await())
+            addShelf("More of what you like", tracks = more.await())
+            addShelf("Today's biggest hits", tracks = hits)
+            addShelf(
+                "Made for you",
+                items = community.filter { it.kind == MediaKind.PLAYLIST || it.kind == MediaKind.MIX }.take(12),
+            )
+            addShelf("Popular radio", items = radio.await())
+            addShelf("Throwback", tracks = throwback.await())
+            addShelf("Best of artists", items = bestArtists.await())
+            addShelf("Your favourite artists", items = artists.take(12))
+        }
     }
 
     suspend fun search(query: String, filter: SearchFilter): SearchResults {
@@ -566,6 +667,11 @@ class MusicRepository(private val settings: com.meoify.music.data.local.Settings
     suspend fun deletePlaylist(playlistId: String): Boolean {
         if (!cookiesPresent) return false
         return runCatching { innerTube.deletePlaylist(playlistId) }.getOrDefault(false)
+    }
+
+    suspend fun removeSongFromPlaylist(playlistId: String, videoId: String): Boolean {
+        if (!cookiesPresent) return false
+        return runCatching { innerTube.removeFromPlaylist(playlistId, videoId) }.getOrDefault(false)
     }
 
     suspend fun renamePlaylist(playlistId: String, title: String): Boolean {

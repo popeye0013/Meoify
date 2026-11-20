@@ -345,7 +345,12 @@ private fun DetailContent(
                     track = track,
                     isCurrent = currentTrackId == track.id,
                     onClick = { actions.playTracks(page.tracks, idx, page.title) },
-                    onMoreClick = { actions.openTrackMenu(track) },
+                    onMoreClick = { actions.openTrackMenu(
+                        track,
+                        if (localPlaylistId != null) localPlaylistId
+                        else if (!isLikedPage && page.kind == MediaKind.PLAYLIST) page.id
+                        else null,
+                    ) },
                     onSwipeRight = if (swipeRightToQueue) {
                         { actions.addToQueue(track) }
                     } else {
@@ -389,7 +394,12 @@ private fun DetailContent(
                         track = track,
                         isCurrent = currentTrackId == track.id,
                         onClick = { actions.playTracks(section.tracks, idx, section.title) },
-                        onMoreClick = { actions.openTrackMenu(track) },
+                        onMoreClick = { actions.openTrackMenu(
+                        track,
+                        if (localPlaylistId != null) localPlaylistId
+                        else if (!isLikedPage && page.kind == MediaKind.PLAYLIST) page.id
+                        else null,
+                    ) },
                         onSwipeRight = if (swipeRightToQueue) {
                             { actions.addToQueue(track) }
                         } else {

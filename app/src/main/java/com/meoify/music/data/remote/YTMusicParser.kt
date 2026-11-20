@@ -2,6 +2,7 @@ package com.meoify.music.data.remote
 
 import com.meoify.music.data.model.DetailPage
 import com.meoify.music.data.model.DetailSection
+import com.meoify.music.data.model.HomeShelf
 import com.meoify.music.data.model.MediaCard
 import com.meoify.music.data.model.MediaKind
 import com.meoify.music.data.model.Track
@@ -85,6 +86,66 @@ object YTMusicParser {
         }
 
         return quickPicks.take(30) to cards.distinctBy { it.id }.take(20)
+    }
+
+    /**
+     * Every populated home shelf, in the order YouTube Music sent it. Reading
+     * the server's own heading keeps every title on screen even when an older
+     * hardcoded section happens to be empty.
+     */
+    fun parseHomeShelves(root: JsonObject): List<HomeShelf> {
+        val shelves = mutableListOf<HomeShelf>()
+
+        root.findAll("musicCarouselShelfRenderer").forEach { element ->
+            val carousel = element.asObjectOrNull() ?: return@forEach
+            val header = carousel["header"]?.asObjectOrNull()
+                ?.get("musicCarouselShelfBasicHeaderRenderer")?.asObjectOrNull()
+            val title = header?.get("title")?.readText() ?: return@forEach
+            val subtitle = header["subtitle"]?.readText()
+            addShelf(shelves, title, subtitle, carousel["contents"]?.asArrayOrNull().orEmpty())
+        }
+
+        root.findAll("musicShelfRenderer").forEach { element ->
+            val shelf = element.asObjectOrNull() ?: return@forEach
+            val title = shelf["title"]?.readText() ?: return@forEach
+            addShelf(
+                shelves,
+                title,
+                shelf["subtitle"]?.readText(),
+                shelf["contents"]?.asArrayOrNull().orEmpty(),
+            )
+        }
+
+        return shelves.filterNot { it.isEmpty }
+            .distinctBy { it.title.trim().lowercase() }
+            .take(16)
+    }
+
+    private fun addShelf(
+        shelves: MutableList<HomeShelf>,
+        rawTitle: String,
+        rawSubtitle: String?,
+        contents: List<JsonElement>,
+    ) {
+        val title = rawTitle.trim()
+        if (title.isBlank()) return
+        val tracks = contents.mapNotNull { item ->
+            item.asObjectOrNull()?.get("musicResponsiveListItemRenderer")?.asObjectOrNull()
+                ?.let { parseTrack(it) }
+        }
+        val items = contents.mapNotNull { item ->
+            item.asObjectOrNull()?.get("musicTwoRowItemRenderer")?.asObjectOrNull()
+                ?.let { parseCard(it) }
+                ?.takeIf { it.kind != MediaKind.TRACK }
+        }
+        shelves.add(
+            HomeShelf(
+                title = title,
+                subtitle = rawSubtitle?.trim()?.takeIf { it.isNotBlank() },
+                tracks = tracks.distinctBy { it.id }.take(30),
+                items = items.distinctBy { it.id }.take(20),
+            ),
+        )
     }
 
     fun parseNewReleases(root: JsonObject): List<MediaCard> {

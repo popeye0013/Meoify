@@ -562,7 +562,7 @@ private fun SearchResultsBody(
                                 onClick = {
                                     actions.playFromSearch(track, data.tracks.drop(idx + 1))
                                 },
-                                onMoreClick = { actions.openTrackMenu(track) },
+                                onMoreClick = { actions.openTrackMenu(track, null) },
                             )
                         }
 

@@ -353,6 +353,22 @@ class InnerTube(private val client: OkHttpClient) {
         )
     }.isSuccess
 
+    suspend fun removeFromPlaylist(playlistId: String, videoId: String): Boolean = runCatching {
+        post(
+            "browse/edit_playlist",
+            buildJsonObject {
+                put("playlistId", playlistId.removePrefix("VL"))
+                putJsonArray("actions") {
+                    addJsonObject {
+                        put("action", "ACTION_REMOVE_VIDEO")
+                        put("removedVideoId", videoId)
+                    }
+                }
+            },
+        )
+        true
+    }.getOrDefault(false)
+
     private suspend fun post(endpoint: String, payload: JsonObject): JsonObject = withContext(Dispatchers.IO) {
         val body = buildJsonObject {
             putJsonObject("context") {

@@ -415,10 +415,11 @@ fun PlayerScreen(onClose: () -> Unit) {
             },
             onMore = { track ->
                 showQueue = false
-                actions.openTrackMenu(track)
+                actions.openTrackMenu(track, null)
             },
             onMove = { from, to -> actions.moveQueueItem(from, to) },
             onRemove = { index -> actions.removeFromQueue(index) },
+            onClearUpcoming = actions.clearUpcoming,
         )
     }
 
@@ -1520,6 +1521,7 @@ private fun QueueSheet(
     onMore: (Track) -> Unit,
     onMove: (Int, Int) -> Unit,
     onRemove: (Int) -> Unit,
+    onClearUpcoming: () -> Unit,
 ) {
     var draggingIndex by remember { mutableStateOf(-1) }
     var dragDistance by remember { mutableStateOf(0f) }
@@ -1528,6 +1530,8 @@ private fun QueueSheet(
     val density = LocalDensity.current
     val fallbackRowHeight = with(density) { 72.dp.toPx() }
     var rowHeight by remember { mutableStateOf(fallbackRowHeight) }
+    val hasUpcoming = state.queueIndex in state.queue.indices &&
+        state.queueIndex < state.queue.lastIndex
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(
@@ -1559,6 +1563,15 @@ private fun QueueSheet(
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                if (hasUpcoming) {
+                    IconButton(onClick = onClearUpcoming) {
+                        Icon(
+                            imageVector = Icons.Filled.Delete,
+                            contentDescription = "Clear upcoming songs",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
             }
             if (state.queue.isNotEmpty()) {
                 Text(

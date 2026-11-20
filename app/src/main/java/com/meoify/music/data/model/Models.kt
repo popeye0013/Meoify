@@ -61,12 +61,26 @@ data class AccountInfo(
             .ifBlank { "M" }
 }
 
+/** A titled row on Home, kept exactly as YouTube Music or Meoify named it. */
+data class HomeShelf(
+    val title: String,
+    val subtitle: String? = null,
+    val tracks: List<Track> = emptyList(),
+    val items: List<MediaCard> = emptyList(),
+) {
+    val isEmpty: Boolean get() = tracks.isEmpty() && items.isEmpty()
+}
+
 data class HomeFeed(
     val quickPicks: List<Track> = emptyList(),
     val communityPlaylists: List<MediaCard> = emptyList(),
     val newReleases: List<MediaCard> = emptyList(),
     val topArtists: List<MediaCard> = emptyList(),
     val chartPlaylists: List<MediaCard> = emptyList(),
+    /** Shelves sent by YouTube Music, in server order. */
+    val shelves: List<HomeShelf> = emptyList(),
+    /** Meoify's personalised shelves, shown after New releases. */
+    val personalShelves: List<HomeShelf> = emptyList(),
 )
 
 /** A playlist parsed from a Spotify or YouTube Music link, before saving. */

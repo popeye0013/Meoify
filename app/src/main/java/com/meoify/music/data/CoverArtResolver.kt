@@ -40,7 +40,11 @@ class CoverArtResolver(private val repository: MusicRepository) {
     }
 
     private suspend fun resolve(track: Track): String? {
-        Artwork.songArt(track.thumbnailUrl)?.let { return it }
+        // Spotify first, then Apple iTunes, then YouTube Music. `musicArtwork`
+        // owns that ordering; YouTube's own thumbnail is only a placeholder or
+        // a last resort when no catalogue has the song.
+        val musicArt = runCatching { repository.musicArtwork(track) }.getOrNull()
+        if (!musicArt.isNullOrBlank()) return musicArt
 
         val albumId = track.albumId?.takeIf { it.isNotBlank() }
         if (albumId != null) {
@@ -48,8 +52,7 @@ class CoverArtResolver(private val repository: MusicRepository) {
             if (!albumArt.isNullOrBlank()) return albumArt
         }
 
-        val musicArt = runCatching { repository.musicArtwork(track) }.getOrNull()
-        if (!musicArt.isNullOrBlank()) return musicArt
+        Artwork.songArt(track.thumbnailUrl)?.let { return it }
 
         // Last resort: the video frame, or a frame built from the song id.
         return Artwork.still(track.thumbnailUrl) ?: Artwork.stillForVideo(track.id)

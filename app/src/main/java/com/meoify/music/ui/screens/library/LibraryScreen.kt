@@ -25,14 +25,13 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PlaylistAdd
 import androidx.compose.material.icons.filled.ViewList
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -86,7 +85,7 @@ import com.meoify.music.ui.navigation.LocalYtLoading
 import com.meoify.music.ui.navigation.LocalYtPlaylists
 import com.meoify.music.ui.theme.ArtworkColorCache
 
-@OptIn(ExperimentalFoundationApi::class)
+@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun LibraryScreen(
     onShowCreatePlaylist: (Boolean) -> Unit,
@@ -159,41 +158,12 @@ fun LibraryScreen(
                         )
                     }
                 }
-                Box {
-                    IconButton(onClick = { showCreateMenu = true }) {
-                        Icon(
-                            Icons.Filled.Add,
-                            contentDescription = "Create or import playlist",
-                            tint = MaterialTheme.colorScheme.onSurface,
-                        )
-                    }
-                    DropdownMenu(
-                        expanded = showCreateMenu,
-                        onDismissRequest = { showCreateMenu = false },
-                    ) {
-                        DropdownMenuItem(
-                            text = { Text("Create playlist") },
-                            leadingIcon = {
-                                Icon(Icons.Filled.PlaylistAdd, contentDescription = null)
-                            },
-                            onClick = {
-                                showCreateMenu = false
-                                onShowCreatePlaylist(true)
-                            },
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Import playlist") },
-                            leadingIcon = {
-                                Icon(Icons.Filled.LibraryMusic, contentDescription = null)
-                            },
-                            onClick = {
-                                showCreateMenu = false
-                                importUrlDraft = ""
-                                importStatus = null
-                                showImportDialog = true
-                            },
-                        )
-                    }
+                IconButton(onClick = { showCreateMenu = true }) {
+                    Icon(
+                        Icons.Filled.Add,
+                        contentDescription = "Create or import playlist",
+                        tint = MaterialTheme.colorScheme.onSurface,
+                    )
                 }
             }
         }
@@ -348,7 +318,7 @@ fun LibraryScreen(
                             onClick = {
                                 actions.playTracks(library.liked, library.liked.indexOf(track), "Liked Songs")
                             },
-                            onMoreClick = { actions.openTrackMenu(track) },
+                            onMoreClick = { actions.openTrackMenu(track, null) },
                         )
                     }
                 }
@@ -409,11 +379,54 @@ fun LibraryScreen(
                     onClick = {
                         actions.playTracks(library.recent, library.recent.indexOf(track), "Recently played")
                     },
-                    onMoreClick = { actions.openTrackMenu(track) },
+                    onMoreClick = { actions.openTrackMenu(track, null) },
                 )
             }
         }
         item { Spacer(Modifier.height(28.dp)) }
+    }
+
+    if (showCreateMenu) {
+        ModalBottomSheet(onDismissRequest = { showCreateMenu = false }) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 24.dp),
+            ) {
+                Text(
+                    text = "Add to library",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.ExtraBold,
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
+                )
+                LibraryCreateOption(
+                    icon = Icons.Filled.PlaylistAdd,
+                    title = "Create playlist",
+                    description = "Create a playlist with songs or episodes.",
+                ) {
+                    showCreateMenu = false
+                    onShowCreatePlaylist(true)
+                }
+                LibraryCreateOption(
+                    icon = Icons.Filled.LibraryMusic,
+                    title = "Import playlist",
+                    description = "Import playlist from Spotify or YouTube Music.",
+                ) {
+                    showCreateMenu = false
+                    importUrlDraft = ""
+                    importStatus = null
+                    showImportDialog = true
+                }
+                LibraryCreateOption(
+                    icon = Icons.Filled.Folder,
+                    title = "Folder",
+                    description = "Organise your playlists",
+                ) {
+                    showCreateMenu = false
+                    actions.showSnackbar("Folders are coming soon")
+                }
+            }
+        }
     }
 
     menuTarget?.let { target ->
@@ -595,6 +608,46 @@ fun LibraryScreen(
                 ) { Text("Cancel") }
             },
         )
+    }
+}
+
+@Composable
+private fun LibraryCreateOption(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    title: String,
+    description: String,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 20.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Surface(
+            shape = RoundedCornerShape(14.dp),
+            color = MaterialTheme.colorScheme.primaryContainer,
+            modifier = Modifier.size(44.dp),
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                    modifier = Modifier.size(22.dp),
+                )
+            }
+        }
+        Spacer(Modifier.width(14.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
+            Text(
+                description,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }
 

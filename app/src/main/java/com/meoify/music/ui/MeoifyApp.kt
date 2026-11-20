@@ -72,6 +72,7 @@ fun MeoifyApp(
     var showPlayer by remember { mutableStateOf(false) }
     var pendingSearch by remember { mutableStateOf<String?>(null) }
     var trackMenuTrack by remember { mutableStateOf<Track?>(null) }
+    var trackMenuPlaylistId by remember { mutableStateOf<String?>(null) }
     var addToPlaylistTrack by remember { mutableStateOf<Track?>(null) }
     var showCreatePlaylist by remember { mutableStateOf(false) }
     var newPlaylistName by remember { mutableStateOf("") }
@@ -163,6 +164,7 @@ fun MeoifyApp(
             playNextInQueue = { index -> container.player.playNextInQueue(index) },
             removeFromQueue = { index -> container.player.removeFromQueue(index) },
             clearQueue = { container.player.clearQueue() },
+            clearUpcoming = { container.player.clearUpcoming() },
             toggleLike = { track ->
                 if (container.repository.signedIn) {
                     val wasLiked = library.liked.any { it.id == track.id }
@@ -187,7 +189,10 @@ fun MeoifyApp(
             toggleShuffle = { container.player.toggleShuffle() },
             cycleRepeat = { container.player.cycleRepeat() },
             seekTo = { pos -> container.player.seekTo(pos) },
-            openTrackMenu = { track -> trackMenuTrack = track },
+            openTrackMenu = { track, playlistId ->
+                trackMenuTrack = track
+                trackMenuPlaylistId = playlistId
+            },
             openAlbum = { id -> if (id != null) detailStack.add(Destination.Album(id)) },
             openArtist = { id -> if (id != null) detailStack.add(Destination.Artist(id)) },
             openPlaylist = { id -> detailStack.add(Destination.Playlist(id)) },
@@ -218,7 +223,19 @@ fun MeoifyApp(
                     container.library.addToPlaylist(id, track)
                 }
             },
-            removeFromPlaylist = { id, trackId -> container.library.removeFromPlaylist(id, trackId) },
+            removeFromPlaylist = { id, trackId ->
+                if (id.startsWith("local_")) {
+                    container.library.removeFromPlaylist(id, trackId)
+                } else {
+                    scope.launch {
+                        val ok = container.repository.removeSongFromPlaylist(id, trackId)
+                        if (ok) container.ytLibrary.refresh()
+                        snackbarHostState.showSnackbar(
+                            if (ok) "Removed from playlist" else "Couldn't remove that song",
+                        )
+                    }
+                }
+            },
             createPlaylist = { name ->
                 if (container.repository.signedIn) {
                     scope.launch {
@@ -333,7 +350,11 @@ fun MeoifyApp(
             pendingSearch = pendingSearch,
             onConsumedPending = { pendingSearch = null },
             trackMenuTrack = trackMenuTrack,
-            onTrackMenuDismiss = { trackMenuTrack = null },
+            trackMenuPlaylistId = trackMenuPlaylistId,
+            onTrackMenuDismiss = {
+                trackMenuTrack = null
+                trackMenuPlaylistId = null
+            },
             addToPlaylistTrack = addToPlaylistTrack,
             onAddToPlaylistDismiss = { addToPlaylistTrack = null },
             onAddToPlaylist = { addToPlaylistTrack = it },

@@ -29,7 +29,7 @@ class AppContainer(context: Context) {
     val settings = SettingsStore(appContext)
     val library = LibraryStore(appContext)
     val playback = PlaybackStore(appContext)
-    val repository = MusicRepository(settings)
+    val repository = MusicRepository(settings, library)
     val coverArt = CoverArtResolver(repository)
     val ytLibrary = YtLibrarySync(repository, library)
     val streamResolver = StreamResolver(appContext, settings)

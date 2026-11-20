@@ -52,6 +52,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.meoify.music.MeoifyApplication
 import com.meoify.music.data.model.MediaCard as MediaCardModel
+import com.meoify.music.data.model.HomeShelf
 import com.meoify.music.data.model.MediaKind
 import com.meoify.music.data.model.Track
 import com.meoify.music.data.model.UiState
@@ -191,6 +192,16 @@ fun HomeScreen() {
                         }
                     }
 
+                    val shelves = feed.shelves.filterNot { it.isEmpty }
+                    if (shelves.isNotEmpty()) {
+                        items(shelves, key = { "shelf_${it.title}" }) { shelf ->
+                            HomeShelfSection(
+                                shelf = shelf,
+                                currentTrackId = currentTrackId,
+                                actions = actions,
+                            )
+                        }
+                    } else {
                     if (quickPicks.isNotEmpty()) {
                         item {
                             SectionHeader(
@@ -207,7 +218,7 @@ fun HomeScreen() {
                                 onPlay = { index ->
                                     actions.playTracks(quickPicks, index, "Quick picks")
                                 },
-                                onMore = { track -> actions.openTrackMenu(track) },
+                                onMore = { track -> actions.openTrackMenu(track, null) },
                             )
                         }
                     }
@@ -256,7 +267,7 @@ fun HomeScreen() {
                                         onClick = {
                                             actions.playTracks(trendingTracks, index, "Trending now")
                                         },
-                                        onMoreClick = { actions.openTrackMenu(track) },
+                                        onMoreClick = { actions.openTrackMenu(track, null) },
                                         modifier = Modifier.weight(1f),
                                         rank = index + 1,
                                     )
@@ -264,6 +275,7 @@ fun HomeScreen() {
                                 if (row.size == 1) Spacer(Modifier.weight(1f))
                             }
                         }
+                    }
                     }
 
                     if (feed.newReleases.isNotEmpty()) {
@@ -285,36 +297,13 @@ fun HomeScreen() {
                         }
                     }
 
-                    if (feed.topArtists.isNotEmpty()) {
-                        item { SectionHeader(title = "Top artists") }
-                        item {
-                            LazyRow(
-                                contentPadding = PaddingValues(horizontal = 16.dp),
-                                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                            ) {
-                                items(feed.topArtists, key = { it.id }) { card ->
-                                    ArtistCard(card = card, onClick = { actions.openArtist(card.id) })
-                                }
-                            }
-                        }
-                    }
-
-                    if (feed.chartPlaylists.isNotEmpty()) {
-                        item { SectionHeader(title = "Charts") }
-                        item {
-                            LazyRow(
-                                contentPadding = PaddingValues(horizontal = 16.dp),
-                                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                            ) {
-                                items(feed.chartPlaylists, key = { it.id }) { card ->
-                                    MediaCard(
-                                        card = card,
-                                        onClick = { actions.openPlaylist(card.id) },
-                                        width = 150.dp,
-                                    )
-                                }
-                            }
-                        }
+                    val personal = feed.personalShelves.filterNot { it.isEmpty }
+                    items(personal, key = { "personal_${it.title}" }) { shelf ->
+                        HomeShelfSection(
+                            shelf = shelf,
+                            currentTrackId = currentTrackId,
+                            actions = actions,
+                        )
                     }
 
                     item { Spacer(Modifier.height(24.dp)) }
@@ -330,6 +319,45 @@ private fun openCard(card: MediaCardModel, actions: com.meoify.music.ui.navigati
         MediaKind.PLAYLIST, MediaKind.MIX -> actions.openPlaylist(card.id)
         MediaKind.ARTIST -> actions.openArtist(card.id)
         else -> actions.search(card.title)
+    }
+}
+
+/** One titled Home row. Songs and cards can share the same heading. */
+@Composable
+private fun HomeShelfSection(
+    shelf: HomeShelf,
+    currentTrackId: String?,
+    actions: com.meoify.music.ui.navigation.AppActions,
+) {
+    if (shelf.tracks.isNotEmpty()) {
+        SectionHeader(title = shelf.title, subtitle = shelf.subtitle)
+        QuickPicksRail(
+            tracks = shelf.tracks,
+            currentTrackId = currentTrackId,
+            onPlay = { index -> actions.playTracks(shelf.tracks, index, shelf.title) },
+            onMore = { track -> actions.openTrackMenu(track, null) },
+        )
+    }
+    if (shelf.items.isNotEmpty()) {
+        if (shelf.tracks.isEmpty()) {
+            SectionHeader(title = shelf.title, subtitle = shelf.subtitle)
+        }
+        LazyRow(
+            contentPadding = PaddingValues(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            items(shelf.items, key = { it.id }) { card ->
+                if (card.kind == MediaKind.ARTIST) {
+                    ArtistCard(card = card, onClick = { actions.openArtist(card.id) })
+                } else {
+                    MediaCard(
+                        card = card,
+                        onClick = { openCard(card, actions) },
+                        width = 150.dp,
+                    )
+                }
+            }
+        }
     }
 }
 

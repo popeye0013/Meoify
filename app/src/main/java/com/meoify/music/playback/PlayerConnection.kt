@@ -1139,6 +1139,26 @@ class PlayerConnection(
     }
 
     /**
+     * Drops every upcoming item but leaves the playing song completely alone:
+     * no stop, no re-prepare and no seek, so playback is never interrupted.
+     */
+    fun clearUpcoming() {
+        if (queueIndex !in queue.indices) return
+        // Stop any late prefetch from adding items back after this clear.
+        generation++
+        val c = controller
+        if (c != null && c.isConnected && c.mediaItemCount > 0) {
+            val index = c.currentMediaItemIndex
+            val count = c.mediaItemCount - index - 1
+            if (count > 0) c.removeMediaItems(index + 1, count)
+        }
+        queue = queue.take(queueIndex + 1)
+        _state.update { it.copy(queue = queue) }
+        persist(force = true)
+        _events.tryEmit(PlaybackEvent.Message("Cleared upcoming songs"))
+    }
+
+    /**
      * Rebuilds the player's media items from an edited app queue. The current
      * song and its position are carried over so editing doesn't restart it.
      */
@@ -1277,7 +1297,7 @@ class PlayerConnection(
     }
 
     private suspend fun Track.toMediaItem(audio: ResolvedAudio): MediaItem {
-        val artwork = coverArt?.cached(id)
+        val artwork = coverArt?.cover(this)
             ?: Artwork.songArt(thumbnailUrl)
             ?: Artwork.still(thumbnailUrl)
             ?: Artwork.stillForVideo(id)

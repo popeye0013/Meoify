@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.LibraryMusic
@@ -42,6 +43,7 @@ import com.meoify.music.ui.theme.ArtworkColorCache
 @Composable
 fun TrackMenuSheet(
     track: Track,
+    playlistId: String? = null,
     onDismiss: () -> Unit,
     onAddToPlaylist: () -> Unit,
 ) {
@@ -85,6 +87,12 @@ fun TrackMenuSheet(
             MenuItem(Icons.Filled.QueueMusic, "Play next") { actions.playNext(track); onDismiss() }
             MenuItem(Icons.Filled.Add, "Add to queue") { actions.addToQueue(track); onDismiss() }
             MenuItem(Icons.Filled.LibraryMusic, "Add to playlist") { onAddToPlaylist(); onDismiss() }
+            if (!playlistId.isNullOrBlank() && playlistId != "liked") {
+                MenuItem(Icons.Filled.Delete, "Remove from this playlist") {
+                    actions.removeFromPlaylist(playlistId, track.id)
+                    onDismiss()
+                }
+            }
             track.albumId?.let { id ->
                 MenuItem(Icons.Filled.LibraryMusic, "Go to album") { actions.openAlbum(id); onDismiss() }
             }

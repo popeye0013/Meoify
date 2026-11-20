@@ -133,6 +133,7 @@ fun MeoifyScaffold(
     pendingSearch: String?,
     onConsumedPending: () -> Unit,
     trackMenuTrack: Track?,
+    trackMenuPlaylistId: String?,
     onTrackMenuDismiss: () -> Unit,
     addToPlaylistTrack: Track?,
     onAddToPlaylistDismiss: () -> Unit,
@@ -456,6 +457,7 @@ fun MeoifyScaffold(
     if (trackMenuTrack != null) {
         com.meoify.music.ui.components.TrackMenuSheet(
             track = trackMenuTrack!!,
+            playlistId = trackMenuPlaylistId,
             onDismiss = onTrackMenuDismiss,
             onAddToPlaylist = { onAddToPlaylist(trackMenuTrack!!) },
         )

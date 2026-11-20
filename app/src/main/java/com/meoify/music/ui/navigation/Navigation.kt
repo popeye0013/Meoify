@@ -32,6 +32,8 @@ data class AppActions(
     val playNextInQueue: (Int) -> Unit,
     val removeFromQueue: (Int) -> Unit,
     val clearQueue: () -> Unit,
+    /** Removes every upcoming song but keeps the current one playing. */
+    val clearUpcoming: () -> Unit,
     val toggleLike: (Track) -> Unit,
     val togglePlayPause: () -> Unit,
     /** Re-resolves the current song after a quality or server change. */
@@ -43,7 +45,7 @@ data class AppActions(
     val toggleShuffle: () -> Unit,
     val cycleRepeat: () -> Unit,
     val seekTo: (Long) -> Unit,
-    val openTrackMenu: (Track) -> Unit,
+    val openTrackMenu: (Track, String?) -> Unit,
     val openAlbum: (String?) -> Unit,
     val openArtist: (String?) -> Unit,
     val openPlaylist: (String) -> Unit,
