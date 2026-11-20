@@ -123,6 +123,7 @@ import com.meoify.music.util.copyText
 import com.meoify.music.util.openUpiPayment
 import com.meoify.music.util.openUrl
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -837,6 +838,7 @@ fun SettingsScreen(
                     // Wait for DataStore before re-resolving so the new quality
                     // is used instead of the old one.
                     app.container.settings.setQuality(quality).join()
+                    app.container.settings.settings.first { it.quality == quality }
                     actions.reloadCurrent()
                 }
                 showQualitySheet = false
@@ -955,6 +957,8 @@ fun SettingsScreen(
                         }
                         scope.launch {
                             app.container.settings.setLosslessServer(value, serverNameDraft).join()
+                            val clean = value.trim().trimEnd('/').takeIf { it.isNotBlank() }
+                            app.container.settings.settings.first { it.losslessServer == clean }
                             actions.reloadCurrent()
                             serverWorking = if (value.isEmpty()) {
                                 null

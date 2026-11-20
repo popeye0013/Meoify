@@ -327,7 +327,7 @@ class StreamResolver(
         if (best?.confident == true) return best.item
 
         val titleOnly = track.title.trim()
-        if (titleOnly.isNotBlank() && normalize(titleOnly) != normalize(combined)) {
+        if (titleOnly.isNotBlank() && ServerTrackMatcher.normalize(titleOnly) != ServerTrackMatcher.normalize(combined)) {
             val secondary = searchItems(server, "s" to titleOnly, "limit" to "20") {
                 it.jsonObject["data"]?.jsonObject?.get("items")?.jsonArray.orEmpty()
             }
@@ -344,7 +344,7 @@ class StreamResolver(
         if (best?.confident == true) return best.item
 
         val titleOnly = track.title.trim()
-        if (titleOnly.isNotBlank() && normalize(titleOnly) != normalize(combined)) {
+        if (titleOnly.isNotBlank() && ServerTrackMatcher.normalize(titleOnly) != ServerTrackMatcher.normalize(combined)) {
             val secondary = searchItems(server, "q" to titleOnly) { it.jsonObject["tracks"]?.jsonArray.orEmpty() }
             best = bestMatch(primary + secondary, track) ?: best
         }
@@ -367,86 +367,14 @@ class StreamResolver(
 
     private fun bestMatch(items: List<JsonObject>, track: Track): Match? = items
         .mapNotNull { item ->
-            val score = matchScore(item, track)
+            val score = ServerTrackMatcher.score(item, track)
             if (score > 0) Match(item, score, score >= CONFIDENT_MATCH_SCORE) else null
         }
         .maxByOrNull { it.score }
 
-    /** Returns a positive score when a search result plausibly matches the track. */
-    private fun matchScore(item: JsonObject, track: Track): Int {
-        val title = item.string("title").orEmpty()
-        if (title.isBlank()) return 0
-
-        val wantedTitle = normalize(track.title)
-        val foundTitle = normalize(title)
-        val titleHits = tokens(track.title).count { it in tokens(title) }
-        if (titleHits == 0 && wantedTitle != foundTitle) return 0
-
-        var score = 25 * titleHits
-        val exactTitle = wantedTitle == foundTitle
-        if (exactTitle) score += 80
-
-        val wantedArtist = normalize(track.artist)
-        val foundArtist = normalize(artistOf(item))
-        val artistMatch = wantedArtist.isNotBlank() && foundArtist.isNotBlank() &&
-            (wantedArtist == foundArtist || tokens(track.artist).any { it in tokens(artistOf(item)) })
-        if (wantedArtist.isNotBlank()) {
-            if (artistMatch) score += 40 else score -= 45
-        }
-
-        val wantedSeconds = track.durationMs / 1000
-        val foundSeconds = durationOf(item)
-        if (wantedSeconds > 0 && foundSeconds > 0) {
-            when (val delta = kotlin.math.abs(foundSeconds - wantedSeconds)) {
-                in 0..2 -> score += 30
-                in 3..10 -> score += 15
-                in 11..30 -> score += 5
-                else -> if (delta > 60) score -= 25
-            }
-        }
-
-        // A remix / live / cover with the same title is not the requested song.
-        if (!exactTitle && isAlternateVersion(title) && !isAlternateVersion(track.title)) score -= 50
-        return score
-    }
-
-    private fun artistOf(item: JsonObject): String = item.string("artist")
-        ?: item["artist"]?.jsonObject?.string("name")
-        ?: item["artists"]?.jsonArray?.firstOrNull()?.jsonObject?.string("name")
-        ?: item.string("primaryArtist")
-        ?: ""
-
-    private fun durationOf(item: JsonObject): Long {
-        val raw = item["duration"]?.jsonPrimitive?.contentOrNull ?: return 0
-        raw.toLongOrNull()?.let { value ->
-            // hifi-api reports seconds; some workers report milliseconds.
-            return if (value > 10_000) value / 1000 else value
-        }
-        val parts = raw.split(":").mapNotNull { it.toLongOrNull() }
-        return when (parts.size) {
-            2 -> parts[0] * 60 + parts[1]
-            3 -> parts[0] * 3600 + parts[1] * 60 + parts[2]
-            else -> 0
-        }
-    }
-
-    private fun isAlternateVersion(title: String): Boolean {
-        val clean = " ${normalize(title)} "
-        return listOf(
-            "remix", "live", "cover", "karaoke", "instrumental", "acoustic",
-            "remastered", "extended", "radio edit", "sped up", "slowed", "reverb",
-        ).any { clean.contains(" $it ") }
-    }
-
-    private fun tokens(value: String): Set<String> = normalize(value).split(' ').filter { it.isNotBlank() }.toSet()
-
-    private fun normalize(value: String): String = java.text.Normalizer
-        .normalize(value.lowercase(), java.text.Normalizer.Form.NFD)
-        .replace(Regex("\\p{InCombiningDiacriticalMarks}+"), "")
-        .replace(Regex("[^a-z0-9]+"), " ")
-        .trim()
-
-    private fun JsonObject.string(key: String): String? = this[key]?.jsonPrimitive?.contentOrNull
+    // Safe primitive read: hifi-api sends some fields as JSON objects.
+    private fun JsonObject.string(key: String): String? =
+        (this[key] as? kotlinx.serialization.json.JsonPrimitive)?.contentOrNull
 
     private fun buildUrl(base: String, path: String, vararg params: Pair<String, String>): String {
         val root = base.toHttpUrlOrNull()
