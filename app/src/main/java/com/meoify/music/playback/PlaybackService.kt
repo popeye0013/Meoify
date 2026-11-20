@@ -116,6 +116,8 @@ class PlaybackService : MediaSessionService() {
             override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
                 // The heart follows the current song.
                 refreshMediaButtons()
+                // Push the now-playing track to the GitHub profile widget.
+                currentTrack()?.let { container.listeningSync.onTrackChanged(it) }
             }
 
             override fun onIsPlayingChanged(isPlaying: Boolean) {
