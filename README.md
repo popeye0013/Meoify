@@ -44,35 +44,29 @@
 
 ## Screenshots
 
-<table align="center">
+<p align="center">
+  <sub>← swipe or scroll sideways to browse →</sub>
+</p>
+
+<table>
   <tr>
-    <td align="center">
-      <img src="https://raw.githubusercontent.com/popeye0013/Dotfiles/main/Meoify/img1.png" width="190" alt="Meoify screenshot 1" />
-      <br /><sub>01</sub>
-    </td>
-    <td align="center">
-      <img src="https://raw.githubusercontent.com/popeye0013/Dotfiles/main/Meoify/img2.png" width="190" alt="Meoify screenshot 2" />
-      <br /><sub>02</sub>
-    </td>
-    <td align="center">
-      <img src="https://raw.githubusercontent.com/popeye0013/Dotfiles/main/Meoify/img3.png" width="190" alt="Meoify screenshot 3" />
-      <br /><sub>03</sub>
-    </td>
+    <td align="center"><sub>01</sub></td>
+    <td align="center"><sub>02</sub></td>
+    <td align="center"><sub>03</sub></td>
+    <td align="center"><sub>04</sub></td>
+    <td align="center"><sub>05</sub></td>
   </tr>
   <tr>
-    <td align="center">
-      <img src="https://raw.githubusercontent.com/popeye0013/Dotfiles/main/Meoify/img4.png" width="190" alt="Meoify screenshot 4" />
-      <br /><sub>04</sub>
-    </td>
-    <td align="center" colspan="2">
-      <img src="https://raw.githubusercontent.com/popeye0013/Dotfiles/main/Meoify/img5.png" width="190" alt="Meoify screenshot 5" />
-      <br /><sub>05</sub>
-    </td>
+    <td><img src="https://raw.githubusercontent.com/popeye0013/Dotfiles/main/Meoify/img1.png" width="260" alt="Meoify screenshot 1" /></td>
+    <td><img src="https://raw.githubusercontent.com/popeye0013/Dotfiles/main/Meoify/img2.png" width="260" alt="Meoify screenshot 2" /></td>
+    <td><img src="https://raw.githubusercontent.com/popeye0013/Dotfiles/main/Meoify/img3.png" width="260" alt="Meoify screenshot 3" /></td>
+    <td><img src="https://raw.githubusercontent.com/popeye0013/Dotfiles/main/Meoify/img4.png" width="260" alt="Meoify screenshot 4" /></td>
+    <td><img src="https://raw.githubusercontent.com/popeye0013/Dotfiles/main/Meoify/img5.png" width="260" alt="Meoify screenshot 5" /></td>
   </tr>
 </table>
 
 <p align="center">
-  <sub>Tap a screenshot in GitHub to view it full size.</sub>
+  <sub>Tap any screenshot in GitHub to view it full size.</sub>
 </p>
 
 ---
