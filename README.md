@@ -42,7 +42,7 @@
 
 ---
 
-## Screenshots
+## <img src="docs/icons/screenshots.svg" width="24" height="24" alt="" />&nbsp;Screenshots
 
 <p align="center">
   <sub>Tap a screenshot to open it full screen, then swipe or use ← → to slide through all five.</sub>
@@ -67,16 +67,16 @@
 
 ---
 
-## Features
+## <img src="docs/icons/features.svg" width="24" height="24" alt="" />&nbsp;Features
 
-### Discover
+### <img src="docs/icons/discover.svg" width="21" height="21" alt="" />&nbsp;Discover
 
 - **Personalised home** — greeting, quick picks, made-for-you mixes, trending songs, new releases, top artists and charts.
 - **Search that stays out of the way** — pill search field, voice input, live suggestions, recent searches and genre shortcuts.
 - **Filters that persist** — switch between Tracks, Albums, Artists and Playlists without losing your query.
 - **Pull to refresh** everywhere the catalogue can change.
 
-### Play
+### <img src="docs/icons/play.svg" width="21" height="21" alt="" />&nbsp;Play
 
 - **Full player** — square artwork, wavy seek bar, shuffle, repeat, mute, queue management and a floating mini player.
 - **Queue gestures** — hold a song to reorder the queue, or swipe it right to remove it.
@@ -91,7 +91,7 @@
 - **High refresh rate** — uses up to 120 Hz where the display supports it.
 - **Real album artwork** — covers from YouTube Music, Spotify and Apple's catalogue. Catalogue art is preferred; the video thumbnail is shown only when no album cover can be found, so a row is never left blank.
 
-### Library & accounts
+### <img src="docs/icons/library-accounts.svg" width="21" height="21" alt="" />&nbsp;Library &amp; accounts
 
 - **Liked songs, playlists, saved albums and history** — with list and grid layouts.
 - **YouTube Music playlists** — your account playlists appear in Library and open straight in the player.
@@ -100,7 +100,7 @@
 - **Local profile** — use Meoify without an account and pick a name and avatar shown across the app.
 - **Backup & restore** — export playlists and your profile to a readable `.json` file.
 
-### Design & details
+### <img src="docs/icons/design-details.svg" width="21" height="21" alt="" />&nbsp;Design &amp; details
 
 - **Material 3 Expressive** — light, dark and pure-black themes, dynamic colour on Android 12+, rounded surfaces and Google Sans Flex.
 - **Volume & output popup** — the speaker button on Now Playing opens a media volume slider with a Bluetooth battery badge. Output switching happens via the system. The button shows a speaker or Bluetooth icon to match the active output.
@@ -109,7 +109,7 @@
 
 ---
 
-## Audio quality
+## <img src="docs/icons/audio-quality.svg" width="24" height="24" alt="" />&nbsp;Audio quality
 
 Pick a mode in **Settings → Playback**, or tap the quality pill on the Now Playing card.
 
@@ -125,7 +125,7 @@ Pick a mode in **Settings → Playback**, or tap the quality pill on the Now Pla
 
 ---
 
-## Build from source
+## <img src="docs/icons/build-from-source.svg" width="24" height="24" alt="" />&nbsp;Build from source
 
 **Requirements:** JDK 17 and Android SDK 36.
 
@@ -147,7 +147,7 @@ For a debug build:
 gradle assembleDebug
 ```
 
-### Patched NewPipeExtractor
+### <img src="docs/icons/patched-extractor.svg" width="21" height="21" alt="" />&nbsp;Patched NewPipeExtractor
 
 Streaming uses [NewPipeExtractor](https://github.com/TeamNewPipe/NewPipeExtractor) `v0.27.1`, patched for Android 8–12. The upstream jar calls APIs that only exist on Android 13+; without the patch, playback crashes with `NoSuchMethodError`.
 
@@ -159,7 +159,7 @@ tools/patch-newpipe-extractor/patch.sh
 
 See [`tools/patch-newpipe-extractor/README.md`](tools/patch-newpipe-extractor/README.md) for the full list of rewrites.
 
-### Tests
+### <img src="docs/icons/tests.svg" width="21" height="21" alt="" />&nbsp;Tests
 
 ```bash
 gradle testDebugUnitTest
@@ -167,7 +167,7 @@ gradle testDebugUnitTest
 
 ---
 
-## Tech stack
+## <img src="docs/icons/tech-stack.svg" width="24" height="24" alt="" />&nbsp;Tech stack
 
 | Layer | Technology |
 |---|---|
@@ -181,7 +181,7 @@ gradle testDebugUnitTest
 | Lyrics | LRCLIB |
 | Artwork | YouTube Music, Spotify, Apple iTunes |
 
-### Project layout
+### <img src="docs/icons/project-layout.svg" width="21" height="21" alt="" />&nbsp;Project layout
 
 ```text
 app/src/main/java/com/meoify/music/
@@ -193,7 +193,7 @@ app/src/main/java/com/meoify/music/
 
 ---
 
-## FAQ
+## <img src="docs/icons/faq.svg" width="24" height="24" alt="" />&nbsp;FAQ
 
 <details>
 <summary><strong>Is Meoify affiliated with YouTube or Google?</strong></summary>
@@ -246,7 +246,7 @@ Use **Settings → About → Check for updates**, or install the newer APK over 
 
 ---
 
-## Contributing
+## <img src="docs/icons/contributing.svg" width="24" height="24" alt="" />&nbsp;Contributing
 
 Issues and pull requests are welcome.
 
@@ -256,7 +256,7 @@ Issues and pull requests are welcome.
 
 ---
 
-## Legal disclaimer
+## <img src="docs/icons/legal-disclaimer.svg" width="24" height="24" alt="" />&nbsp;Legal disclaimer
 
 Meoify is an **unofficial, independent project**. It is not affiliated with, endorsed by, or sponsored by YouTube, Google or any music catalogue provider.
 
