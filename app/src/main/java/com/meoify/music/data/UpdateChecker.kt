@@ -15,12 +15,10 @@ import okhttp3.Request
 import java.util.concurrent.TimeUnit
 
 /**
- * Looks up the newest published Meoify release.
+ * Looks up the newest published Meoify release on GitHub.
  *
- * The Meoify repository is private, so an anonymous call to the GitHub API
- * cannot see its releases (it answers 404). A tiny public manifest is kept in
- * the profile repository and is read first; the GitHub API is still tried as a
- * fallback so the check keeps working if the repository is ever made public.
+ * GitHub releases are the single source of truth for both the update prompt
+ * and the in-app changelog, so the two always show the same notes.
  */
 object UpdateChecker {
 
@@ -34,9 +32,6 @@ object UpdateChecker {
         val published: String? = null,
     )
 
-    private const val MANIFEST_URL =
-        "https://raw.githubusercontent.com/${DeveloperInfo.HANDLE}/${DeveloperInfo.HANDLE}/main/meoify-latest.json"
-
     private val client = OkHttpClient.Builder()
         .connectTimeout(12, TimeUnit.SECONDS)
         .readTimeout(12, TimeUnit.SECONDS)
@@ -45,38 +40,8 @@ object UpdateChecker {
     private val json = Json { ignoreUnknownKeys = true }
 
     suspend fun latest(): Release? = withContext(Dispatchers.IO) {
-        fromManifest() ?: fromGitHubApi()
+        fromGitHubApi()
     }
-
-    private fun fromManifest(): Release? = runCatching {
-        val request = Request.Builder()
-            .url(MANIFEST_URL)
-            .header("User-Agent", "Meoify-Android")
-            .build()
-        client.newCall(request).execute().use { response ->
-            if (!response.isSuccessful) return@runCatching null
-            val root = json.parseToJsonElement(response.body?.string().orEmpty()).jsonObject
-            val version = root["version"]
-                ?.jsonPrimitive
-                ?.contentOrNull
-                .orEmpty()
-                .trim()
-                .removePrefix("v")
-                .removePrefix("V")
-            if (version.isBlank()) return@runCatching null
-            Release(
-                version = version,
-                url = root["release_url"]?.jsonPrimitive?.contentOrNull ?: DeveloperInfo.REPO_URL,
-                apkUrl = root["apk_url"]?.jsonPrimitive?.contentOrNull,
-                notes = (root["changelog"] as? JsonArray)
-                    ?.mapNotNull { it.jsonPrimitive.contentOrNull }
-                    ?.map { it.trim() }
-                    ?.filter { it.isNotEmpty() }
-                    .orEmpty(),
-                published = root["published"]?.jsonPrimitive?.contentOrNull,
-            )
-        }
-    }.getOrNull()
 
     private fun fromGitHubApi(): Release? = runCatching {
         val request = Request.Builder()

@@ -87,10 +87,10 @@ class PlaybackService : MediaSessionService() {
         // rolling buffer so network hiccups don't turn into visible buffering.
         val loadControl = DefaultLoadControl.Builder()
             .setBufferDurationsMs(
-                12_000, // min buffer
-                30_000, // max buffer
-                750,    // start playback after this much is buffered
-                1_500,  // after a rebuffer
+                25_000, // min buffer
+                60_000, // max buffer
+                1_000,  // start playback after this much is buffered
+                2_000,  // after a rebuffer
             )
             .setPrioritizeTimeOverSizeThresholds(true)
             .build()

@@ -59,7 +59,7 @@ fun WelcomeScreen(
     onCreateLocalProfile: (String) -> Unit,
 ) {
     var showProfileDialog by remember { mutableStateOf(false) }
-    var profileName by remember { mutableStateOf("Music Lover") }
+    var profileName by remember { mutableStateOf("") }
 
     Box(
         modifier = Modifier

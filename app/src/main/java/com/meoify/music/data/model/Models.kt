@@ -69,6 +69,12 @@ data class HomeFeed(
     val chartPlaylists: List<MediaCard> = emptyList(),
 )
 
+/** A playlist parsed from a Spotify or YouTube Music link, before saving. */
+data class ImportedPlaylist(
+    val title: String,
+    val tracks: List<Track>,
+)
+
 data class SearchResults(
     val query: String,
     val tracks: List<Track> = emptyList(),

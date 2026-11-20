@@ -63,6 +63,7 @@ import androidx.compose.material.icons.filled.Verified
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -167,6 +168,7 @@ fun SettingsScreen(
     }
 
     var editProfile by remember { mutableStateOf(false) }
+    var showSignOutDialog by remember { mutableStateOf(false) }
     var showQualitySheet by remember { mutableStateOf(false) }
     var showServerDialog by remember { mutableStateOf(false) }
     var serverDraft by remember { mutableStateOf("") }
@@ -430,11 +432,7 @@ fun SettingsScreen(
                         editProfile = true
                     },
                     onSignIn = onOpenLogin,
-                    onSignOut = {
-                        app.container.settings.logoutYouTube()
-                        profileViewModel.clear()
-                        actions.showSnackbar("Signed out of YouTube Music")
-                    },
+                    onSignOut = { showSignOutDialog = true },
                 )
             }
             }
@@ -979,6 +977,30 @@ fun SettingsScreen(
         )
     }
 
+    if (showSignOutDialog) {
+        AlertDialog(
+            onDismissRequest = { showSignOutDialog = false },
+            icon = { Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = null) },
+            title = { Text("Sign out?") },
+            text = { Text("You'll be signed out of YouTube Music. Your local library and playlists stay on this device.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showSignOutDialog = false
+                        app.container.settings.logoutYouTube()
+                        profileViewModel.clear()
+                        actions.showSnackbar("Signed out of YouTube Music")
+                    },
+                ) {
+                    Text("Sign out", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showSignOutDialog = false }) { Text("Cancel") }
+            },
+        )
+    }
+
     if (editProfile) {
         ModalBottomSheet(
             onDismissRequest = { editProfile = false },
@@ -1242,7 +1264,14 @@ private fun ProfileCard(
                         Spacer(Modifier.width(8.dp))
                         Text("Refresh")
                     }
-                    TextButton(onClick = onSignOut) {
+                    FilledTonalButton(
+                        onClick = onSignOut,
+                        colors = ButtonDefaults.filledTonalButtonColors(
+                            containerColor = MaterialTheme.colorScheme.errorContainer,
+                            contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                        ),
+                        modifier = Modifier.weight(1f),
+                    ) {
                         Icon(
                             Icons.AutoMirrored.Filled.Logout,
                             contentDescription = null,
@@ -1260,7 +1289,10 @@ private fun ProfileCard(
                         Spacer(Modifier.width(8.dp))
                         Text("Sign in")
                     }
-                    TextButton(onClick = onEditLocal) {
+                    Button(
+                        onClick = onEditLocal,
+                        modifier = Modifier.weight(1f),
+                    ) {
                         Icon(Icons.Filled.Edit, contentDescription = null, modifier = Modifier.size(17.dp))
                         Spacer(Modifier.width(8.dp))
                         Text("Edit profile")
@@ -1673,4 +1705,5 @@ private fun ActionRow(
         )
     }
 }
+
 

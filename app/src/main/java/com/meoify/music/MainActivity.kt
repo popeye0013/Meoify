@@ -35,19 +35,24 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         // Prefer the highest refresh rate the display supports for smooth UI.
+        // Setting both the preferred mode and refresh rate keeps 90/120 Hz
+        // screens from falling back to 60 Hz.
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            val current = display?.mode
-            val bestMode = display?.supportedModes
-                ?.filter { mode ->
+            val display = display
+            val current = runCatching { display?.mode }.getOrNull()
+            val modes = display?.supportedModes.orEmpty()
+            val bestMode = modes
+                .filter { mode ->
                     current == null ||
                         (mode.physicalWidth == current.physicalWidth &&
                             mode.physicalHeight == current.physicalHeight)
                 }
-                ?.maxByOrNull { it.refreshRate }
-                ?: display?.supportedModes?.maxByOrNull { it.refreshRate }
+                .maxByOrNull { it.refreshRate }
+                ?: modes.maxByOrNull { it.refreshRate }
             if (bestMode != null) {
                 window.attributes = window.attributes.apply {
                     preferredDisplayModeId = bestMode.modeId
+                    preferredRefreshRate = bestMode.refreshRate
                 }
             }
         }

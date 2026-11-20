@@ -2,6 +2,7 @@ package com.meoify.music.data
 
 import com.meoify.music.data.model.DetailPage
 import com.meoify.music.data.model.HomeFeed
+import com.meoify.music.data.model.ImportedPlaylist
 import com.meoify.music.data.model.MediaCard
 import com.meoify.music.data.model.SearchResults
 import com.meoify.music.data.model.Track
@@ -10,14 +11,19 @@ import com.meoify.music.data.remote.ArtworkCandidate
 import com.meoify.music.data.remote.InnerTube
 import com.meoify.music.data.remote.MusicArtworkMatch
 import com.meoify.music.data.remote.MusicApiException
+import com.meoify.music.data.remote.SpotifyPlaylistClient
+import com.meoify.music.data.remote.SpotifyTrack
 import com.meoify.music.data.remote.YTMusicParser
 import com.meoify.music.data.remote.YTMusicParser.SearchFilter
 import com.meoify.music.data.remote.YTMusicParser.findAll
 import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import okhttp3.OkHttpClient
@@ -41,6 +47,7 @@ class MusicRepository(private val settings: com.meoify.music.data.local.Settings
     private val lyricsApi = com.meoify.music.data.remote.LyricsApi(http)
     private val spotifyArtwork = com.meoify.music.data.remote.SpotifyArtwork(http)
     private val appleArtwork = com.meoify.music.data.remote.AppleArtwork(http)
+    private val spotifyPlaylists = SpotifyPlaylistClient(http)
     private val settingsScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     @Volatile
@@ -157,6 +164,125 @@ class MusicRepository(private val settings: com.meoify.music.data.local.Settings
             fallback = page
         }
         return fallback ?: throw MusicApiException("Couldn't load this playlist")
+    }
+
+    /**
+     * Imports a playlist from a pasted Spotify or YouTube Music link.
+     *
+     * YouTube Music playlists are read directly. Spotify has no keyless public
+     * playlist API, so its public embed page is read for the track list and
+     * every song is then matched to a YouTube Music song. [onProgress] reports
+     * matching progress so a long Spotify playlist can show a live count.
+     */
+    suspend fun importPlaylist(
+        rawUrl: String,
+        onProgress: (done: Int, total: Int) -> Unit = { _, _ -> },
+    ): ImportedPlaylist {
+        val value = rawUrl.trim()
+        if (value.isBlank()) {
+            throw MusicApiException("Paste a Spotify or YouTube playlist link.")
+        }
+
+        if (value.contains("spotify", ignoreCase = true) ||
+            value.startsWith("spotify:", ignoreCase = true)
+        ) {
+            val spotify = spotifyPlaylists.playlist(value)
+            if (spotify.tracks.isEmpty()) {
+                throw MusicApiException("That Spotify playlist is empty or private.")
+            }
+            val tracks = resolveSpotifyTracks(spotify.tracks, onProgress)
+            if (tracks.isEmpty()) {
+                throw MusicApiException("Couldn't match any songs from that Spotify playlist.")
+            }
+            return ImportedPlaylist(
+                title = spotify.name.ifBlank { "Imported playlist" },
+                tracks = tracks,
+            )
+        }
+
+        val id = youtubePlaylistId(value)
+            ?: throw MusicApiException("Couldn't find a playlist ID in that link.")
+        onProgress(0, 0)
+        val page = playlist(id)
+        if (page.tracks.isEmpty()) {
+            throw MusicApiException("That playlist is empty or private.")
+        }
+        return ImportedPlaylist(
+            title = page.title.ifBlank { "Imported playlist" },
+            tracks = page.tracks,
+        )
+    }
+
+    /** Searches YouTube Music for each Spotify song, preserving playlist order. */
+    private suspend fun resolveSpotifyTracks(
+        songs: List<SpotifyTrack>,
+        onProgress: (done: Int, total: Int) -> Unit,
+    ): List<Track> = coroutineScope {
+        val total = songs.size
+        val gate = Semaphore(4)
+        var done = 0
+        val progressLock = Mutex()
+
+        songs.map { song ->
+            async(Dispatchers.IO) {
+                gate.withPermit {
+                    val match = runCatching { matchSpotifyTrack(song) }.getOrNull()
+                    progressLock.withLock {
+                        done++
+                        onProgress(done, total)
+                    }
+                    match
+                }
+            }
+        }.awaitAll().filterNotNull().distinctBy { it.id }
+    }
+
+    private suspend fun matchSpotifyTrack(song: SpotifyTrack): Track? {
+        val title = song.title.trim()
+        if (title.isBlank()) return null
+        val artist = song.artist.trim()
+        val query = listOf(title, artist).filter { it.isNotBlank() }.joinToString(" ")
+        val results = search(query, SearchFilter.SONGS).tracks
+        if (results.isEmpty()) return null
+
+        val probe = Track(
+            id = "",
+            title = title,
+            artist = artist,
+            durationMs = song.durationMs,
+        )
+        val candidates = results.map { result ->
+            result to ArtworkCandidate(
+                title = result.title,
+                artist = result.artist,
+                album = result.album,
+                durationMs = result.durationMs,
+                artworkUrl = result.thumbnailUrl.orEmpty(),
+            )
+        }
+        MusicArtworkMatch.best(probe, candidates.map { it.second })?.let { best ->
+            return candidates.first { it.second === best }.first
+        }
+
+        // A looser fallback keeps a radio edit or a slightly different title
+        // when the strict artwork matcher decides it is not the same recording.
+        return candidates
+            .map { it.first to MusicArtworkMatch.score(probe, it.second) }
+            .filter { it.second >= 30 }
+            .maxByOrNull { it.second }
+            ?.first
+    }
+
+    /** Reads a playlist id from a YouTube link, or accepts a bare id. */
+    private fun youtubePlaylistId(raw: String): String? {
+        if (raw.isBlank()) return null
+        Regex("[?&]list=([^&]+)").find(raw)?.let { return it.groupValues[1] }
+        val trimmed = raw.trim()
+        return trimmed.takeIf {
+            it.startsWith("PL") || it.startsWith("VL") ||
+                it.startsWith("UU") || it.startsWith("FL") ||
+                it.startsWith("LL") || it.startsWith("RD")
+        }
     }
 
     /** Appends every continuation row to [initial], up to a sane cap. */

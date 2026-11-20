@@ -31,10 +31,13 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PlaylistAdd
 import androidx.compose.material.icons.filled.ViewList
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material.icons.filled.Search
@@ -47,6 +50,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -60,6 +64,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.launch
 import com.meoify.music.MeoifyApplication
 import com.meoify.music.data.model.LocalPlaylist
 import com.meoify.music.data.model.MediaCard as MediaCardModel
@@ -111,7 +116,13 @@ fun LibraryScreen(
     var renameTarget by remember { mutableStateOf<PlaylistTarget?>(null) }
     var deleteTarget by remember { mutableStateOf<PlaylistTarget?>(null) }
     var renameValue by remember { mutableStateOf("") }
+    var showCreateMenu by remember { mutableStateOf(false) }
+    var showImportDialog by remember { mutableStateOf(false) }
+    var importUrlDraft by remember { mutableStateOf("") }
+    var importingPlaylist by remember { mutableStateOf(false) }
+    var importStatus by remember { mutableStateOf<String?>(null) }
 
+    val scope = rememberCoroutineScope()
     val listState = rememberLazyListState()
 
     LaunchedEffect(filterName) {
@@ -148,12 +159,41 @@ fun LibraryScreen(
                         )
                     }
                 }
-                IconButton(onClick = { onShowCreatePlaylist(true) }) {
-                    Icon(
-                        Icons.Filled.Add,
-                        contentDescription = "Create playlist",
-                        tint = MaterialTheme.colorScheme.onSurface,
-                    )
+                Box {
+                    IconButton(onClick = { showCreateMenu = true }) {
+                        Icon(
+                            Icons.Filled.Add,
+                            contentDescription = "Create or import playlist",
+                            tint = MaterialTheme.colorScheme.onSurface,
+                        )
+                    }
+                    DropdownMenu(
+                        expanded = showCreateMenu,
+                        onDismissRequest = { showCreateMenu = false },
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("Create playlist") },
+                            leadingIcon = {
+                                Icon(Icons.Filled.PlaylistAdd, contentDescription = null)
+                            },
+                            onClick = {
+                                showCreateMenu = false
+                                onShowCreatePlaylist(true)
+                            },
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Import playlist") },
+                            leadingIcon = {
+                                Icon(Icons.Filled.LibraryMusic, contentDescription = null)
+                            },
+                            onClick = {
+                                showCreateMenu = false
+                                importUrlDraft = ""
+                                importStatus = null
+                                showImportDialog = true
+                            },
+                        )
+                    }
                 }
             }
         }
@@ -438,6 +478,122 @@ fun LibraryScreen(
                 }) { Text("Delete") }
             },
             dismissButton = { TextButton(onClick = { deleteTarget = null }) { Text("Cancel") } },
+        )
+    }
+
+    if (showImportDialog) {
+        AlertDialog(
+            onDismissRequest = { if (!importingPlaylist) showImportDialog = false },
+            icon = { Icon(Icons.Filled.LibraryMusic, contentDescription = null) },
+            title = { Text("Import playlist") },
+            text = {
+                Column {
+                    Text(
+                        "Paste a Spotify or YouTube Music playlist link. Spotify songs " +
+                            "are matched to YouTube Music.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = importUrlDraft,
+                        onValueChange = { importUrlDraft = it },
+                        label = { Text("Playlist URL") },
+                        placeholder = {
+                            Text("open.spotify.com/playlist/… or music.youtube.com/playlist?list=…")
+                        },
+                        leadingIcon = { Icon(Icons.Filled.LibraryMusic, contentDescription = null) },
+                        singleLine = true,
+                        shape = RoundedCornerShape(16.dp),
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = !importingPlaylist,
+                    )
+                    if (importingPlaylist) {
+                        Spacer(Modifier.height(10.dp))
+                        LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                        importStatus?.let { status ->
+                            Spacer(Modifier.height(6.dp))
+                            Text(
+                                text = status,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val raw = importUrlDraft.trim()
+                        if (raw.isBlank()) {
+                            actions.showSnackbar("Paste a playlist link first")
+                            return@TextButton
+                        }
+                        val spotify = raw.contains("spotify", ignoreCase = true) ||
+                            raw.startsWith("spotify:", ignoreCase = true)
+                        importingPlaylist = true
+                        importStatus = if (spotify) {
+                            "Reading the Spotify playlist…"
+                        } else {
+                            "Loading the playlist…"
+                        }
+                        scope.launch {
+                            val result = runCatching {
+                                app.container.repository.importPlaylist(raw) { done, total ->
+                                    if (total > 0) {
+                                        scope.launch {
+                                            importStatus = "Matching songs… $done of $total"
+                                        }
+                                    }
+                                }
+                            }
+                            importingPlaylist = false
+                            importStatus = null
+                            result.fold(
+                                onSuccess = { playlist ->
+                                    showImportDialog = false
+                                    val count = playlist.tracks.size
+                                    val imported = "Imported “${playlist.title}” " +
+                                        "($count track${if (count == 1) "" else "s"})"
+                                    if (signedIn) {
+                                        // Creating playlists on YouTube Music is
+                                        // what the Library's Create action does,
+                                        // so an import stays visible in the list.
+                                        val id = app.container.ytLibrary
+                                            .createPlaylist(playlist.title, playlist.tracks)
+                                        if (id != null) {
+                                            app.container.ytLibrary.refresh()
+                                            actions.showSnackbar("$imported on YouTube Music")
+                                        } else {
+                                            app.container.library
+                                                .savePlaylist(playlist.title, playlist.tracks)
+                                            actions.showSnackbar("$imported on this device")
+                                        }
+                                    } else {
+                                        app.container.library
+                                            .savePlaylist(playlist.title, playlist.tracks)
+                                        actions.showSnackbar(imported)
+                                    }
+                                },
+                                onFailure = { error ->
+                                    actions.showSnackbar(
+                                        error.message?.takeIf { it.isNotBlank() }
+                                            ?: "Couldn't import that playlist",
+                                    )
+                                },
+                            )
+                        }
+                    },
+                    enabled = !importingPlaylist,
+                ) { Text(if (importingPlaylist) "Importing…" else "Import") }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showImportDialog = false },
+                    enabled = !importingPlaylist,
+                ) { Text("Cancel") }
+            },
         )
     }
 }
