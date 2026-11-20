@@ -40,6 +40,7 @@ class SettingsStore(private val context: Context) {
         val localProfileName = stringPreferencesKey("local_profile_name")
         val localAvatarPath = stringPreferencesKey("local_avatar_path")
         val libraryGrid = booleanPreferencesKey("library_grid")
+        val lyricsPreview = booleanPreferencesKey("lyrics_preview")
         val skippedUpdate = stringPreferencesKey("skipped_update_version")
     }
 
@@ -68,6 +69,7 @@ class SettingsStore(private val context: Context) {
                 localProfileName = prefs[Keys.localProfileName],
                 localAvatarPath = prefs[Keys.localAvatarPath],
                 libraryGridView = prefs[Keys.libraryGrid] ?: false,
+                lyricsPreview = prefs[Keys.lyricsPreview] ?: true,
                 skippedUpdateVersion = prefs[Keys.skippedUpdate],
             )
         }
@@ -147,6 +149,11 @@ class SettingsStore(private val context: Context) {
     /** Remembers whether the Library playlists are shown as a grid. */
     fun setLibraryGridView(enabled: Boolean) = scope.launch {
         context.settingsStore.edit { it[Keys.libraryGrid] = enabled }
+    }
+
+    /** Remembers the synced-lyrics preview toggle on Now Playing. */
+    fun setLyricsPreview(enabled: Boolean) = scope.launch {
+        context.settingsStore.edit { it[Keys.lyricsPreview] = enabled }
     }
 
     /** Remembers the release version whose home-screen update popup was skipped. */

@@ -34,6 +34,8 @@ data class AppActions(
     val clearQueue: () -> Unit,
     val toggleLike: (Track) -> Unit,
     val togglePlayPause: () -> Unit,
+    /** Re-resolves the current song after a quality or server change. */
+    val reloadCurrent: () -> Unit,
     val pause: () -> Unit,
     val sleepTimer: (Int) -> Unit,
     val skipNext: () -> Unit,

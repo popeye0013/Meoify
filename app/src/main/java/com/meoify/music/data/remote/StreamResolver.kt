@@ -65,7 +65,7 @@ class StreamResolver(
     private val client = OkHttpClient.Builder()
         .connectTimeout(20, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
-        .callTimeout(45, TimeUnit.SECONDS)
+        .callTimeout(25, TimeUnit.SECONDS)
         .followRedirects(true)
         .build()
 
@@ -188,19 +188,7 @@ class StreamResolver(
         track: Track,
         quality: AudioQuality,
     ): ResolvedAudio {
-        val query = listOf(track.title.trim(), track.artist.trim())
-            .filter { it.isNotEmpty() }
-            .joinToString(" ")
-            .ifBlank { throw StreamUnavailableException("This track has no searchable title.") }
-
-        val results = getJson(server, "search", "s" to query, "limit" to "10")
-        val items = results.jsonObject["data"]?.jsonObject?.get("items")?.jsonArray.orEmpty()
-        val match = items.mapNotNull { it as? JsonObject }
-            .map { it to matchScore(it, track) }
-            .filter { it.second > 0 }
-            .maxByOrNull { it.second }
-            ?.first
-            ?: throw StreamUnavailableException("This track wasn't found on the lossless server.")
+        val match = findHifiMatch(server, track)
 
         if (match["allowStreaming"]?.jsonPrimitive?.contentOrNull == "false" ||
             match["streamReady"]?.jsonPrimitive?.contentOrNull == "false"
@@ -304,19 +292,7 @@ class StreamResolver(
 
     /** Searches the Echo worker's Saavn catalogue and resolves its best AAC stream. */
     private suspend fun resolveFromSaavn(server: String, track: Track): ResolvedAudio {
-        val query = listOf(track.title.trim(), track.artist.trim())
-            .filter { it.isNotEmpty() }
-            .joinToString(" ")
-            .ifBlank { throw StreamUnavailableException("This track has no searchable title.") }
-
-        val results = getJson(server, "search", "q" to query)
-        val items = results["tracks"]?.jsonArray.orEmpty()
-        val match = items.mapNotNull { it as? JsonObject }
-            .map { it to matchScore(it, track) }
-            .filter { it.second > 0 }
-            .maxByOrNull { it.second }
-            ?.first
-            ?: throw StreamUnavailableException("This track wasn't found on the 320 kbps server.")
+        val match = findSaavnMatch(server, track)
 
         val id = match.string("id")?.takeIf { it.isNotBlank() }
             ?: throw StreamUnavailableException("The 320 kbps server returned an invalid track.")
@@ -336,42 +312,137 @@ class StreamResolver(
         )
     }
 
+    // ---------------------------------------------------------------------
+    // Accurate catalogue matching
+    // ---------------------------------------------------------------------
+
+    private data class Match(val item: JsonObject, val score: Int, val confident: Boolean)
+
+    private suspend fun findHifiMatch(server: String, track: Track): JsonObject {
+        val combined = searchQuery(track)
+        val primary = searchItems(server, "s" to combined, "limit" to "20") {
+            it.jsonObject["data"]?.jsonObject?.get("items")?.jsonArray.orEmpty()
+        }
+        var best = bestMatch(primary, track)
+        if (best?.confident == true) return best.item
+
+        val titleOnly = track.title.trim()
+        if (titleOnly.isNotBlank() && normalize(titleOnly) != normalize(combined)) {
+            val secondary = searchItems(server, "s" to titleOnly, "limit" to "20") {
+                it.jsonObject["data"]?.jsonObject?.get("items")?.jsonArray.orEmpty()
+            }
+            best = bestMatch(primary + secondary, track) ?: best
+        }
+        return best?.item
+            ?: throw StreamUnavailableException("This track wasn't found on the lossless server.")
+    }
+
+    private suspend fun findSaavnMatch(server: String, track: Track): JsonObject {
+        val combined = searchQuery(track)
+        val primary = searchItems(server, "q" to combined) { it.jsonObject["tracks"]?.jsonArray.orEmpty() }
+        var best = bestMatch(primary, track)
+        if (best?.confident == true) return best.item
+
+        val titleOnly = track.title.trim()
+        if (titleOnly.isNotBlank() && normalize(titleOnly) != normalize(combined)) {
+            val secondary = searchItems(server, "q" to titleOnly) { it.jsonObject["tracks"]?.jsonArray.orEmpty() }
+            best = bestMatch(primary + secondary, track) ?: best
+        }
+        return best?.item
+            ?: throw StreamUnavailableException("This track wasn't found on the 320 kbps server.")
+    }
+
+    private suspend fun searchItems(
+        server: String,
+        vararg params: Pair<String, String>,
+        extract: (kotlinx.serialization.json.JsonElement) -> List<kotlinx.serialization.json.JsonElement>,
+    ): List<JsonObject> = runCatching {
+        extract(getJson(server, "search", *params)).mapNotNull { it as? JsonObject }
+    }.getOrDefault(emptyList<JsonObject>())
+
+    private fun searchQuery(track: Track): String = listOf(track.title.trim(), track.artist.trim())
+        .filter { it.isNotEmpty() }
+        .joinToString(" ")
+        .ifBlank { throw StreamUnavailableException("This track has no searchable title.") }
+
+    private fun bestMatch(items: List<JsonObject>, track: Track): Match? = items
+        .mapNotNull { item ->
+            val score = matchScore(item, track)
+            if (score > 0) Match(item, score, score >= CONFIDENT_MATCH_SCORE) else null
+        }
+        .maxByOrNull { it.score }
+
     /** Returns a positive score when a search result plausibly matches the track. */
     private fun matchScore(item: JsonObject, track: Track): Int {
         val title = item.string("title").orEmpty()
-        val artist = item.string("artist")
-            ?: item["artist"]?.jsonObject?.string("name")
-            ?: item["artists"]?.jsonArray?.firstOrNull()?.jsonObject?.string("name")
-            ?: ""
         if (title.isBlank()) return 0
 
-        val wantedTitle = tokens(track.title)
-        val foundTitle = tokens(title)
-        val wantedArtist = tokens(track.artist)
-        val foundArtist = tokens(artist)
-        val titleHits = wantedTitle.count { it in foundTitle }
-        if (titleHits == 0) return 0
+        val wantedTitle = normalize(track.title)
+        val foundTitle = normalize(title)
+        val titleHits = tokens(track.title).count { it in tokens(title) }
+        if (titleHits == 0 && wantedTitle != foundTitle) return 0
 
-        var score = 20 * titleHits
-        if (normalize(title) == normalize(track.title)) score += 60
-        if (wantedArtist.isNotEmpty() && wantedArtist.any { it in foundArtist }) score += 30
+        var score = 25 * titleHits
+        val exactTitle = wantedTitle == foundTitle
+        if (exactTitle) score += 80
 
-        val duration = item["duration"]?.jsonPrimitive?.intOrNull ?: 0
+        val wantedArtist = normalize(track.artist)
+        val foundArtist = normalize(artistOf(item))
+        val artistMatch = wantedArtist.isNotBlank() && foundArtist.isNotBlank() &&
+            (wantedArtist == foundArtist || tokens(track.artist).any { it in tokens(artistOf(item)) })
+        if (wantedArtist.isNotBlank()) {
+            if (artistMatch) score += 40 else score -= 45
+        }
+
         val wantedSeconds = track.durationMs / 1000
-        if (duration > 0 && wantedSeconds > 0) {
-            val delta = kotlin.math.abs(duration - wantedSeconds)
-            when {
-                delta <= 3 -> score += 25
-                delta <= 15 -> score += 10
-                delta > 45 -> score -= 30
+        val foundSeconds = durationOf(item)
+        if (wantedSeconds > 0 && foundSeconds > 0) {
+            when (val delta = kotlin.math.abs(foundSeconds - wantedSeconds)) {
+                in 0..2 -> score += 30
+                in 3..10 -> score += 15
+                in 11..30 -> score += 5
+                else -> if (delta > 60) score -= 25
             }
         }
+
+        // A remix / live / cover with the same title is not the requested song.
+        if (!exactTitle && isAlternateVersion(title) && !isAlternateVersion(track.title)) score -= 50
         return score
+    }
+
+    private fun artistOf(item: JsonObject): String = item.string("artist")
+        ?: item["artist"]?.jsonObject?.string("name")
+        ?: item["artists"]?.jsonArray?.firstOrNull()?.jsonObject?.string("name")
+        ?: item.string("primaryArtist")
+        ?: ""
+
+    private fun durationOf(item: JsonObject): Long {
+        val raw = item["duration"]?.jsonPrimitive?.contentOrNull ?: return 0
+        raw.toLongOrNull()?.let { value ->
+            // hifi-api reports seconds; some workers report milliseconds.
+            return if (value > 10_000) value / 1000 else value
+        }
+        val parts = raw.split(":").mapNotNull { it.toLongOrNull() }
+        return when (parts.size) {
+            2 -> parts[0] * 60 + parts[1]
+            3 -> parts[0] * 3600 + parts[1] * 60 + parts[2]
+            else -> 0
+        }
+    }
+
+    private fun isAlternateVersion(title: String): Boolean {
+        val clean = " ${normalize(title)} "
+        return listOf(
+            "remix", "live", "cover", "karaoke", "instrumental", "acoustic",
+            "remastered", "extended", "radio edit", "sped up", "slowed", "reverb",
+        ).any { clean.contains(" $it ") }
     }
 
     private fun tokens(value: String): Set<String> = normalize(value).split(' ').filter { it.isNotBlank() }.toSet()
 
-    private fun normalize(value: String): String = value.lowercase()
+    private fun normalize(value: String): String = java.text.Normalizer
+        .normalize(value.lowercase(), java.text.Normalizer.Form.NFD)
+        .replace(Regex("\\p{InCombiningDiacriticalMarks}+"), "")
         .replace(Regex("[^a-z0-9]+"), " ")
         .trim()
 
@@ -389,7 +460,7 @@ class StreamResolver(
     private suspend fun getJson(base: String, path: String, vararg params: Pair<String, String>): JsonObject {
         var target = buildUrl(base, path, *params)
         var result: JsonObject? = null
-        repeat(8) { attempt ->
+        repeat(4) { attempt ->
             val request = Request.Builder().url(target).header("Accept", "application/json").build()
             client.newCall(request).execute().use { response ->
                 val text = response.body?.string().orEmpty()
@@ -402,7 +473,7 @@ class StreamResolver(
                         } else {
                             base.trimEnd('/') + status
                         }
-                        delay(1000L + attempt * 250L)
+                        delay(600L + attempt * 200L)
                         return@use
                     }
                 }
@@ -478,6 +549,8 @@ class StreamResolver(
 
     private companion object {
         const val CACHE_TTL_MS = 20 * 60 * 1000L
+        /** Title + artist + duration agreeing — no need for a second search. */
+        const val CONFIDENT_MATCH_SCORE = 120
     }
 }
 

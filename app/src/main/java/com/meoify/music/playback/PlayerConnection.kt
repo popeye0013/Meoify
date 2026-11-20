@@ -39,6 +39,8 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -241,6 +243,7 @@ class PlayerConnection(
     private var queueIndex: Int = -1
     private var sourceTitle: String = "YouTube Music"
     private var appendJob: Job? = null
+    private var reloadJob: Job? = null
     private var generation = 0
     private var lastVolume: Float = 1f
     private var sleepJob: Job? = null
@@ -707,9 +710,26 @@ class PlayerConnection(
             refresh()
             persist(force = true)
 
-            // Resolve the rest of the queue in order. The first items are ready
-            // long before the current track ends, so transitions stay seamless.
-            for (index in attempt + 1..queue.lastIndex) {
+            // Resolve the next few tracks in parallel, then add them in order.
+            // Doing these lookups together hides server/YouTube latency so the
+            // following songs are already buffered when they're needed.
+            val upcoming = (attempt + 1..queue.lastIndex).toList()
+            coroutineScope {
+                upcoming.take(PARALLEL_PREFETCH).map { index ->
+                    async(Dispatchers.IO) {
+                        val next = queue[index]
+                        runCatching { resolver.resolve(next) }
+                            .getOrNull()
+                            ?.let { next to it }
+                    }
+                }.forEach { deferred ->
+                    val resolved = deferred.await() ?: return@forEach
+                    if (generation == myGeneration) {
+                        c.addMediaItem(resolved.first.toMediaItem(resolved.second))
+                    }
+                }
+            }
+            for (index in (attempt + 1 + PARALLEL_PREFETCH)..queue.lastIndex) {
                 if (generation != myGeneration) break
                 val track = queue.getOrNull(index) ?: break
                 try {
@@ -723,6 +743,44 @@ class PlayerConnection(
                     _events.tryEmit(PlaybackEvent.Message("Couldn't queue “${track.title}”."))
                 }
             }
+        }
+    }
+
+    /**
+     * Re-resolves the current song after a quality or server change and swaps
+     * its MediaItem in place, keeping the exact position and play/pause state.
+     */
+    fun reloadCurrent() {
+        val track = _state.value.track ?: return
+        reloadJob?.cancel()
+        reloadJob = scope.launch {
+            val c = try {
+                awaitController()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                return@launch
+            }
+            if (c.currentMediaItem?.mediaId != track.id || c.mediaItemCount == 0) return@launch
+            val position = c.currentPosition
+            val wasPlaying = c.isPlaying
+            val audio = try {
+                resolver.resolve(track, force = true)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _events.tryEmit(PlaybackEvent.Failure(e.message ?: "Couldn't switch audio quality."))
+                return@launch
+            }
+            if (!isActive) return@launch
+            val index = c.currentMediaItemIndex
+            if (index !in 0 until c.mediaItemCount) return@launch
+            c.replaceMediaItem(index, track.toMediaItem(audio))
+            c.seekTo(index, position)
+            c.prepare()
+            c.playWhenReady = wasPlaying
+            refresh()
+            _events.tryEmit(PlaybackEvent.Message("Switched to the selected audio quality."))
         }
     }
 
@@ -1241,6 +1299,9 @@ class PlayerConnection(
     }
 
     private companion object {
+        /** How many following tracks are resolved at the same time. */
+        const val PARALLEL_PREFETCH = 3
+
         /** How many following tracks are tried when the selected one fails. */
         const val SKIP_WINDOW = 8
 

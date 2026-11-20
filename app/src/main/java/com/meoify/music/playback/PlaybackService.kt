@@ -12,6 +12,7 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultHttpDataSource
+import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.session.CommandButton
@@ -82,8 +83,21 @@ class PlaybackService : MediaSessionService() {
                 ),
             )
 
+        // Start playback as soon as a small chunk is ready, but keep a healthy
+        // rolling buffer so network hiccups don't turn into visible buffering.
+        val loadControl = DefaultLoadControl.Builder()
+            .setBufferDurationsMs(
+                12_000, // min buffer
+                30_000, // max buffer
+                750,    // start playback after this much is buffered
+                1_500,  // after a rebuffer
+            )
+            .setPrioritizeTimeOverSizeThresholds(true)
+            .build()
+
         val player = ExoPlayer.Builder(this)
             .setMediaSourceFactory(DefaultMediaSourceFactory(dataSourceFactory))
+            .setLoadControl(loadControl)
             // handleAudioFocus = true: Media3 ducks on transient focus loss
             // (calls, notifications) and pauses on permanent loss.
             .setAudioAttributes(

@@ -101,6 +101,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -172,8 +173,10 @@ fun PlayerScreen(onClose: () -> Unit) {
     var accent by remember(track?.id) { mutableStateOf(ArtworkColorCache.fallbackColor(track?.title ?: "meoify")) }
     LaunchedEffect(cover, track?.title) { accent = ArtworkColorCache.extract(cover, track?.title ?: "meoify") }
 
+    val appSettings by app.container.settings.settings.collectAsStateWithLifecycle()
+    val lyricsPreview = appSettings.lyricsPreview
+
     var showLyrics by remember { mutableStateOf(false) }
-    var showLyricsPreview by remember { mutableStateOf(true) }
     var showQueue by remember { mutableStateOf(false) }
     var menuOpen by remember { mutableStateOf(false) }
     var showSleepTimer by remember { mutableStateOf(false) }
@@ -366,7 +369,7 @@ fun PlayerScreen(onClose: () -> Unit) {
                         state = state,
                         track = track,
                         lyrics = lyrics,
-                        lyricsPreviewEnabled = showLyricsPreview,
+                        lyricsPreviewEnabled = lyricsPreview,
                         actions = actions,
                         accent = accent,
                         onShowLyrics = { showLyrics = true },
@@ -427,8 +430,12 @@ fun PlayerScreen(onClose: () -> Unit) {
             onDismiss = { menuOpen = false },
             onShare = ::shareTrack,
             onShowQueue = { showQueue = true },
-            lyricsPreviewEnabled = showLyricsPreview,
-            onToggleLyricsPreview = { showLyricsPreview = !showLyricsPreview },
+            lyricsPreviewEnabled = lyricsPreview,
+            onToggleLyricsPreview = {
+                swipeScope.launch {
+                    app.container.settings.setLyricsPreview(!lyricsPreview)
+                }
+            },
             onListenTogether = { showListenTogether = true },
             onOpenVideo = ::openVideo,
             onSleepTimer = { showSleepTimer = true },

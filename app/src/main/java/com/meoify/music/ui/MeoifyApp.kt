@@ -179,6 +179,7 @@ fun MeoifyApp(
                 }
             },
             togglePlayPause = { container.player.togglePlayPause() },
+            reloadCurrent = { container.player.reloadCurrent() },
             pause = { container.player.pause() },
             sleepTimer = { minutes -> container.player.setSleepTimer(minutes) },
             skipNext = { container.player.skipNext() },

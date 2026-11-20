@@ -833,7 +833,12 @@ fun SettingsScreen(
         AudioQualitySheet(
             quality = settings.quality,
             onSelect = { quality ->
-                app.container.settings.setQuality(quality)
+                scope.launch {
+                    // Wait for DataStore before re-resolving so the new quality
+                    // is used instead of the old one.
+                    app.container.settings.setQuality(quality).join()
+                    actions.reloadCurrent()
+                }
                 showQualitySheet = false
             },
             onDismiss = { showQualitySheet = false },
@@ -948,12 +953,13 @@ fun SettingsScreen(
                             actions.showSnackbar("Enter a URL starting with http:// or https://")
                             return@TextButton
                         }
-                        app.container.settings.setLosslessServer(value, serverNameDraft)
-                        if (value.isEmpty()) {
-                            serverWorking = null
-                        } else {
-                            scope.launch {
-                                serverWorking = app.container.streamResolver.checkServer(value) == null
+                        scope.launch {
+                            app.container.settings.setLosslessServer(value, serverNameDraft).join()
+                            actions.reloadCurrent()
+                            serverWorking = if (value.isEmpty()) {
+                                null
+                            } else {
+                                app.container.streamResolver.checkServer(value) == null
                             }
                         }
                         showServerDialog = false

@@ -177,6 +177,8 @@ data class AppSettings(
     val localProfileName: String? = null,
     val localAvatarPath: String? = null,
     val libraryGridView: Boolean = false,
+    /** Shows synced lyrics beside the artwork on Now Playing. */
+    val lyricsPreview: Boolean = true,
     val onboardingCompleted: Boolean = false,
     /** Version whose home-screen update popup was skipped; cleared by a newer release. */
     val skippedUpdateVersion: String? = null,
