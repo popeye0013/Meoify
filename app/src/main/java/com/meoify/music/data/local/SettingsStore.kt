@@ -34,6 +34,11 @@ class SettingsStore(private val context: Context) {
         val losslessServer = stringPreferencesKey("lossless_server")
         val losslessServerName = stringPreferencesKey("lossless_server_name")
         val historySync = booleanPreferencesKey("history_sync")
+        val scrobblingEnabled = booleanPreferencesKey("scrobbling_enabled")
+        val lastfmApiKey = stringPreferencesKey("lastfm_api_key")
+        val lastfmApiSecret = stringPreferencesKey("lastfm_api_secret")
+        val lastfmSessionKey = stringPreferencesKey("lastfm_session_key")
+        val lastfmUsername = stringPreferencesKey("lastfm_username")
         val onboarding = booleanPreferencesKey("onboarding_completed")
         val ytCookies = stringPreferencesKey("yt_cookies")
         val accountName = stringPreferencesKey("yt_account")
@@ -51,7 +56,7 @@ class SettingsStore(private val context: Context) {
                 themeMode = runCatching { ThemeMode.valueOf(prefs[Keys.theme] ?: "") }
                     .getOrDefault(ThemeMode.DARK),
                 dynamicColor = prefs[Keys.dynamic] ?: false,
-                pureBlack = prefs[Keys.pureBlack] ?: true,
+                pureBlack = prefs[Keys.pureBlack] ?: false,
                 quality = when (prefs[Keys.quality]) {
                     // Legacy names from the three-option picker.
                     "HIGH" -> AudioQuality.HI_RES
@@ -63,6 +68,11 @@ class SettingsStore(private val context: Context) {
                 losslessServer = prefs[Keys.losslessServer]?.takeIf { it.isNotBlank() },
                 losslessServerName = prefs[Keys.losslessServerName]?.takeIf { it.isNotBlank() },
                 historySync = prefs[Keys.historySync] ?: true,
+                scrobblingEnabled = prefs[Keys.scrobblingEnabled] ?: false,
+                lastfmApiKey = prefs[Keys.lastfmApiKey],
+                lastfmApiSecret = prefs[Keys.lastfmApiSecret],
+                lastfmSessionKey = prefs[Keys.lastfmSessionKey],
+                lastfmUsername = prefs[Keys.lastfmUsername],
                 onboardingCompleted = prefs[Keys.onboarding] ?: false,
                 ytCookies = prefs[Keys.ytCookies],
                 accountName = prefs[Keys.accountName],
@@ -108,6 +118,33 @@ class SettingsStore(private val context: Context) {
 
     fun setHistorySync(enabled: Boolean) = scope.launch {
         context.settingsStore.edit { it[Keys.historySync] = enabled }
+    }
+
+    fun setScrobblingEnabled(enabled: Boolean) = scope.launch {
+        context.settingsStore.edit { it[Keys.scrobblingEnabled] = enabled }
+    }
+
+    fun saveLastFm(
+        apiKey: String,
+        apiSecret: String,
+        sessionKey: String,
+        username: String,
+    ) = scope.launch {
+        context.settingsStore.edit {
+            it[Keys.lastfmApiKey] = apiKey.trim()
+            it[Keys.lastfmApiSecret] = apiSecret.trim()
+            it[Keys.lastfmSessionKey] = sessionKey.trim()
+            it[Keys.lastfmUsername] = username.trim()
+            it[Keys.scrobblingEnabled] = true
+        }
+    }
+
+    fun clearLastFm() = scope.launch {
+        context.settingsStore.edit {
+            it.remove(Keys.lastfmSessionKey)
+            it.remove(Keys.lastfmUsername)
+            it[Keys.scrobblingEnabled] = false
+        }
     }
 
     fun setYtCookies(cookies: String?) = scope.launch {

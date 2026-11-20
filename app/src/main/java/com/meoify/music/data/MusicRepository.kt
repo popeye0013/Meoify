@@ -12,6 +12,7 @@ import com.meoify.music.data.model.Track
 import com.meoify.music.data.remote.Artwork
 import com.meoify.music.data.remote.ArtworkCandidate
 import com.meoify.music.data.remote.InnerTube
+import com.meoify.music.data.remote.LastFmClient
 import com.meoify.music.data.remote.MusicArtworkMatch
 import com.meoify.music.data.remote.MusicApiException
 import com.meoify.music.data.remote.SpotifyPlaylistClient
@@ -54,6 +55,7 @@ class MusicRepository(
     private val spotifyArtwork = com.meoify.music.data.remote.SpotifyArtwork(http)
     private val appleArtwork = com.meoify.music.data.remote.AppleArtwork(http)
     private val spotifyPlaylists = SpotifyPlaylistClient(http)
+    private val lastFm = LastFmClient(http)
     private val settingsScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     @Volatile
@@ -726,8 +728,103 @@ class MusicRepository(
 
     private val lyricsCache = mutableMapOf<String, String>()
 
+    // ------------------------------------------------------------- last.fm
+
+    suspend fun lastFmSession(
+        apiKey: String,
+        apiSecret: String,
+        username: String,
+        password: String,
+    ): LastFmClient.Session = lastFm.mobileSession(apiKey, apiSecret, username, password)
+
+    suspend fun lastFmNowPlaying(track: Track): Boolean {
+        val s = settings?.current() ?: return false
+        val key = s.lastfmSessionKey ?: return false
+        val apiKey = s.lastfmApiKey ?: return false
+        val secret = s.lastfmApiSecret ?: return false
+        return lastFm.updateNowPlaying(apiKey, secret, key, track)
+    }
+
+    suspend fun lastFmScrobble(track: Track, timestampSeconds: Long): Boolean {
+        val s = settings?.current() ?: return false
+        val key = s.lastfmSessionKey ?: return false
+        val apiKey = s.lastfmApiKey ?: return false
+        val secret = s.lastfmApiSecret ?: return false
+        return lastFm.scrobble(apiKey, secret, key, track, timestampSeconds)
+    }
+
+    // --------------------------------------------------------- smart mixes
+
+    /**
+     * Builds mood/genre mixes from the person's liked songs. Mood mixes use the
+     * catalogue search; artist mixes use YouTube Music's own radio for a liked
+     * seed. Nothing is saved here — the caller decides which mixes to keep.
+     */
+    suspend fun generateSmartMixes(
+        liked: List<Track>,
+        perMix: Int = 15,
+        includeMoods: Boolean = true,
+        includeArtists: Boolean = true,
+        selectedMoods: List<String> = DEFAULT_MOODS,
+        selectedArtists: List<String>? = null,
+    ): List<ImportedPlaylist> = supervisorScope {
+        if (liked.isEmpty()) return@supervisorScope emptyList()
+
+        val defaultTopArtists = liked
+            .mapNotNull { it.artist.trim().takeIf { name -> name.isNotBlank() } }
+            .groupingBy { it.lowercase() }
+            .eachCount()
+            .entries
+            .sortedByDescending { it.value }
+            .take(3)
+            .map { it.key }
+        val mixArtists = selectedArtists?.takeIf { it.isNotEmpty() } ?: defaultTopArtists
+
+        val moods = selectedMoods.map { it.trim().lowercase() }.filter { it.isNotBlank() }
+        val moodJobs = if (includeMoods) {
+            moods.map { mood ->
+                async(Dispatchers.IO) {
+                    val artist = defaultTopArtists.firstOrNull()
+                    val queries = listOfNotNull(
+                        artist?.let { "$mood $it" },
+                        "$mood hits",
+                    )
+                    val tracks = queries.firstNotNullOfOrNull { query ->
+                        runCatching { search(query, SearchFilter.SONGS) }
+                            .getOrNull()?.tracks?.takeIf { it.isNotEmpty() }
+                    }.orEmpty().distinctBy { it.id }.take(perMix)
+                    if (tracks.isEmpty()) null else ImportedPlaylist(
+                        title = "Smart Mix: ${mood.replaceFirstChar { it.uppercaseChar() }}",
+                        tracks = tracks,
+                    )
+                }
+            }
+        } else {
+            emptyList()
+        }
+
+        val artistJobs = if (includeArtists) {
+            mixArtists.map { artist ->
+                async(Dispatchers.IO) {
+                    val seed = liked.firstOrNull { it.artist.equals(artist, ignoreCase = true) }
+                    val tracks = seed?.let { runCatching { radioQueue(it) }.getOrNull() }
+                        .orEmpty().distinctBy { it.id }.take(perMix)
+                    if (tracks.isEmpty()) null else ImportedPlaylist(
+                        title = "Smart Mix: $artist",
+                        tracks = tracks,
+                    )
+                }
+            }
+        } else {
+            emptyList()
+        }
+
+        (moodJobs + artistJobs).awaitAll().filterNotNull()
+    }
+
     private companion object {
         const val HOME_TTL_MS = 5 * 60 * 1000L
+        val DEFAULT_MOODS = listOf("Chill", "Party", "Throwback", "Focus", "Romantic", "Workout")
         const val FILTER_SONGS = "EgWKAQIIAWoKEAkQBRAKEAMQBA%3D%3D"
         const val FILTER_ALBUMS = "EgWKAQIYAWoKEAkQChAFEAMQBA%3D%3D"
         const val FILTER_ARTISTS = "EgWKAQIgAWoKEAkQChAFEAMQBA%3D%3D"

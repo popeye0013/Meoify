@@ -22,6 +22,9 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Favorite
@@ -30,6 +33,8 @@ import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PlaylistAdd
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.filled.ViewList
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -39,7 +44,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -97,14 +101,49 @@ fun LibraryScreen(
     val app = context.applicationContext as MeoifyApplication
     val settings by app.container.settings.settings.collectAsStateWithLifecycle()
     val ytPlaylists = LocalYtPlaylists.current
-    var playlistQuery by remember { mutableStateOf("") }
-    val filteredPlaylists = remember(ytPlaylists, playlistQuery) {
-        if (playlistQuery.isBlank()) ytPlaylists
-        else ytPlaylists.filter { it.title.contains(playlistQuery, ignoreCase = true) }
-    }
     val ytLoading = LocalYtLoading.current
     val signedIn = LocalSignedIn.current
     val currentTrackId = LocalPlayerState.current.track?.id
+    val likedArtists = remember(library.liked) {
+        library.liked
+            .mapNotNull { it.artist.trim().takeIf { name -> name.isNotBlank() } }
+            .groupBy { it.lowercase() }
+            .entries
+            .sortedByDescending { it.value.size }
+            .take(8)
+            .map { it.value.first() }
+    }
+    val moodOptions = listOf("Chill", "Party", "Throwback", "Focus", "Romantic", "Workout")
+
+    // Sorting applies to both YouTube Music and local playlists.
+    var librarySearchOpen by rememberSaveable { mutableStateOf(false) }
+    var libraryQuery by rememberSaveable { mutableStateOf("") }
+    val query = libraryQuery.trim()
+    var sortName by rememberSaveable { mutableStateOf(LibrarySort.NAME.name) }
+    var showSortSheet by remember { mutableStateOf(false) }
+    val sortMode = LibrarySort.valueOf(sortName)
+    val filteredPlaylists = remember(ytPlaylists, sortMode, query) {
+        sortCards(ytPlaylists, sortMode)
+            .filter { query.isBlank() || it.title.contains(query, ignoreCase = true) }
+    }
+    val sortedLocalPlaylists = remember(library.playlists, sortMode, query) {
+        sortLocalPlaylists(library.playlists, sortMode)
+            .filter { query.isBlank() || it.name.contains(query, ignoreCase = true) }
+    }
+    val filteredLiked = remember(library.liked, query) {
+        if (query.isBlank()) library.liked
+        else library.liked.filter {
+            it.title.contains(query, ignoreCase = true) ||
+                it.artist.contains(query, ignoreCase = true)
+        }
+    }
+    val filteredRecent = remember(library.recent, query) {
+        if (query.isBlank()) library.recent
+        else library.recent.filter {
+            it.title.contains(query, ignoreCase = true) ||
+                it.artist.contains(query, ignoreCase = true)
+        }
+    }
 
     var filterName by rememberSaveable { mutableStateOf(LibraryFilter.Playlists.name) }
     val filter = LibraryFilter.valueOf(filterName)
@@ -116,6 +155,12 @@ fun LibraryScreen(
     var deleteTarget by remember { mutableStateOf<PlaylistTarget?>(null) }
     var renameValue by remember { mutableStateOf("") }
     var showCreateMenu by remember { mutableStateOf(false) }
+    var showSmartMixPrompt by remember { mutableStateOf(false) }
+    var smartMixMoods by remember { mutableStateOf(false) }
+    var smartMixArtists by remember { mutableStateOf(false) }
+    var selectedMoods by remember { mutableStateOf(moodOptions.toSet()) }
+    var selectedArtists by remember { mutableStateOf(emptySet<String>()) }
+    var generatingMixes by remember { mutableStateOf(false) }
     var showImportDialog by remember { mutableStateOf(false) }
     var importUrlDraft by remember { mutableStateOf("") }
     var importingPlaylist by remember { mutableStateOf(false) }
@@ -142,21 +187,41 @@ fun LibraryScreen(
                     .padding(start = 20.dp, end = 8.dp, top = 16.dp, bottom = 6.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(
-                    text = "Your Library",
-                    style = MaterialTheme.typography.headlineLarge,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = MaterialTheme.colorScheme.onBackground,
-                    modifier = Modifier.weight(1f),
-                )
-                if (filter == LibraryFilter.Playlists) {
-                    IconButton(onClick = { app.container.settings.setLibraryGridView(!gridView) }) {
-                        Icon(
-                            imageVector = if (gridView) Icons.Filled.ViewList else Icons.Filled.GridView,
-                            contentDescription = if (gridView) "Show as list" else "Show as grid",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
+                if (librarySearchOpen) {
+                    OutlinedTextField(
+                        value = libraryQuery,
+                        onValueChange = { libraryQuery = it },
+                        placeholder = { Text("Search in library") },
+                        leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
+                        singleLine = true,
+                        shape = RoundedCornerShape(28.dp),
+                        modifier = Modifier.weight(1f),
+                    )
+                } else {
+                    Text(
+                        text = "Your Library",
+                        style = MaterialTheme.typography.headlineLarge,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = MaterialTheme.colorScheme.onBackground,
+                        maxLines = 1,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+                IconButton(
+                    onClick = {
+                        if (librarySearchOpen) {
+                            librarySearchOpen = false
+                            libraryQuery = ""
+                        } else {
+                            librarySearchOpen = true
+                        }
+                    },
+                ) {
+                    Icon(
+                        imageVector = if (librarySearchOpen) Icons.Filled.Close else Icons.Filled.Search,
+                        contentDescription = if (librarySearchOpen) "Close library search" else "Search in library",
+                        tint = MaterialTheme.colorScheme.onSurface,
+                    )
                 }
                 IconButton(onClick = { showCreateMenu = true }) {
                     Icon(
@@ -195,20 +260,44 @@ fun LibraryScreen(
                     }
                 }
                 if (filter == LibraryFilter.Playlists) {
-                    OutlinedTextField(
-                        value = playlistQuery,
-                        onValueChange = { playlistQuery = it },
-                        placeholder = { Text("Search playlists") },
-                        leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
-                        singleLine = true,
-                        shape = RoundedCornerShape(16.dp),
+                    Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 8.dp),
-                    )
+                            .padding(horizontal = 16.dp, vertical = 2.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(50))
+                                .clickable { showSortSheet = true }
+                                .padding(horizontal = 10.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Icon(
+                                Icons.AutoMirrored.Filled.Sort,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(18.dp),
+                            )
+                            Spacer(Modifier.width(6.dp))
+                            Text(
+                                text = "Sort by: ${sortMode.label}",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.primary,
+                            )
+                        }
+                        Spacer(Modifier.weight(1f))
+                        IconButton(onClick = { app.container.settings.setLibraryGridView(!gridView) }) {
+                            Icon(
+                                imageVector = if (gridView) Icons.Filled.ViewList else Icons.Filled.GridView,
+                                contentDescription = if (gridView) "Show as list" else "Show as grid",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
                 }
 
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(4.dp))
             }
         }
 
@@ -237,8 +326,12 @@ fun LibraryScreen(
 
                         filteredPlaylists.isEmpty() -> item {
                             EmptyLibrary(
-                                title = "No playlists on this account",
-                                message = "Playlists you create in Meoify are saved straight to your YouTube Music account.",
+                                title = if (query.isBlank()) "No playlists on this account" else "No playlists match “$query”",
+                                message = if (query.isBlank()) {
+                                    "Playlists you create in Meoify are saved straight to your YouTube Music account."
+                                } else {
+                                    "Try a different name."
+                                },
                                 action = "New playlist",
                                 onAction = { onShowCreatePlaylist(true) },
                             )
@@ -259,18 +352,22 @@ fun LibraryScreen(
                         }
                     }
                 } else {
-                    if (library.playlists.isEmpty()) {
+                    if (sortedLocalPlaylists.isEmpty()) {
                         item {
                             EmptyLibrary(
-                                title = "Create your first playlist",
-                                message = "Collect the songs you love and keep them in one place.",
+                                title = if (query.isBlank()) "Create your first playlist" else "No playlists match “$query”",
+                                message = if (query.isBlank()) {
+                                    "Collect the songs you love and keep them in one place."
+                                } else {
+                                    "Try a different name."
+                                },
                                 action = "New playlist",
                                 onAction = { onShowCreatePlaylist(true) },
                             )
                         }
                     } else if (gridView) {
                         items(
-                            items = library.playlists.chunked(2).toList(),
+                            items = sortedLocalPlaylists.chunked(2).toList(),
                             key = { row -> "local_" + row.joinToString("|") { it.id } },
                         ) { row ->
                             PlaylistGridRow(
@@ -291,7 +388,7 @@ fun LibraryScreen(
                             )
                         }
                     } else {
-                        items(library.playlists, key = { it.id }) { playlist ->
+                        items(sortedLocalPlaylists, key = { it.id }) { playlist ->
                             PlaylistListCard(
                                 card = playlist.toCard(),
                                 onClick = { actions.openLocalPlaylist(playlist.id) },
@@ -302,21 +399,25 @@ fun LibraryScreen(
             }
 
             LibraryFilter.Songs -> {
-                if (library.liked.isEmpty()) {
+                if (filteredLiked.isEmpty()) {
                     item {
                         EmptyLibrary(
-                            title = "No liked songs yet",
-                            message = "Tap the heart on any song to save it here.",
+                            title = if (query.isBlank()) "No liked songs yet" else "No songs match “$query”",
+                            message = if (query.isBlank()) {
+                                "Tap the heart on any song to save it here."
+                            } else {
+                                "Try a different name or artist."
+                            },
                             action = null,
                             onAction = {},
                         )
                     }
                 } else {
-                    items(library.liked, key = { it.id }) { track ->
+                    items(filteredLiked, key = { it.id }) { track ->
                         TrackRow(
                             track = track,
                             onClick = {
-                                actions.playTracks(library.liked, library.liked.indexOf(track), "Liked Songs")
+                                actions.playTracks(filteredLiked, filteredLiked.indexOf(track), "Liked Songs")
                             },
                             onMoreClick = { actions.openTrackMenu(track, null) },
                         )
@@ -325,7 +426,7 @@ fun LibraryScreen(
             }
 
             LibraryFilter.Albums -> {
-                val albums = (library.liked + library.recent)
+                val albums = (filteredLiked + filteredRecent)
                     .mapNotNull { track -> track.albumId?.let { id -> track.album to id } }
                     .distinctBy { it.second }
                 if (albums.isEmpty()) {
@@ -370,20 +471,61 @@ fun LibraryScreen(
             }
         }
 
-        if (filter == LibraryFilter.Playlists && library.recent.isNotEmpty()) {
+        if (filter == LibraryFilter.Playlists && filteredRecent.isNotEmpty()) {
             item { SectionHeader(title = "Recently played") }
-            items(library.recent.take(12), key = { "recent_${it.id}" }) { track ->
+            items(filteredRecent.take(12), key = { "recent_${it.id}" }) { track ->
                 TrackCard(
                     track = track,
                     isCurrent = currentTrackId == track.id,
                     onClick = {
-                        actions.playTracks(library.recent, library.recent.indexOf(track), "Recently played")
+                        actions.playTracks(filteredRecent, filteredRecent.indexOf(track), "Recently played")
                     },
                     onMoreClick = { actions.openTrackMenu(track, null) },
                 )
             }
         }
         item { Spacer(Modifier.height(28.dp)) }
+    }
+
+    if (showSortSheet) {
+        ModalBottomSheet(onDismissRequest = { showSortSheet = false }) {
+            Column(modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp)) {
+                Text(
+                    text = "Sort playlists by",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.ExtraBold,
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
+                )
+                LibrarySort.entries.forEach { option ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                sortName = option.name
+                                showSortSheet = false
+                            }
+                            .padding(horizontal = 20.dp, vertical = 14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(option.label, style = MaterialTheme.typography.bodyLarge)
+                            Text(
+                                option.description,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        if (option == sortMode) {
+                            Icon(
+                                Icons.Filled.Check,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                            )
+                        }
+                    }
+                }
+            }
+        }
     }
 
     if (showCreateMenu) {
@@ -416,6 +558,18 @@ fun LibraryScreen(
                     importUrlDraft = ""
                     importStatus = null
                     showImportDialog = true
+                }
+                LibraryCreateOption(
+                    icon = Icons.Filled.AutoAwesome,
+                    title = "Smart mixes",
+                    description = "Generate mood and genre mixes from your liked songs.",
+                ) {
+                    showCreateMenu = false
+                    selectedMoods = moodOptions.toSet()
+                    selectedArtists = likedArtists.toSet()
+                    smartMixMoods = false
+                    smartMixArtists = false
+                    showSmartMixPrompt = true
                 }
                 LibraryCreateOption(
                     icon = Icons.Filled.Folder,
@@ -491,6 +645,153 @@ fun LibraryScreen(
                 }) { Text("Delete") }
             },
             dismissButton = { TextButton(onClick = { deleteTarget = null }) { Text("Cancel") } },
+        )
+    }
+
+    val smartMixReady = (smartMixMoods || smartMixArtists) &&
+        (!smartMixMoods || selectedMoods.isNotEmpty()) &&
+        (!smartMixArtists || selectedArtists.isNotEmpty())
+
+    if (showSmartMixPrompt) {
+        AlertDialog(
+            onDismissRequest = { if (!generatingMixes) showSmartMixPrompt = false },
+            icon = { Icon(Icons.Filled.AutoAwesome, contentDescription = null) },
+            title = { Text("Generate smart mixes?") },
+            text = {
+                Column {
+                    Text(
+                        "Meoify will look at your liked songs and build playlists by mood " +
+                            "(chill, focus, workout and more) and by your most-liked artists. " +
+                            "Each mix is saved to your library.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    Text("Generate", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FilterChip(
+                            selected = smartMixMoods,
+                            onClick = {
+                                smartMixMoods = !smartMixMoods
+                                if (smartMixMoods) smartMixArtists = false
+                            },
+                            label = { Text("Mood mixes") },
+                            leadingIcon = if (smartMixMoods) {
+                                { Icon(Icons.Filled.Check, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                            } else {
+                                null
+                            },
+                        )
+                        FilterChip(
+                            selected = smartMixArtists,
+                            onClick = {
+                                smartMixArtists = !smartMixArtists
+                                if (smartMixArtists) smartMixMoods = false
+                            },
+                            label = { Text("Artist mixes") },
+                            leadingIcon = if (smartMixArtists) {
+                                { Icon(Icons.Filled.Check, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                            } else {
+                                null
+                            },
+                        )
+                    }
+                    if (!smartMixMoods && !smartMixArtists) {
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            "Select at least one type of mix.",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    }
+                    if (smartMixMoods) {
+                        SmartMixChipRow("Moods", moodOptions, selectedMoods) { mood ->
+                            selectedMoods = if (mood in selectedMoods) selectedMoods - mood else selectedMoods + mood
+                        }
+                    }
+                    if (smartMixArtists) {
+                        SmartMixChipRow("Artists from your liked songs", likedArtists, selectedArtists) { artist ->
+                            selectedArtists = if (artist in selectedArtists) {
+                                selectedArtists - artist
+                            } else {
+                                selectedArtists + artist
+                            }
+                        }
+                        if (likedArtists.isEmpty()) {
+                            Text(
+                                "Like a few songs to see artists here.",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                    if (!smartMixReady && (smartMixMoods || smartMixArtists)) {
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            "Pick at least one mood or artist.",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    }
+                    if (generatingMixes) {
+                        Spacer(Modifier.height(10.dp))
+                        LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            "Searching the catalogue and building mixes…",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        if (library.liked.isEmpty()) {
+                            showSmartMixPrompt = false
+                            actions.showSnackbar("Like a few songs first, then try again")
+                            return@TextButton
+                        }
+                        if (!smartMixReady) {
+                            return@TextButton
+                        }
+                        generatingMixes = true
+                        scope.launch {
+                            val result = runCatching {
+                                app.container.repository.generateSmartMixes(
+                                    liked = library.liked,
+                                    includeMoods = smartMixMoods,
+                                    includeArtists = smartMixArtists,
+                                    selectedMoods = selectedMoods.toList(),
+                                    selectedArtists = selectedArtists.toList(),
+                                )
+                            }
+                            generatingMixes = false
+                            showSmartMixPrompt = false
+                            result.fold(
+                                onSuccess = { mixes ->
+                                    mixes.forEach { mix ->
+                                        app.container.library.savePlaylist(mix.title, mix.tracks)
+                                    }
+                                    actions.showSnackbar(
+                                        if (mixes.isEmpty()) "Not enough liked songs to build mixes"
+                                        else "Created ${mixes.size} smart mix${if (mixes.size == 1) "" else "es"}",
+                                    )
+                                },
+                                onFailure = { actions.showSnackbar("Couldn't generate smart mixes") },
+                            )
+                        }
+                    },
+                    enabled = !generatingMixes && smartMixReady,
+                ) { Text(if (generatingMixes) "Generating…" else "Generate") }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showSmartMixPrompt = false },
+                    enabled = !generatingMixes,
+                ) { Text("Cancel") }
+            },
         )
     }
 
@@ -612,6 +913,37 @@ fun LibraryScreen(
 }
 
 @Composable
+private fun SmartMixChipRow(
+    label: String,
+    options: List<String>,
+    selected: Set<String>,
+    onToggle: (String) -> Unit,
+) {
+    if (options.isEmpty()) return
+    Column {
+        Spacer(Modifier.height(10.dp))
+        Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        LazyRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            items(options, key = { it }) { option ->
+                val isSelected = option in selected
+                FilterChip(
+                    selected = isSelected,
+                    onClick = { onToggle(option) },
+                    label = { Text(option, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                    leadingIcon = if (isSelected) {
+                        { Icon(Icons.Filled.Check, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                    } else {
+                        null
+                    },
+                )
+            }
+        }
+    }
+}
+
+@Composable
 private fun LibraryCreateOption(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     title: String,
@@ -659,6 +991,36 @@ private data class PlaylistTarget(
 )
 
 enum class LibraryFilter { Playlists, Songs, Albums }
+
+enum class LibrarySort(
+    val label: String,
+    val description: String,
+) {
+    NAME("Name", "Alphabetical order"),
+    RECENT("Recently added", "Newest playlists first"),
+    SONGS("Song count", "Most songs first"),
+}
+
+private fun sortCards(
+    cards: List<MediaCardModel>,
+    sort: LibrarySort,
+): List<MediaCardModel> = when (sort) {
+    LibrarySort.NAME -> cards.sortedBy { it.title.trim().lowercase() }
+    LibrarySort.RECENT -> cards // YouTube Music does not expose a created date
+    LibrarySort.SONGS -> cards.sortedByDescending { songCount(it.subtitle) }
+}
+
+private fun sortLocalPlaylists(
+    playlists: List<LocalPlaylist>,
+    sort: LibrarySort,
+): List<LocalPlaylist> = when (sort) {
+    LibrarySort.NAME -> playlists.sortedBy { it.name.trim().lowercase() }
+    LibrarySort.RECENT -> playlists.sortedByDescending { it.createdAt }
+    LibrarySort.SONGS -> playlists.sortedByDescending { it.tracks.size }
+}
+
+private fun songCount(subtitle: String?): Int =
+    Regex("\\d+").find(subtitle.orEmpty())?.value?.toIntOrNull() ?: 0
 
 @Composable
 private fun PlaylistGridRow(

@@ -192,6 +192,12 @@ data class AppSettings(
     /** User-defined label shown for the lossless server in Settings. */
     val losslessServerName: String? = null,
     val historySync: Boolean = true,
+    /** Submits listens to Last.fm when a track changes and after a qualifying listen. */
+    val scrobblingEnabled: Boolean = false,
+    val lastfmApiKey: String? = null,
+    val lastfmApiSecret: String? = null,
+    val lastfmSessionKey: String? = null,
+    val lastfmUsername: String? = null,
     val ytCookies: String? = null,
     val accountName: String? = null,
     val localProfileName: String? = null,

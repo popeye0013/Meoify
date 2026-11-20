@@ -62,6 +62,7 @@ import androidx.compose.material.icons.filled.SearchOff
 import androidx.compose.material.icons.filled.Verified
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilledTonalButton
@@ -99,6 +100,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.graphics.drawable.toBitmap
@@ -148,6 +150,7 @@ fun SettingsScreen(
     val account by profileViewModel.account.collectAsStateWithLifecycle()
     val profileLoading by profileViewModel.loading.collectAsStateWithLifecycle()
     val historyStatus by app.container.historySync.status.collectAsStateWithLifecycle()
+    val scrobbleStatus by app.container.scrobbleSync.status.collectAsStateWithLifecycle()
 
     // The Played count only changes when the account history does, so read it
     // again when Settings opens instead of showing the number from startup.
@@ -169,6 +172,13 @@ fun SettingsScreen(
 
     var editProfile by remember { mutableStateOf(false) }
     var showSignOutDialog by remember { mutableStateOf(false) }
+    var showScrobbleDialog by remember { mutableStateOf(false) }
+    var lastfmKeyDraft by remember { mutableStateOf("") }
+    var lastfmSecretDraft by remember { mutableStateOf("") }
+    var lastfmUserDraft by remember { mutableStateOf("") }
+    var lastfmPasswordDraft by remember { mutableStateOf("") }
+    var connectingLastFm by remember { mutableStateOf(false) }
+    var lastfmError by remember { mutableStateOf<String?>(null) }
     var showQualitySheet by remember { mutableStateOf(false) }
     var showServerDialog by remember { mutableStateOf(false) }
     var serverDraft by remember { mutableStateOf("") }
@@ -273,7 +283,7 @@ fun SettingsScreen(
     val playbackKeys = arrayOf(
         "Playback", "audio", "quality", "auto", "lossless", "hi-res", "hires",
         "320", "youtube", "saver", "data",
-        "kbps", "history", "sync",
+        "kbps", "history", "sync", "scrobbl", "last.fm", "lastfm", "mixes",
     )
     val libraryKeys = arrayOf("Library", "clear", "recent", "searches", "listening", "history")
     val backupKeys = arrayOf("Backup", "restore", "export", "import", "json", "file")
@@ -610,6 +620,49 @@ fun SettingsScreen(
                     )
                 }
             }
+            item { SectionLabel("Scrobbling") }
+            item {
+                SettingsCard {
+                    ToggleRow(
+                        icon = Icons.Filled.CloudSync,
+                        title = "Scrobble to Last.fm",
+                        subtitle = when {
+                            settings.lastfmSessionKey == null ->
+                                "Connect a Last.fm account first"
+                            scrobbleStatus != null -> scrobbleStatus.orEmpty()
+                            else -> "Submit tracks as you listen"
+                        },
+                        checked = settings.scrobblingEnabled,
+                        enabled = settings.lastfmSessionKey != null,
+                        onCheckedChange = { app.container.settings.setScrobblingEnabled(it) },
+                    )
+                    ActionRow(
+                        icon = Icons.Filled.Person,
+                        title = "Last.fm account",
+                        subtitle = settings.lastfmUsername
+                            ?.let { "Connected as $it" }
+                            ?: "Add your API key and sign in to scrobble",
+                        onClick = {
+                            lastfmKeyDraft = settings.lastfmApiKey.orEmpty()
+                            lastfmSecretDraft = settings.lastfmApiSecret.orEmpty()
+                            lastfmUserDraft = settings.lastfmUsername.orEmpty()
+                            lastfmPasswordDraft = ""
+                            lastfmError = null
+                            showScrobbleDialog = true
+                        },
+                    )
+                    if (settings.lastfmSessionKey != null) {
+                        ActionRow(
+                            icon = Icons.AutoMirrored.Filled.Logout,
+                            title = "Disconnect Last.fm",
+                            onClick = {
+                                app.container.settings.clearLastFm()
+                                actions.showSnackbar("Last.fm disconnected")
+                            },
+                        )
+                    }
+                }
+            }
             }
 
             if (matches(*libraryKeys)) {
@@ -865,7 +918,7 @@ fun SettingsScreen(
                         value = serverNameDraft,
                         onValueChange = { serverNameDraft = it },
                         label = { Text("Server name") },
-                        placeholder = { Text("Meoify") },
+                        placeholder = { Text("FLAC / AAC Server") },
                         leadingIcon = { Icon(Icons.Filled.Badge, contentDescription = null) },
                         singleLine = true,
                         shape = RoundedCornerShape(16.dp),
@@ -954,7 +1007,12 @@ fun SettingsScreen(
                             return@TextButton
                         }
                         scope.launch {
-                            app.container.settings.setLosslessServer(value, serverNameDraft).join()
+                            val nameToSave = if (value.isBlank()) {
+                                null
+                            } else {
+                                serverNameDraft.trim().ifBlank { "FLAC / AAC Server" }
+                            }
+                            app.container.settings.setLosslessServer(value, nameToSave).join()
                             val clean = value.trim().trimEnd('/').takeIf { it.isNotBlank() }
                             app.container.settings.settings.first { it.losslessServer == clean }
                             actions.reloadCurrent()
@@ -973,6 +1031,114 @@ fun SettingsScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showServerDialog = false }) { Text("Cancel") }
+            },
+        )
+    }
+
+    if (showScrobbleDialog) {
+        AlertDialog(
+            onDismissRequest = { if (!connectingLastFm) showScrobbleDialog = false },
+            icon = { Icon(Icons.Filled.CloudSync, contentDescription = null) },
+            title = { Text("Connect Last.fm") },
+            text = {
+                Column {
+                    Text(
+                        "Create a Last.fm API application to get a key and shared secret, then sign in below. Only the session key is stored — your password is not.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = lastfmKeyDraft,
+                        onValueChange = { lastfmKeyDraft = it },
+                        label = { Text("API key") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = !connectingLastFm,
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = lastfmSecretDraft,
+                        onValueChange = { lastfmSecretDraft = it },
+                        label = { Text("Shared secret") },
+                        singleLine = true,
+                        visualTransformation = PasswordVisualTransformation(),
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = !connectingLastFm,
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = lastfmUserDraft,
+                        onValueChange = { lastfmUserDraft = it },
+                        label = { Text("Last.fm username") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = !connectingLastFm,
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = lastfmPasswordDraft,
+                        onValueChange = { lastfmPasswordDraft = it },
+                        label = { Text("Password") },
+                        singleLine = true,
+                        visualTransformation = PasswordVisualTransformation(),
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = !connectingLastFm,
+                    )
+                    if (connectingLastFm) {
+                        Spacer(Modifier.height(10.dp))
+                        LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                    }
+                    if (lastfmError != null) {
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            text = lastfmError.orEmpty(),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val key = lastfmKeyDraft.trim()
+                        val secret = lastfmSecretDraft.trim()
+                        val user = lastfmUserDraft.trim()
+                        val password = lastfmPasswordDraft
+                        if (key.isBlank() || secret.isBlank() || user.isBlank() || password.isBlank()) {
+                            lastfmError = "Fill in all four fields"
+                            return@TextButton
+                        }
+                        connectingLastFm = true
+                        lastfmError = null
+                        scope.launch {
+                            val result = runCatching {
+                                app.container.repository.lastFmSession(key, secret, user, password)
+                            }
+                            connectingLastFm = false
+                            result.fold(
+                                onSuccess = { session ->
+                                    app.container.settings.saveLastFm(key, secret, session.key, session.username)
+                                    lastfmPasswordDraft = ""
+                                    showScrobbleDialog = false
+                                    actions.showSnackbar("Connected to Last.fm as ${session.username}")
+                                },
+                                onFailure = {
+                                    lastfmError = it.message?.takeIf { msg -> msg.isNotBlank() }
+                                        ?: "Couldn't connect to Last.fm"
+                                },
+                            )
+                        }
+                    },
+                    enabled = !connectingLastFm,
+                ) { Text(if (connectingLastFm) "Connecting…" else "Connect") }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showScrobbleDialog = false },
+                    enabled = !connectingLastFm,
+                ) { Text("Cancel") }
             },
         )
     }
