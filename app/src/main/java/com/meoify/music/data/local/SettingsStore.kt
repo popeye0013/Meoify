@@ -42,8 +42,6 @@ class SettingsStore(private val context: Context) {
         val libraryGrid = booleanPreferencesKey("library_grid")
         val lyricsPreview = booleanPreferencesKey("lyrics_preview")
         val skippedUpdate = stringPreferencesKey("skipped_update_version")
-        val githubProfileSync = booleanPreferencesKey("github_profile_sync")
-        val githubProfileSyncUrl = stringPreferencesKey("github_profile_sync_url")
     }
 
     val settings: StateFlow<AppSettings> = context.settingsStore.data
@@ -73,8 +71,6 @@ class SettingsStore(private val context: Context) {
                 libraryGridView = prefs[Keys.libraryGrid] ?: false,
                 lyricsPreview = prefs[Keys.lyricsPreview] ?: true,
                 skippedUpdateVersion = prefs[Keys.skippedUpdate],
-                githubProfileSync = prefs[Keys.githubProfileSync] ?: false,
-                githubProfileSyncUrl = prefs[Keys.githubProfileSyncUrl]?.takeIf { it.isNotBlank() },
             )
         }
         .stateIn(scope, SharingStarted.Eagerly, AppSettings())
@@ -158,16 +154,6 @@ class SettingsStore(private val context: Context) {
     /** Remembers the synced-lyrics preview toggle on Now Playing. */
     fun setLyricsPreview(enabled: Boolean) = scope.launch {
         context.settingsStore.edit { it[Keys.lyricsPreview] = enabled }
-    }
-
-    /** Saves the GitHub profile sync toggle and target URL. */
-    fun setGitHubProfileSync(enabled: Boolean, url: String? = null) = scope.launch {
-        context.settingsStore.edit {
-            it[Keys.githubProfileSync] = enabled
-            val clean = url?.trim()?.trimEnd('/')?.takeIf { it.isNotBlank() }
-            if (clean == null) it.remove(Keys.githubProfileSyncUrl)
-            else it[Keys.githubProfileSyncUrl] = clean
-        }
     }
 
     /** Remembers the release version whose home-screen update popup was skipped. */

@@ -182,10 +182,6 @@ data class AppSettings(
     val onboardingCompleted: Boolean = false,
     /** Version whose home-screen update popup was skipped; cleared by a newer release. */
     val skippedUpdateVersion: String? = null,
-    /** Whether listening activity is pushed to the GitHub profile README. */
-    val githubProfileSync: Boolean = false,
-    /** Base URL of the Firebase Storage SVG that the profile README reads. */
-    val githubProfileSyncUrl: String? = null,
 )
 
 sealed interface UiState<out T> {

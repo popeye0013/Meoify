@@ -62,7 +62,6 @@ import androidx.compose.material.icons.filled.SearchOff
 import androidx.compose.material.icons.filled.Verified
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
@@ -175,8 +174,6 @@ fun SettingsScreen(
     var serverError by remember { mutableStateOf<String?>(null) }
     var checkingServer by remember { mutableStateOf(false) }
     var serverWorking by remember { mutableStateOf<Boolean?>(null) }
-    var showProfileSyncDialog by remember { mutableStateOf(false) }
-    var profileSyncUrlDraft by remember { mutableStateOf("") }
     var nameDraft by remember { mutableStateOf("") }
 
     val configuredServer = settings.losslessServer
@@ -598,56 +595,6 @@ fun SettingsScreen(
                 }
             }
             item {
-                Surface(
-                    onClick = {
-                        profileSyncUrlDraft = settings.githubProfileSyncUrl.orEmpty()
-                        showProfileSyncDialog = true
-                    },
-                    shape = RoundedCornerShape(24.dp),
-                    color = MaterialTheme.colorScheme.surfaceContainerLow,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 14.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        SettingsIconTile(icon = Icons.Filled.CloudSync)
-                        Spacer(Modifier.width(12.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "GitHub profile sync",
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                            Spacer(Modifier.height(2.dp))
-                            Text(
-                                text = if (settings.githubProfileSync) "Enabled" else "Disabled",
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.SemiBold,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                            Spacer(Modifier.height(2.dp))
-                            Text(
-                                text = settings.githubProfileSyncUrl
-                                    ?: "Push now-playing track to your GitHub profile README",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        }
-                        Spacer(Modifier.width(8.dp))
-                        Icon(
-                            Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                            contentDescription = "Configure GitHub profile sync",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(20.dp),
-                        )
-                    }
-                }
-            }
-            item {
                 SettingsCard {
                     ToggleRow(
                         icon = Icons.Filled.CloudSync,
@@ -1028,76 +975,6 @@ fun SettingsScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showServerDialog = false }) { Text("Cancel") }
-            },
-        )
-    }
-
-    if (showProfileSyncDialog) {
-        AlertDialog(
-            onDismissRequest = { showProfileSyncDialog = false },
-            icon = { Icon(Icons.Filled.CloudSync, contentDescription = null) },
-            title = { Text("GitHub profile sync") },
-            text = {
-                Column {
-                    Text(
-                        "Pushes the track you're listening to to your GitHub profile " +
-                            "README's Meoify Listening widget. Requires a Firebase " +
-                            "Storage URL (see the iXenonN setup).",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Spacer(Modifier.height(12.dp))
-                    OutlinedTextField(
-                        value = profileSyncUrlDraft,
-                        onValueChange = { profileSyncUrlDraft = it },
-                        label = { Text("Firebase Storage URL") },
-                        placeholder = { Text("https://…appspot.com/listening-on-ytmusic.svg") },
-                        leadingIcon = { Icon(Icons.Filled.Cloud, contentDescription = null) },
-                        singleLine = true,
-                        shape = RoundedCornerShape(16.dp),
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    Spacer(Modifier.height(8.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Checkbox(
-                            checked = settings.githubProfileSync,
-                            onCheckedChange = { checked ->
-                                scope.launch {
-                                    app.container.settings.setGitHubProfileSync(
-                                        checked,
-                                        profileSyncUrlDraft.takeIf { it.isNotBlank() },
-                                    )
-                                }
-                            },
-                        )
-                        Spacer(Modifier.width(8.dp))
-                        Text(
-                            "Enable sync",
-                            style = MaterialTheme.typography.bodyMedium,
-                        )
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        val value = profileSyncUrlDraft.trim()
-                        scope.launch {
-                            app.container.settings.setGitHubProfileSync(
-                                settings.githubProfileSync || value.isNotBlank(),
-                                value.takeIf { it.isNotBlank() },
-                            )
-                        }
-                        showProfileSyncDialog = false
-                        actions.showSnackbar(
-                            if (value.isBlank()) "GitHub profile sync disabled"
-                            else "GitHub profile sync saved",
-                        )
-                    },
-                ) { Text("Save") }
-            },
-            dismissButton = {
-                TextButton(onClick = { showProfileSyncDialog = false }) { Text("Cancel") }
             },
         )
     }

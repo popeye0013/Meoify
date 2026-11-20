@@ -13,7 +13,6 @@ import com.meoify.music.data.local.LibraryStore
 import com.meoify.music.data.local.PlaybackStore
 import com.meoify.music.data.local.SettingsStore
 import com.meoify.music.data.remote.StreamResolver
-import com.meoify.music.data.remote.ListeningSync
 import com.meoify.music.playback.HistorySync
 import com.meoify.music.playback.PlayerConnection
 
@@ -36,7 +35,6 @@ class AppContainer(context: Context) {
     val streamResolver = StreamResolver(appContext, settings)
     val player = PlayerConnection(appContext, streamResolver, library, coverArt, playback)
     val historySync = HistorySync(player, repository, settings) { ytLibrary.notePlayed() }
-    val listeningSync = ListeningSync(settings)
 }
 
 class MeoifyApplication : Application(), SingletonImageLoader.Factory {
