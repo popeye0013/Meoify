@@ -53,6 +53,19 @@ android {
         }
     }
 
+    signingConfigs {
+        // Real release signing is optional so contributions/forks can still
+        // build without the maintainer's private keystore. The secrets come
+        // from the environment; never commit them to the repository.
+        create("release") {
+            val keystore = System.getenv("MEOIFY_KEYSTORE")
+            storeFile = file(keystore ?: "debug.keystore")
+            storePassword = System.getenv("MEOIFY_STORE_PASSWORD").orEmpty()
+            keyAlias = System.getenv("MEOIFY_KEY_ALIAS") ?: "meoify"
+            keyPassword = System.getenv("MEOIFY_KEY_PASSWORD").orEmpty()
+        }
+    }
+
     buildTypes {
         debug {
             isMinifyEnabled = false
@@ -60,7 +73,11 @@ android {
         }
         release {
             isMinifyEnabled = false
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = if (System.getenv("MEOIFY_KEYSTORE").isNullOrBlank()) {
+                signingConfigs.getByName("debug")
+            } else {
+                signingConfigs.getByName("release")
+            }
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
