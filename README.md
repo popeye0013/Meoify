@@ -1,10 +1,8 @@
-<p align="center">
-  <img src="docs/logo.svg" width="116" alt="Meoify logo" />
-</p>
-
 <a id="meoify"></a>
 
-<h1 align="center"><img src="docs/meoify-title.svg" width="360" alt="Meoify" /></h1>
+<h1 align="center">
+  <img src="docs/header.svg" width="440" alt="Meoify" />
+</h1>
 
 <p align="center">
   <img src="https://readme-typing-svg.demolab.com?font=Google+Sans&weight=600&size=22&pause=1000&color=FF4D67&center=true&vCenter=true&width=520&lines=YouTube+Music%2C+the+way+you+want+it.;Material+3+Expressive+%C2%B7+Lossless+%C2%B7+Lyrics;Background+playback+%C2%B7+Real+artwork" alt="Typing animation" />
