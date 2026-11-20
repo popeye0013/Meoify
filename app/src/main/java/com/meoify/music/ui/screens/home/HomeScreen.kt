@@ -19,6 +19,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
@@ -279,21 +280,18 @@ fun HomeScreen() {
                     }
 
                     if (feed.newReleases.isNotEmpty()) {
-                        item { SectionHeader(title = "New releases") }
                         item {
-                            LazyRow(
-                                contentPadding = PaddingValues(horizontal = 16.dp),
-                                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                            ) {
-                                items(feed.newReleases, key = { it.id }) { card ->
-                                    MediaCard(
-                                        card = card,
-                                        onClick = { actions.openAlbum(card.id) },
-                                        width = 150.dp,
-                                        badge = "NEW",
-                                    )
-                                }
-                            }
+                            SectionHeader(
+                                title = "New releases",
+                                subtitle = "Fresh albums from the catalogue",
+                            )
+                        }
+                        item {
+                            CatalogCardRail(
+                                cards = feed.newReleases,
+                                badge = "NEW",
+                                onOpen = { card -> actions.openAlbum(card.id) },
+                            )
                         }
                     }
 
@@ -329,6 +327,21 @@ private fun HomeShelfSection(
     currentTrackId: String?,
     actions: com.meoify.music.ui.navigation.AppActions,
 ) {
+    val useCatalogCards = shelf.items.isNotEmpty() && (
+        shelf.title.equals("Made for you", ignoreCase = true) ||
+            shelf.title.equals("New releases", ignoreCase = true) ||
+            shelf.title.contains("biggest hits", ignoreCase = true) ||
+            shelf.title.contains("trending community playlists", ignoreCase = true) ||
+            shelf.title.contains("from your library", ignoreCase = true) ||
+            shelf.title.contains("fresh finds", ignoreCase = true) ||
+            shelf.title.contains("band baaja baraat", ignoreCase = true)
+        )
+    if (useCatalogCards) {
+        SectionHeader(title = shelf.title, subtitle = shelf.subtitle)
+        CatalogCardRail(cards = shelf.items) { card -> openCard(card, actions) }
+        return
+    }
+
     if (shelf.tracks.isNotEmpty()) {
         SectionHeader(title = shelf.title, subtitle = shelf.subtitle)
         QuickPicksRail(
@@ -354,6 +367,105 @@ private fun HomeShelfSection(
                         card = card,
                         onClick = { openCard(card, actions) },
                         width = 150.dp,
+                    )
+                }
+            }
+        }
+    }
+}
+
+
+/**
+ * SongCard-style rail for album/playlist cards, matching "More of what you
+ * like": the same 152dp card, square artwork and title/subtitle below.
+ */
+@Composable
+private fun CatalogCardRail(
+    cards: List<MediaCardModel>,
+    badge: String? = null,
+    onOpen: (MediaCardModel) -> Unit,
+) {
+    LazyRow(
+        contentPadding = PaddingValues(horizontal = 16.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        items(cards, key = { it.id }) { card ->
+            Surface(
+                onClick = { onOpen(card) },
+                shape = RoundedCornerShape(20.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                modifier = Modifier.width(152.dp),
+            ) {
+                Column {
+                    Box(
+                        modifier = Modifier
+                            .padding(8.dp)
+                            .fillMaxWidth()
+                            .aspectRatio(1f)
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+                    ) {
+                        if (!card.thumbnailUrl.isNullOrBlank()) {
+                            ArtworkImage(
+                                url = card.thumbnailUrl,
+                                contentDescription = null,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize(),
+                            )
+                        }
+                        if (badge != null) {
+                            Box(
+                                modifier = Modifier
+                                    .align(Alignment.TopStart)
+                                    .padding(6.dp)
+                                    .clip(RoundedCornerShape(50))
+                                    .background(MaterialTheme.colorScheme.primary)
+                                    .padding(horizontal = 8.dp, vertical = 3.dp),
+                            ) {
+                                Text(
+                                    text = badge,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = MaterialTheme.colorScheme.onPrimary,
+                                )
+                            }
+                        }
+                        Surface(
+                            onClick = { onOpen(card) },
+                            shape = CircleShape,
+                            color = Color.White,
+                            modifier = Modifier
+                                .align(Alignment.BottomEnd)
+                                .padding(6.dp)
+                                .size(34.dp),
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    Icons.Filled.PlayArrow,
+                                    contentDescription = "Play ${card.title}",
+                                    tint = Color.Black,
+                                    modifier = Modifier.size(18.dp),
+                                )
+                            }
+                        }
+                    }
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        text = card.title,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(horizontal = 10.dp),
+                    )
+                    Text(
+                        text = card.subtitle.orEmpty().ifBlank { "Playlist" },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
                     )
                 }
             }

@@ -173,6 +173,7 @@ fun SettingsScreen(
     var editProfile by remember { mutableStateOf(false) }
     var showSignOutDialog by remember { mutableStateOf(false) }
     var showScrobbleDialog by remember { mutableStateOf(false) }
+    var showDisconnectLastFmDialog by remember { mutableStateOf(false) }
     var lastfmKeyDraft by remember { mutableStateOf("") }
     var lastfmSecretDraft by remember { mutableStateOf("") }
     var lastfmUserDraft by remember { mutableStateOf("") }
@@ -622,44 +623,99 @@ fun SettingsScreen(
             }
             item { SectionLabel("Scrobbling") }
             item {
-                SettingsCard {
-                    ToggleRow(
-                        icon = Icons.Filled.CloudSync,
-                        title = "Scrobble to Last.fm",
-                        subtitle = when {
-                            settings.lastfmSessionKey == null ->
-                                "Connect a Last.fm account first"
-                            scrobbleStatus != null -> scrobbleStatus.orEmpty()
-                            else -> "Submit tracks as you listen"
-                        },
-                        checked = settings.scrobblingEnabled,
-                        enabled = settings.lastfmSessionKey != null,
-                        onCheckedChange = { app.container.settings.setScrobblingEnabled(it) },
-                    )
-                    ActionRow(
-                        icon = Icons.Filled.Person,
-                        title = "Last.fm account",
-                        subtitle = settings.lastfmUsername
-                            ?.let { "Connected as $it" }
-                            ?: "Add your API key and sign in to scrobble",
-                        onClick = {
-                            lastfmKeyDraft = settings.lastfmApiKey.orEmpty()
-                            lastfmSecretDraft = settings.lastfmApiSecret.orEmpty()
-                            lastfmUserDraft = settings.lastfmUsername.orEmpty()
-                            lastfmPasswordDraft = ""
-                            lastfmError = null
-                            showScrobbleDialog = true
-                        },
-                    )
-                    if (settings.lastfmSessionKey != null) {
-                        ActionRow(
-                            icon = Icons.AutoMirrored.Filled.Logout,
-                            title = "Disconnect Last.fm",
-                            onClick = {
-                                app.container.settings.clearLastFm()
-                                actions.showSnackbar("Last.fm disconnected")
-                            },
+                Surface(
+                    shape = RoundedCornerShape(28.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerLow,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(
+                                    Brush.verticalGradient(
+                                        listOf(
+                                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f),
+                                            MaterialTheme.colorScheme.surfaceContainerLow,
+                                        ),
+                                    ),
+                                )
+                                .padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            SettingsIconTile(icon = Icons.Filled.CloudSync)
+                            Spacer(Modifier.width(12.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Last.fm scrobbling",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.ExtraBold,
+                                )
+                                Text(
+                                    text = when {
+                                        settings.lastfmSessionKey == null -> "Connect a Last.fm account first"
+                                        scrobbleStatus != null -> scrobbleStatus.orEmpty()
+                                        else -> "Submit tracks as you listen"
+                                    },
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 2,
+                                )
+                            }
+                            Switch(
+                                checked = settings.scrobblingEnabled,
+                                enabled = settings.lastfmSessionKey != null,
+                                onCheckedChange = { app.container.settings.setScrobblingEnabled(it) },
+                            )
+                        }
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(1.dp)
+                                .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
                         )
+                        Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)) {
+                            ActionRow(
+                                icon = Icons.Filled.Person,
+                                title = settings.lastfmUsername ?: "Last.fm account",
+                                subtitle = when {
+                                    settings.lastfmSessionKey == null ->
+                                        "Connect your account to scrobble tracks as you listen."
+                                    settings.scrobblingEnabled ->
+                                        "Scrobbling is on. Tracks are sent as you listen."
+                                    else ->
+                                        "Scrobbling is off. Tracks won't be sent until you turn it on."
+                                },
+                                onClick = {
+                                    lastfmKeyDraft = settings.lastfmApiKey.orEmpty()
+                                    lastfmSecretDraft = settings.lastfmApiSecret.orEmpty()
+                                    lastfmUserDraft = settings.lastfmUsername.orEmpty()
+                                    lastfmPasswordDraft = ""
+                                    lastfmError = null
+                                    showScrobbleDialog = true
+                                },
+                            )
+                            if (settings.lastfmSessionKey != null) {
+                                Spacer(Modifier.height(6.dp))
+                                FilledTonalButton(
+                                    onClick = { showDisconnectLastFmDialog = true },
+                                    shape = RoundedCornerShape(50),
+                                    colors = ButtonDefaults.filledTonalButtonColors(
+                                        containerColor = MaterialTheme.colorScheme.errorContainer,
+                                        contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                                    ),
+                                    modifier = Modifier.fillMaxWidth(),
+                                ) {
+                                    Icon(
+                                        Icons.AutoMirrored.Filled.Logout,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(17.dp),
+                                    )
+                                    Spacer(Modifier.width(8.dp))
+                                    Text("Disconnect Last.fm")
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -668,17 +724,50 @@ fun SettingsScreen(
             if (matches(*libraryKeys)) {
             item { SectionLabel("Library") }
             item {
-                SettingsCard {
-                    ActionRow(
-                        icon = Icons.Filled.SearchOff,
-                        title = "Clear recent searches",
-                        onClick = actions.clearRecentSearches,
-                    )
-                    ActionRow(
-                        icon = Icons.Filled.DeleteSweep,
-                        title = "Clear listening history",
-                        onClick = actions.clearRecent,
-                    )
+                Surface(
+                    shape = RoundedCornerShape(28.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerLow,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            SettingsIconTile(icon = Icons.Filled.AutoAwesome)
+                            Spacer(Modifier.width(12.dp))
+                            Column {
+                                Text(
+                                    text = "Library tools",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.ExtraBold,
+                                )
+                                Text(
+                                    text = "Manage the data Meoify keeps on this device",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(1.dp)
+                                .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
+                        )
+                        Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)) {
+                            ActionRow(
+                                icon = Icons.Filled.SearchOff,
+                                title = "Clear recent searches",
+                                onClick = actions.clearRecentSearches,
+                            )
+                            ActionRow(
+                                icon = Icons.Filled.DeleteSweep,
+                                title = "Clear listening history",
+                                onClick = actions.clearRecent,
+                            )
+                        }
+                    }
                 }
             }
             }
@@ -686,17 +775,22 @@ fun SettingsScreen(
             if (matches(*backupKeys)) {
             item { SectionLabel("Backup & restore") }
             item {
-                SettingsCard {
-                    ActionRow(
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    BackupTile(
                         icon = Icons.Filled.Backup,
                         title = "Backup",
-                        subtitle = "Save your playlists and local profile",
+                        subtitle = "Save playlists and profile",
+                        modifier = Modifier.weight(1f),
                         onClick = { backupLauncher.launch(backupManager.suggestedFileName()) },
                     )
-                    ActionRow(
+                    BackupTile(
                         icon = Icons.Filled.Restore,
                         title = "Restore",
-                        subtitle = "Replaces local playlists and profile",
+                        subtitle = "Replace from a file",
+                        modifier = Modifier.weight(1f),
                         onClick = { restoreLauncher.launch("application/json") },
                     )
                 }
@@ -884,6 +978,7 @@ fun SettingsScreen(
     if (showQualitySheet) {
         AudioQualitySheet(
             quality = settings.quality,
+            serverConnected = settings.losslessServer != null && serverWorking != false,
             onSelect = { quality ->
                 scope.launch {
                     // Wait for DataStore before re-resolving so the new quality
@@ -1014,7 +1109,18 @@ fun SettingsScreen(
                             }
                             app.container.settings.setLosslessServer(value, nameToSave).join()
                             val clean = value.trim().trimEnd('/').takeIf { it.isNotBlank() }
-                            app.container.settings.settings.first { it.losslessServer == clean }
+                            val current = app.container.settings.settings.first { it.losslessServer == clean }
+                            // Server-only tiers must not stay selected once the
+                            // server is removed; fall back to the best stream.
+                            if (value.isBlank() &&
+                                (current.quality == AudioQuality.HIFI ||
+                                    current.quality == AudioQuality.HI_RES)
+                            ) {
+                                app.container.settings.setQuality(AudioQuality.HIGH_YOUTUBE).join()
+                                app.container.settings.settings.first {
+                                    it.quality == AudioQuality.HIGH_YOUTUBE
+                                }
+                            }
                             actions.reloadCurrent()
                             serverWorking = if (value.isEmpty()) {
                                 null
@@ -1031,6 +1137,33 @@ fun SettingsScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showServerDialog = false }) { Text("Cancel") }
+            },
+        )
+    }
+
+    if (showDisconnectLastFmDialog) {
+        AlertDialog(
+            onDismissRequest = { showDisconnectLastFmDialog = false },
+            icon = { Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = null) },
+            title = { Text("Disconnect Last.fm?") },
+            text = {
+                Text(
+                    "Scrobbling will stop and your Last.fm session will be removed from this device. You can reconnect anytime.",
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        app.container.settings.clearLastFm()
+                        showDisconnectLastFmDialog = false
+                        actions.showSnackbar("Last.fm disconnected")
+                    },
+                ) {
+                    Text("Disconnect", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDisconnectLastFmDialog = false }) { Text("Cancel") }
             },
         )
     }
@@ -1739,6 +1872,49 @@ private fun DonateCard(
                 text = "Works with Google Pay, PhonePe, Paytm and any other UPI app.",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+@Composable
+private fun BackupTile(
+    icon: ImageVector,
+    title: String,
+    subtitle: String,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(24.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        modifier = modifier,
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(42.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(22.dp),
+                )
+            }
+            Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.ExtraBold)
+            Text(
+                subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                minLines = 2,
             )
         }
     }

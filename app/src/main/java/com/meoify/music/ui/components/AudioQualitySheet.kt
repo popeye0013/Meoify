@@ -39,6 +39,7 @@ import com.meoify.music.data.model.AudioQuality
 @Composable
 fun AudioQualitySheet(
     quality: AudioQuality,
+    serverConnected: Boolean,
     onSelect: (AudioQuality) -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -83,7 +84,14 @@ fun AudioQualitySheet(
 
             Spacer(Modifier.height(14.dp))
 
-            AudioQuality.entries.forEach { option ->
+            val options = if (serverConnected) {
+                AudioQuality.entries
+            } else {
+                AudioQuality.entries.filterNot {
+                    it == AudioQuality.HIFI || it == AudioQuality.HI_RES
+                }
+            }
+            options.forEach { option ->
                 AudioQualityOptionRow(
                     quality = option,
                     selected = option == quality,
@@ -93,10 +101,11 @@ fun AudioQualitySheet(
 
             Spacer(Modifier.height(10.dp))
             Text(
-                text = "Add a hifi-api (Tidal) server for Hi-Res FLAC, or a " +
-                    "320 kbps server for AAC streaming, in Settings → Playback → " +
-                    "Lossless server. Without one, those tiers fall back to " +
-                    "YouTube Music's best stream.",
+                text = if (serverConnected) {
+                    "HiFi and Lossless use your connected server. Without it, those tiers fall back to YouTube Music's best stream."
+                } else {
+                    "Add a HiFi (320 kbps) or Tidal/hifi-api server in Settings → Playback → Lossless server to unlock HiFi and Lossless."
+                },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = 6.dp),

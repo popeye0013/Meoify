@@ -100,7 +100,7 @@ class StreamResolver(
                 return@withLock again.audio
             }
             val audio = if (server != null &&
-                (quality == AudioQuality.HI_RES || quality == AudioQuality.STANDARD)
+                (quality == AudioQuality.HI_RES || quality == AudioQuality.HIFI)
             ) {
                 runCatching { resolveFromServer(server, track, quality) }
                     .getOrElse { e ->
@@ -432,9 +432,10 @@ class StreamResolver(
             // YouTube Music has no true 320 kbps or lossless stream; when the
             // hifi server is unavailable these tiers use the best it offers.
             AudioQuality.HI_RES -> Int.MAX_VALUE
-            AudioQuality.STANDARD -> 320_000
-            AudioQuality.YOUTUBE_MUSIC -> 256_000
-            AudioQuality.SAVER -> 96_000
+            AudioQuality.HIFI -> 320_000
+            AudioQuality.HIGH_YOUTUBE -> 256_000
+            AudioQuality.LOW -> 48_000
+            AudioQuality.MEDIUM -> 128_000
         }
         return try {
             val info = try {

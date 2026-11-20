@@ -45,6 +45,7 @@ class SettingsStore(private val context: Context) {
         val localProfileName = stringPreferencesKey("local_profile_name")
         val localAvatarPath = stringPreferencesKey("local_avatar_path")
         val libraryGrid = booleanPreferencesKey("library_grid")
+        val librarySort = stringPreferencesKey("library_sort")
         val lyricsPreview = booleanPreferencesKey("lyrics_preview")
         val skippedUpdate = stringPreferencesKey("skipped_update_version")
     }
@@ -58,10 +59,12 @@ class SettingsStore(private val context: Context) {
                 dynamicColor = prefs[Keys.dynamic] ?: false,
                 pureBlack = prefs[Keys.pureBlack] ?: false,
                 quality = when (prefs[Keys.quality]) {
-                    // Legacy names from the three-option picker.
+                    // Legacy names from older pickers. New tiers use distinct
+                    // enum names so a saved "HIGH" still means the old Hi-Res.
                     "HIGH" -> AudioQuality.HI_RES
-                    "NORMAL" -> AudioQuality.STANDARD
-                    "SAVER" -> AudioQuality.SAVER
+                    "NORMAL", "STANDARD" -> AudioQuality.HIFI
+                    "SAVER" -> AudioQuality.LOW
+                    "YOUTUBE_MUSIC" -> AudioQuality.HIGH_YOUTUBE
                     else -> runCatching { AudioQuality.valueOf(prefs[Keys.quality] ?: "") }
                         .getOrDefault(AudioQuality.AUTO)
                 },
@@ -79,6 +82,7 @@ class SettingsStore(private val context: Context) {
                 localProfileName = prefs[Keys.localProfileName],
                 localAvatarPath = prefs[Keys.localAvatarPath],
                 libraryGridView = prefs[Keys.libraryGrid] ?: false,
+                librarySort = prefs[Keys.librarySort] ?: "NAME",
                 lyricsPreview = prefs[Keys.lyricsPreview] ?: true,
                 skippedUpdateVersion = prefs[Keys.skippedUpdate],
             )
@@ -186,6 +190,10 @@ class SettingsStore(private val context: Context) {
     /** Remembers whether the Library playlists are shown as a grid. */
     fun setLibraryGridView(enabled: Boolean) = scope.launch {
         context.settingsStore.edit { it[Keys.libraryGrid] = enabled }
+    }
+
+    fun setLibrarySort(mode: String) = scope.launch {
+        context.settingsStore.edit { it[Keys.librarySort] = mode }
     }
 
     /** Remembers the synced-lyrics preview toggle on Now Playing. */

@@ -119,9 +119,9 @@ fun LibraryScreen(
     var librarySearchOpen by rememberSaveable { mutableStateOf(false) }
     var libraryQuery by rememberSaveable { mutableStateOf("") }
     val query = libraryQuery.trim()
-    var sortName by rememberSaveable { mutableStateOf(LibrarySort.NAME.name) }
+    val sortMode = runCatching { LibrarySort.valueOf(settings.librarySort) }
+        .getOrDefault(LibrarySort.NAME)
     var showSortSheet by remember { mutableStateOf(false) }
-    val sortMode = LibrarySort.valueOf(sortName)
     val filteredPlaylists = remember(ytPlaylists, sortMode, query) {
         sortCards(ytPlaylists, sortMode)
             .filter { query.isBlank() || it.title.contains(query, ignoreCase = true) }
@@ -221,6 +221,7 @@ fun LibraryScreen(
                         imageVector = if (librarySearchOpen) Icons.Filled.Close else Icons.Filled.Search,
                         contentDescription = if (librarySearchOpen) "Close library search" else "Search in library",
                         tint = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.size(22.dp),
                     )
                 }
                 IconButton(onClick = { showCreateMenu = true }) {
@@ -228,6 +229,7 @@ fun LibraryScreen(
                         Icons.Filled.Add,
                         contentDescription = "Create or import playlist",
                         tint = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.size(22.dp),
                     )
                 }
             }
@@ -281,17 +283,24 @@ fun LibraryScreen(
                             )
                             Spacer(Modifier.width(6.dp))
                             Text(
-                                text = "Sort by: ${sortMode.label}",
+                                text = sortMode.label,
                                 style = MaterialTheme.typography.labelLarge,
                                 color = MaterialTheme.colorScheme.primary,
                             )
                         }
                         Spacer(Modifier.weight(1f))
-                        IconButton(onClick = { app.container.settings.setLibraryGridView(!gridView) }) {
+                        Row(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(50))
+                                .clickable { app.container.settings.setLibraryGridView(!gridView) }
+                                .padding(horizontal = 10.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
                             Icon(
                                 imageVector = if (gridView) Icons.Filled.ViewList else Icons.Filled.GridView,
                                 contentDescription = if (gridView) "Show as list" else "Show as grid",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(18.dp),
                             )
                         }
                     }
@@ -501,7 +510,7 @@ fun LibraryScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable {
-                                sortName = option.name
+                                app.container.settings.setLibrarySort(option.name)
                                 showSortSheet = false
                             }
                             .padding(horizontal = 20.dp, vertical = 14.dp),
@@ -771,13 +780,35 @@ fun LibraryScreen(
                             showSmartMixPrompt = false
                             result.fold(
                                 onSuccess = { mixes ->
-                                    mixes.forEach { mix ->
-                                        app.container.library.savePlaylist(mix.title, mix.tracks)
+                                    if (mixes.isEmpty()) {
+                                        actions.showSnackbar("Not enough liked songs to build mixes")
+                                        return@fold
                                     }
-                                    actions.showSnackbar(
-                                        if (mixes.isEmpty()) "Not enough liked songs to build mixes"
-                                        else "Created ${mixes.size} smart mix${if (mixes.size == 1) "" else "es"}",
-                                    )
+                                    if (signedIn) {
+                                        // Local playlists are hidden while signed
+                                        // in, so create the mixes on the account.
+                                        var created = 0
+                                        mixes.forEach { mix ->
+                                            val id = app.container.ytLibrary
+                                                .createPlaylist(mix.title, mix.tracks)
+                                            if (id != null) created++
+                                        }
+                                        if (created > 0) app.container.ytLibrary.refresh()
+                                        actions.showSnackbar(
+                                            if (created == 0) {
+                                                "Couldn't create smart mixes on YouTube Music"
+                                            } else {
+                                                "Created $created smart mix${if (created == 1) "" else "es"} on YouTube Music"
+                                            },
+                                        )
+                                    } else {
+                                        mixes.forEach { mix ->
+                                            app.container.library.savePlaylist(mix.title, mix.tracks)
+                                        }
+                                        actions.showSnackbar(
+                                            "Created ${mixes.size} smart mix${if (mixes.size == 1) "" else "es"}",
+                                        )
+                                    }
                                 },
                                 onFailure = { actions.showSnackbar("Couldn't generate smart mixes") },
                             )
@@ -997,7 +1028,7 @@ enum class LibrarySort(
     val description: String,
 ) {
     NAME("Name", "Alphabetical order"),
-    RECENT("Recently added", "Newest playlists first"),
+    RECENT("Recents", "Newest playlists first"),
     SONGS("Song count", "Most songs first"),
 }
 

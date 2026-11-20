@@ -160,25 +160,30 @@ enum class AudioQuality(
         shortLabel = "Auto",
         description = "Adapts to your connection. Wi-Fi uses Hi-Res; mobile data stays balanced.",
     ),
+    LOW(
+        title = "Low (48 kbps)",
+        shortLabel = "48 kbps",
+        description = "Uses the least data; suited for very slow connections.",
+    ),
+    MEDIUM(
+        title = "Normal (128 kbps)",
+        shortLabel = "128 kbps",
+        description = "The default setting for streaming and downloads.",
+    ),
+    HIGH_YOUTUBE(
+        title = "High (256 kbps)",
+        shortLabel = "256 kbps",
+        description = "256 kbps YouTube Music AAC/Opus stream.",
+    ),
+    HIFI(
+        title = "HiFi (320 kbps)",
+        shortLabel = "HiFi",
+        description = "Streams high-quality 320 kbps AAC from a HiFi or 320 server.",
+    ),
     HI_RES(
         title = "Lossless (Hi-Res)",
         shortLabel = "Hi-Res",
-        description = "Up to 24-bit FLAC from a hifi-api/Tidal server",
-    ),
-    STANDARD(
-        title = "Standard quality (320 kbps)",
-        shortLabel = "320 kbps",
-        description = "320 kbps AAC from a hifi-api or 320 kbps server",
-    ),
-    YOUTUBE_MUSIC(
-        title = "Balanced (256 kbps)",
-        shortLabel = "256 kbps",
-        description = "256 kbps • YouTube Music AAC/Opus stream",
-    ),
-    SAVER(
-        title = "Data Saver",
-        shortLabel = "Data Saver",
-        description = "Low-bitrate audio to reduce mobile data use",
+        description = "Up to 24-bit FLAC streaming from supported servers.",
     ),
 }
 
@@ -203,6 +208,8 @@ data class AppSettings(
     val localProfileName: String? = null,
     val localAvatarPath: String? = null,
     val libraryGridView: Boolean = false,
+    /** Persisted Library sort mode (LibrarySort.name). */
+    val librarySort: String = "NAME",
     /** Shows synced lyrics beside the artwork on Now Playing. */
     val lyricsPreview: Boolean = true,
     val onboardingCompleted: Boolean = false,
