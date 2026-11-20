@@ -45,7 +45,7 @@
 ## Screenshots
 
 <p align="center">
-  <sub>← swipe or scroll sideways to browse →</sub>
+  <sub>Tap a screenshot to open it full screen, then swipe or use ← → to slide through all five.</sub>
 </p>
 
 <table>
@@ -64,10 +64,6 @@
     <td><img src="https://raw.githubusercontent.com/popeye0013/Dotfiles/main/Meoify/img5.png" width="260" alt="Meoify screenshot 5" /></td>
   </tr>
 </table>
-
-<p align="center">
-  <sub>Tap any screenshot in GitHub to view it full size.</sub>
-</p>
 
 ---
 
