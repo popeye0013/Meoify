@@ -22,7 +22,13 @@ class HomeViewModel(private val repository: MusicRepository) : ViewModel() {
     fun load(force: Boolean = false) {
         _state.value = UiState.Loading
         viewModelScope.launch {
-            runCatching { repository.home(force) }
+            runCatching {
+                repository.home(force) { base ->
+                    // Show the catalogue shelves now; personalised ones are
+                    // still being searched and arrive with the final result.
+                    if (_state.value is UiState.Loading) _state.value = UiState.Success(base)
+                }
+            }
                 .onSuccess { _state.value = UiState.Success(it) }
                 .onFailure { _state.value = UiState.Error(it.message ?: "Couldn't load home.") }
         }

@@ -59,7 +59,7 @@ data class AppActions(
     val openPlayer: () -> Unit,
     val isLiked: (String) -> Boolean,
     val addToPlaylist: (String, Track) -> Unit,
-    val removeFromPlaylist: (String, String) -> Unit,
+    val removeFromPlaylist: (String, Track) -> Unit,
     val createPlaylist: (String) -> Unit,
     val createPlaylistWithTrack: (String, Track) -> Unit,
     val savePlaylist: (String, List<Track>) -> Unit,

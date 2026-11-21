@@ -44,6 +44,7 @@ fun MeoifyApp(
     val settings by container.settings.settings.collectAsStateWithLifecycle()
     val ytState by container.ytLibrary.state.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
+    val appContext = LocalContext.current.applicationContext
 
     val snackbarHostState = androidx.compose.material3.SnackbarHostState()
 
@@ -223,16 +224,21 @@ fun MeoifyApp(
                     container.library.addToPlaylist(id, track)
                 }
             },
-            removeFromPlaylist = { id, trackId ->
+            removeFromPlaylist = { id, track ->
                 if (id.startsWith("local_")) {
-                    container.library.removeFromPlaylist(id, trackId)
+                    container.library.removeFromPlaylist(id, track.id)
+                    scope.launch { snackbarHostState.showSnackbar("Removed from playlist") }
                 } else {
                     scope.launch {
-                        val ok = container.repository.removeSongFromPlaylist(id, trackId)
-                        if (ok) container.ytLibrary.refresh()
-                        snackbarHostState.showSnackbar(
-                            if (ok) "Removed from playlist" else "Couldn't remove that song",
+                        val (ok, _) = container.repository.removeSongFromPlaylist(
+                            id,
+                            track.id,
+                            track.setVideoId,
                         )
+                        if (ok) {
+                            container.ytLibrary.refresh()
+                            container.playlistChanges.value = id
+                        }
                     }
                 }
             },

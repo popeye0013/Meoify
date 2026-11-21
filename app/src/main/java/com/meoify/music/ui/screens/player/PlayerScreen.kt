@@ -132,6 +132,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import androidx.core.view.WindowCompat
 import com.meoify.music.data.model.Track
+import com.meoify.music.data.remote.Artwork
 import com.meoify.music.data.remote.TrackLyrics
 import com.meoify.music.playback.PlayerUiState
 import com.meoify.music.playback.isBluetoothAudio
@@ -420,6 +421,7 @@ fun PlayerScreen(onClose: () -> Unit) {
             onMove = { from, to -> actions.moveQueueItem(from, to) },
             onRemove = { index -> actions.removeFromQueue(index) },
             onClearUpcoming = actions.clearUpcoming,
+            onPrevious = actions.skipPrevious,
         )
     }
 
@@ -613,6 +615,7 @@ private fun PlayerMainContent(
                 val side = minOf(maxWidth, maxHeight)
                 MotionCanvas(
                     url = cover,
+                    fallbackUrl = Artwork.songArt(track?.thumbnailUrl),
                     accent = accent,
                     modifier = Modifier
                         .size(side)
@@ -662,6 +665,7 @@ private fun PlayerMainContent(
                 val side = minOf(maxWidth, maxHeight)
                 MotionCanvas(
                     url = cover,
+                    fallbackUrl = Artwork.songArt(track?.thumbnailUrl),
                     accent = accent,
                     modifier = Modifier
                         .size(side)
@@ -998,6 +1002,7 @@ private fun PlayerControls(
 @Composable
 private fun MotionCanvas(
     url: String?,
+    fallbackUrl: String? = null,
     accent: Color,
     modifier: Modifier = Modifier,
     cornerRadius: androidx.compose.ui.unit.Dp = 14.dp,
@@ -1010,6 +1015,7 @@ private fun MotionCanvas(
         if (!url.isNullOrBlank()) {
             ArtworkImage(
                 url = url,
+                fallbackUrl = fallbackUrl,
                 contentDescription = "Album artwork",
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize(),
@@ -1522,6 +1528,7 @@ private fun QueueSheet(
     onMove: (Int, Int) -> Unit,
     onRemove: (Int) -> Unit,
     onClearUpcoming: () -> Unit,
+    onPrevious: () -> Unit,
 ) {
     var draggingIndex by remember { mutableStateOf(-1) }
     var dragDistance by remember { mutableStateOf(0f) }
@@ -1563,6 +1570,15 @@ private fun QueueSheet(
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                if (state.queueIndex > 0) {
+                    IconButton(onClick = onPrevious) {
+                        Icon(
+                            imageVector = Icons.Filled.SkipPrevious,
+                            contentDescription = "Previous track",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
                 if (hasUpcoming) {
                     IconButton(onClick = onClearUpcoming) {
                         Icon(

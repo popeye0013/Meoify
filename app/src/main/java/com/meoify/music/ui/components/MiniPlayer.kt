@@ -47,6 +47,7 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.meoify.music.data.remote.Artwork
 import com.meoify.music.ui.navigation.LocalAppActions
 import com.meoify.music.ui.navigation.LocalPlayerState
 import kotlinx.coroutines.launch
@@ -128,6 +129,7 @@ fun MiniPlayer(onOpen: () -> Unit) {
                 ) {
                     ArtworkImage(
                         url = cover,
+                        fallbackUrl = Artwork.songArt(track?.thumbnailUrl),
                         contentDescription = null,
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxWidth().height(46.dp),

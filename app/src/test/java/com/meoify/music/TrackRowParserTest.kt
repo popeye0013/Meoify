@@ -104,4 +104,16 @@ class TrackRowParserTest {
         assertEquals("Some Artist", track.artist)
         assertEquals(3L * 60_000 + 21_000, track.durationMs)
     }
+
+    @Test
+    fun playlistRowsKeepTheSetVideoIdNeededForRemoval() {
+        val json = row("""{"text":"Some Artist"}""")
+            .replace(
+                "\"videoId\":\"NJAv_7lHUIU\"",
+                "\"videoId\":\"NJAv_7lHUIU\",\"playlistSetVideoId\":\"set-abc\"",
+            )
+        val track = parse(json)!!
+        assertEquals("NJAv_7lHUIU", track.id)
+        assertEquals("set-abc", track.setVideoId)
+    }
 }

@@ -58,6 +58,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.meoify.music.data.remote.Artwork
 import com.meoify.music.data.model.Track
 import com.meoify.music.ui.components.ArtworkImage
 import com.meoify.music.ui.components.rememberTrackCover
@@ -125,6 +126,7 @@ internal fun NowPlayingSheet(
                 ) {
                     ArtworkImage(
                         url = cover,
+                        fallbackUrl = Artwork.songArt(track?.thumbnailUrl),
                         contentDescription = null,
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize(),

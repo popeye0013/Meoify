@@ -115,7 +115,7 @@ fun WelcomeScreen(
             )
             Spacer(Modifier.height(6.dp))
             Text(
-                text = "Your music, beautifully material.",
+                text = "Material Design YouTube Music client for Android.",
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
@@ -183,7 +183,7 @@ fun WelcomeScreen(
             }
             Spacer(Modifier.height(18.dp))
             Text(
-                text = "A local profile keeps everything on this device — no Google account needed. You can sign in later from Settings. Meoify is an unofficial client and isn't affiliated with YouTube.",
+                text = "A Local Profile Stores Everything on this Device—No Google Account Required.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,

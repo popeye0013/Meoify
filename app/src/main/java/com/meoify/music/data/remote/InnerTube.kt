@@ -353,8 +353,21 @@ class InnerTube(private val client: OkHttpClient) {
         )
     }.isSuccess
 
-    suspend fun removeFromPlaylist(playlistId: String, videoId: String): Boolean = runCatching {
-        post(
+    /**
+     * Removes one entry from a playlist. YouTube Music identifies the entry by
+     * its per-playlist `setVideoId`; sending only the video id is rejected.
+     */
+    /**
+     * Returns (success, reason). `reason` is the HTTP status code or the
+     * YouTube `status` field (or an exception message) so failures can be
+     * surfaced instead of swallowed.
+     */
+    suspend fun removeFromPlaylist(
+        playlistId: String,
+        videoId: String,
+        setVideoId: String?,
+    ): Pair<Boolean, String> = runCatching {
+        val root = post(
             "browse/edit_playlist",
             buildJsonObject {
                 put("playlistId", playlistId.removePrefix("VL"))
@@ -362,12 +375,15 @@ class InnerTube(private val client: OkHttpClient) {
                     addJsonObject {
                         put("action", "ACTION_REMOVE_VIDEO")
                         put("removedVideoId", videoId)
+                        setVideoId?.takeIf { it.isNotBlank() }?.let { put("setVideoId", it) }
                     }
                 }
             },
         )
-        true
-    }.getOrDefault(false)
+        val status = root["status"]?.jsonPrimitive?.contentOrNull
+        val ok = status == null || !status.contains("FAILED", ignoreCase = true)
+        ok to (status ?: "HTTP ok")
+    }.getOrElse { false to (it.message ?: "exception") }
 
     private suspend fun post(endpoint: String, payload: JsonObject): JsonObject = withContext(Dispatchers.IO) {
         val body = buildJsonObject {

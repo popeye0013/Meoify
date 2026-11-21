@@ -21,6 +21,8 @@ data class Track(
     val album: String? = null,
     val albumId: String? = null,
     val durationMs: Long = 0L,
+    /** Playlist-item id; required by YouTube Music to remove a song from a playlist. */
+    val setVideoId: String? = null,
     val thumbnailUrl: String? = null,
     val plays: String? = null,
     val explicit: Boolean = false,

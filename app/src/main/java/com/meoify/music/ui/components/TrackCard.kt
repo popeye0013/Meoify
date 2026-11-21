@@ -34,6 +34,7 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.meoify.music.data.remote.Artwork
 import com.meoify.music.data.model.Track
 import com.meoify.music.util.formatDuration
 
@@ -155,6 +156,7 @@ private fun TrackCardBody(
                 Box(modifier = Modifier.size(46.dp)) {
                     ArtworkImage(
                         url = cover,
+                        fallbackUrl = Artwork.songArt(track?.thumbnailUrl),
                         contentDescription = null,
                         contentScale = ContentScale.Crop,
                         modifier = Modifier

@@ -89,7 +89,7 @@
 - **Lyrics preview** — real-time synced lyrics under the album art on Now Playing.
 - **Volume & output** — media volume slider with a Bluetooth battery badge; switch outputs from the system.
 - **High refresh rate** — uses up to 120 Hz where the display supports it.
-- **Real album artwork** — covers from YouTube Music, Spotify and Apple's catalogue. Catalogue art is preferred; the video thumbnail is shown only when no album cover can be found, so a row is never left blank.
+- **Real album artwork** — covers are looked up in this order: Spotify, Apple iTunes, then YouTube Music. A video frame is never used as song artwork. Covers and decoded images are cached in memory and on disk, so they load instantly on mobile data and Wi-Fi.
 
 ### <img src="docs/icons/library-accounts.svg" width="21" height="21" alt="" />&nbsp;Library &amp; accounts
 

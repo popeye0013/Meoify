@@ -31,6 +31,14 @@ class DetailViewModel(
         }
     }
 
+    /** Refreshes the page in the background without flashing the loading state. */
+    fun refresh() {
+        viewModelScope.launch {
+            runCatching { fetch() }
+                .onSuccess { _state.value = UiState.Success(it) }
+        }
+    }
+
     private suspend fun fetch(): DetailPage = when (destination) {
         is Destination.Album -> repository.album(destination.id)
         is Destination.Playlist -> repository.playlist(destination.id)

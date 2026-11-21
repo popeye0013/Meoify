@@ -152,6 +152,17 @@ fun DetailScreen(destination: Destination, onBack: () -> Unit) {
         factory = DetailViewModelFactory(appContainer.repository, destination),
     )
     val state by viewModel.state.collectAsStateWithLifecycle()
+    // Reload the page when a song is removed from this playlist elsewhere.
+    LaunchedEffect(destination) {
+        appContainer.playlistChanges.collect { changedId ->
+            if (changedId != null) {
+                val currentId = (viewModel.state.value as? UiState.Success)?.value?.id
+                if (currentId != null && currentId == changedId) {
+                    viewModel.refresh()
+                }
+            }
+        }
+    }
     when (val s = state) {
         UiState.Loading -> {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {

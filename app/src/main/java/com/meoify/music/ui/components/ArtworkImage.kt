@@ -5,7 +5,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.painter.ColorPainter
 import androidx.compose.ui.layout.ContentScale
 import coil3.compose.AsyncImage
 import com.meoify.music.data.remote.Artwork
@@ -30,10 +32,13 @@ fun ArtworkImage(
         (Artwork.candidates(url) + Artwork.candidates(fallbackUrl)).distinct()
     }
     var index by remember(url, fallbackUrl) { mutableIntStateOf(0) }
+    val emptyCover = ColorPainter(MaterialTheme.colorScheme.surfaceContainerHigh)
     AsyncImage(
         model = candidates.getOrNull(index),
         contentDescription = contentDescription,
         contentScale = contentScale,
+        error = emptyCover,
+        fallback = emptyCover,
         modifier = modifier,
         onError = {
             if (index < candidates.lastIndex) index++

@@ -51,6 +51,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.meoify.music.data.remote.Artwork
 import com.meoify.music.MeoifyApplication
 import com.meoify.music.data.model.MediaCard as MediaCardModel
 import com.meoify.music.data.model.HomeShelf
@@ -686,6 +687,7 @@ private fun QuickAccessGrid(
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             ArtworkImage(
                                 url = cover,
+                                fallbackUrl = Artwork.songArt(track?.thumbnailUrl),
                                 contentDescription = null,
                                 contentScale = ContentScale.Crop,
                                 modifier = Modifier

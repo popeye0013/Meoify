@@ -34,6 +34,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.meoify.music.data.remote.Artwork
 import com.meoify.music.data.model.Track
 import com.meoify.music.ui.navigation.LocalAppActions
 import com.meoify.music.ui.navigation.LocalLibrary
@@ -70,6 +71,7 @@ fun TrackMenuSheet(
                 ) {
                     ArtworkImage(
                         url = cover,
+                        fallbackUrl = Artwork.songArt(track?.thumbnailUrl),
                         contentDescription = null,
                         contentScale = androidx.compose.ui.layout.ContentScale.Crop,
                         modifier = Modifier.fillMaxWidth().height(56.dp),
@@ -89,7 +91,7 @@ fun TrackMenuSheet(
             MenuItem(Icons.Filled.LibraryMusic, "Add to playlist") { onAddToPlaylist(); onDismiss() }
             if (!playlistId.isNullOrBlank() && playlistId != "liked") {
                 MenuItem(Icons.Filled.Delete, "Remove from this playlist") {
-                    actions.removeFromPlaylist(playlistId, track.id)
+                    actions.removeFromPlaylist(playlistId, track)
                     onDismiss()
                 }
             }

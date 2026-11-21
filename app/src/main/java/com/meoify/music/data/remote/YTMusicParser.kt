@@ -702,9 +702,14 @@ object YTMusicParser {
         }
         val durationMs = durationText?.let(::parseTimestamp) ?: 0L
 
-        val videoId = renderer["playlistItemData"]?.asObjectOrNull()?.get("videoId")?.readText()
+        val playlistItemData = renderer["playlistItemData"]?.asObjectOrNull()
+        val videoId = playlistItemData?.get("videoId")?.readText()
             ?: renderer.findAll("watchEndpoint").firstOrNull()?.asObjectOrNull()?.get("videoId")?.readText()
         if (videoId.isNullOrBlank()) return null
+        // YouTube Music identifies a playlist entry by playlistSetVideoId. It is
+        // required to remove a song, so keep it on the parsed row.
+        val setVideoId = playlistItemData?.get("playlistSetVideoId")?.readText()
+            ?.takeIf { it.isNotBlank() }
 
         val plays = columns.getOrNull(2)?.get("text")?.readText()
             ?.takeIf { it.contains("play", true) || it.contains("view", true) }
@@ -718,6 +723,7 @@ object YTMusicParser {
             album = album,
             albumId = albumRun?.findBrowseId(),
             durationMs = durationMs,
+            setVideoId = setVideoId,
             thumbnailUrl = renderer.findThumbnail(),
             plays = plays,
             explicit = renderer.toString().contains("MUSIC_BADGE_STYLE_EXPLICIT"),

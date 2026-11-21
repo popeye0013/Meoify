@@ -437,6 +437,7 @@ fun SettingsScreen(
                         ?: settings.localProfileName?.trim()?.take(1)?.uppercase(),
                     signedIn = settings.ytCookies != null,
                     loading = profileLoading,
+                    historyStatus = historyStatus,
                     onRefresh = { profileViewModel.refresh(force = true) },
                     onEditLocal = {
                         nameDraft = settings.localProfileName.orEmpty()
@@ -1451,6 +1452,7 @@ private fun ProfileCard(
     initials: String?,
     signedIn: Boolean,
     loading: Boolean,
+    historyStatus: String? = null,
     onRefresh: () -> Unit,
     onEditLocal: () -> Unit,
     onSignIn: () -> Unit,
@@ -1534,6 +1536,18 @@ private fun ProfileCard(
                         SyncChip(
                             text = if (signedIn) "YouTube Music connected" else "Local profile",
                             active = signedIn,
+                        )
+                    }
+                    // Live result of the last listen synced to YouTube Music
+                    // history, shown directly under the account name.
+                    if (signedIn && !historyStatus.isNullOrBlank()) {
+                        Spacer(Modifier.height(5.dp))
+                        Text(
+                            text = historyStatus.orEmpty(),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
                         )
                     }
                 }

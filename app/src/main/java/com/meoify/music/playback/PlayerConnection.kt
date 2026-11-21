@@ -274,20 +274,6 @@ class PlayerConnection(
                     _state.update { it.copy(track = track) }
                     library.addRecent(track)
                 }
-
-                // Keep the queue as "up next": everything already played is
-                // dropped and the current song becomes the first item. This
-                // never touches the current MediaItem, so audio is unaffected.
-                if (queueIndex > 0) {
-                    val c = controller
-                    val mediaIndex = c?.currentMediaItemIndex ?: -1
-                    if (c != null && mediaIndex > 0) {
-                        runCatching { c.removeMediaItems(0, mediaIndex) }
-                    }
-                    queue = queue.drop(queueIndex)
-                    queueIndex = 0
-                    _state.update { it.copy(queue = queue, queueIndex = 0) }
-                }
             }
             refresh()
             persist(force = true)
@@ -1311,10 +1297,8 @@ class PlayerConnection(
     }
 
     private suspend fun Track.toMediaItem(audio: ResolvedAudio): MediaItem {
-        val artwork = coverArt?.cover(this)
-            ?: Artwork.songArt(thumbnailUrl)
-            ?: Artwork.still(thumbnailUrl)
-            ?: Artwork.stillForVideo(id)
+        // Spotify -> Apple iTunes -> YouTube Music, never a video frame.
+        val artwork = coverArt?.cover(this) ?: Artwork.songArt(thumbnailUrl)
         val metadata = MediaMetadata.Builder()
             .setTitle(title)
             .setArtist(artist)

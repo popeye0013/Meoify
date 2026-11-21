@@ -37,6 +37,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import com.meoify.music.data.local.SettingsStore
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 
 class MusicRepository(
@@ -57,6 +58,12 @@ class MusicRepository(
     private val spotifyPlaylists = SpotifyPlaylistClient(http)
     private val lastFm = LastFmClient(http)
     private val settingsScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    // Network results are cached in memory so reopening a screen, pulling to
+    // refresh and the searches artwork resolution makes all reuse data that is
+    // already on the device instead of hitting the network again.
+    private val searchCache = ConcurrentHashMap<Pair<String, SearchFilter>, Pair<SearchResults, Long>>()
+    private val pageCache = ConcurrentHashMap<Pair<String, String>, Pair<DetailPage, Long>>()
 
     @Volatile
     private var cookiesPresent = false
@@ -83,12 +90,21 @@ class MusicRepository(
     @Volatile
     private var cachedHome: Pair<HomeFeed, Long>? = null
 
-    suspend fun home(force: Boolean = false): HomeFeed = homeMutex.withLock {
+    /**
+     * Loads the home feed. [onBaseReady] is called as soon as the core shelves
+     * are parsed, before the slower personalised searches finish, so the UI can
+     * show content straight away and add the extra shelves a moment later.
+     */
+    suspend fun home(
+        force: Boolean = false,
+        onBaseReady: ((HomeFeed) -> Unit)? = null,
+    ): HomeFeed = homeMutex.withLock {
         cachedHome?.takeIf { !force && System.currentTimeMillis() - it.second < HOME_TTL_MS }?.let {
             return it.first
         }
 
-        val feed = coroutineScope {
+        var chartTracks: List<Track> = emptyList()
+        val base = coroutineScope {
             val homeDeferred = async { innerTube.browse("FEmusic_home") }
             val extras = supervisorScope {
                 listOf(
@@ -106,20 +122,10 @@ class MusicRepository(
             // Some accounts never receive YouTube Music's Quick picks shelf.
             // The charts page always has its top songs, so top the list up
             // with those rather than hiding Quick picks and Trending now.
-            val chartTracks = chartRoot?.let { YTMusicParser.parseTracks(it) }.orEmpty()
+            chartTracks = chartRoot?.let { YTMusicParser.parseTracks(it) }.orEmpty()
             val resolvedQuickPicks = (quickPicks + chartTracks)
                 .distinctBy { it.id }
                 .take(30)
-            val libraryData = library?.current()
-            val personalShelves = buildPersonalShelves(
-                recent = libraryData?.recent.orEmpty(),
-                liked = libraryData?.liked.orEmpty(),
-                quickPicks = resolvedQuickPicks,
-                community = communityPlaylists,
-                chartTracks = chartTracks,
-                artists = charts?.first.orEmpty(),
-                existing = shelves,
-            )
             HomeFeed(
                 quickPicks = resolvedQuickPicks,
                 communityPlaylists = communityPlaylists,
@@ -127,16 +133,29 @@ class MusicRepository(
                 topArtists = charts?.first.orEmpty(),
                 chartPlaylists = charts?.second.orEmpty(),
                 shelves = shelves,
-                personalShelves = personalShelves,
+                personalShelves = emptyList(),
             )
         }
 
-        if (feed.quickPicks.isEmpty() && feed.communityPlaylists.isEmpty() &&
-            feed.newReleases.isEmpty() && feed.topArtists.isEmpty() &&
-            feed.shelves.isEmpty() && feed.personalShelves.isEmpty()
+        if (base.quickPicks.isEmpty() && base.communityPlaylists.isEmpty() &&
+            base.newReleases.isEmpty() && base.topArtists.isEmpty() &&
+            base.shelves.isEmpty()
         ) {
             throw MusicApiException("YouTube Music didn't return any content. Pull down to try again.")
         }
+        onBaseReady?.invoke(base)
+
+        val libraryData = library?.current()
+        val personalShelves = buildPersonalShelves(
+            recent = libraryData?.recent.orEmpty(),
+            liked = libraryData?.liked.orEmpty(),
+            quickPicks = base.quickPicks,
+            community = base.communityPlaylists,
+            chartTracks = chartTracks,
+            artists = base.topArtists,
+            existing = base.shelves,
+        )
+        val feed = base.copy(personalShelves = personalShelves)
 
         cachedHome = feed to System.currentTimeMillis()
         return feed
@@ -224,6 +243,10 @@ class MusicRepository(
     }
 
     suspend fun search(query: String, filter: SearchFilter): SearchResults {
+        val key = query.trim() to filter
+        val now = System.currentTimeMillis()
+        searchCache[key]?.takeIf { now - it.second < SEARCH_TTL_MS }?.let { return it.first }
+
         val params = when (filter) {
             SearchFilter.SONGS -> FILTER_SONGS
             SearchFilter.ALBUMS -> FILTER_ALBUMS
@@ -232,13 +255,16 @@ class MusicRepository(
         }
         val root = innerTube.search(query, params)
         val parsed = YTMusicParser.parseSearch(root, filter)
-        return SearchResults(
+        val results = SearchResults(
             query = query,
             tracks = parsed.tracks,
             albums = parsed.albums,
             artists = parsed.artists,
             playlists = parsed.playlists,
         )
+        if (searchCache.size >= 120) searchCache.clear()
+        searchCache[key] = results to System.currentTimeMillis()
+        return results
     }
 
     suspend fun suggestions(query: String): List<String> {
@@ -247,12 +273,27 @@ class MusicRepository(
             .getOrDefault(emptyList())
     }
 
-    suspend fun album(albumId: String): DetailPage {
-        val root = innerTube.browse(albumId)
-        return YTMusicParser.parseAlbum(root, albumId)
+    /** Reuses a recently opened page so going back to a list is instant. */
+    private suspend fun cachedPage(
+        kind: String,
+        id: String,
+        load: suspend () -> DetailPage,
+    ): DetailPage {
+        val key = kind to id
+        val now = System.currentTimeMillis()
+        pageCache[key]?.takeIf { now - it.second < PAGE_TTL_MS }?.let { return it.first }
+        val page = load()
+        if (pageCache.size >= 40) pageCache.clear()
+        pageCache[key] = page to System.currentTimeMillis()
+        return page
     }
 
-    suspend fun playlist(playlistId: String): DetailPage {
+    suspend fun album(albumId: String): DetailPage = cachedPage("album", albumId) {
+        val root = innerTube.browse(albumId)
+        YTMusicParser.parseAlbum(root, albumId)
+    }
+
+    suspend fun playlist(playlistId: String): DetailPage = cachedPage("playlist", playlistId) {
         val bare = playlistId.removePrefix("VL")
         val candidates = listOf("VL$bare", bare).distinct()
         var fallback: DetailPage? = null
@@ -262,11 +303,11 @@ class MusicRepository(
             if (page.tracks.isNotEmpty()) {
                 // Long playlists arrive in pages of ~100; keep asking for the
                 // next batch so the whole playlist is visible.
-                return page.copy(tracks = withContinuations(root, page.tracks))
+                return@cachedPage page.copy(tracks = withContinuations(root, page.tracks))
             }
             fallback = page
         }
-        return fallback ?: throw MusicApiException("Couldn't load this playlist")
+        fallback ?: throw MusicApiException("Couldn't load this playlist")
     }
 
     /**
@@ -435,10 +476,18 @@ class MusicRepository(
      * match, YouTube Music itself is searched for the song and only a result
      * carrying real album art is used. A music-video frame is never returned.
      */
-    suspend fun musicArtwork(track: Track): String? =
-        spotifyArtwork.cover(track)
-            ?: appleArtwork.cover(track)
-            ?: youTubeArtwork(track)
+    suspend fun musicArtwork(track: Track): String? = coroutineScope {
+        // Spotify and Apple are independent catalogues. Searching both at once
+        // halves the wait when the first one has no match; Spotify's cover still
+        // wins whenever both find one.
+        val spotify = async(Dispatchers.IO) { runCatching { spotifyArtwork.cover(track) }.getOrNull() }
+        val apple = async(Dispatchers.IO) { runCatching { appleArtwork.cover(track) }.getOrNull() }
+
+        spotify.await()?.takeIf { it.isNotBlank() }?.let { return@coroutineScope it }
+        apple.await()?.takeIf { it.isNotBlank() }?.let { return@coroutineScope it }
+        // Last chance: YouTube Music's own catalogue, never a video frame.
+        runCatching { youTubeArtwork(track) }.getOrNull()
+    }
 
     /**
      * Finds album art from a YouTube Music search result.
@@ -550,9 +599,9 @@ class MusicRepository(
         return emptyList()
     }
 
-    suspend fun artist(artistId: String): DetailPage {
+    suspend fun artist(artistId: String): DetailPage = cachedPage("artist", artistId) {
         val root = innerTube.browse(artistId)
-        return YTMusicParser.parseArtist(root, artistId)
+        YTMusicParser.parseArtist(root, artistId)
     }
 
     suspend fun lyrics(videoId: String): String? {
@@ -671,9 +720,39 @@ class MusicRepository(
         return runCatching { innerTube.deletePlaylist(playlistId) }.getOrDefault(false)
     }
 
-    suspend fun removeSongFromPlaylist(playlistId: String, videoId: String): Boolean {
-        if (!cookiesPresent) return false
-        return runCatching { innerTube.removeFromPlaylist(playlistId, videoId) }.getOrDefault(false)
+    suspend fun removeSongFromPlaylist(
+        playlistId: String,
+        videoId: String,
+        setVideoId: String? = null,
+    ): Pair<Boolean, String> {
+        if (!cookiesPresent) return false to "not signed in"
+        val fresh = runCatching {
+            val bare = playlistId.removePrefix("VL")
+            val root = innerTube.browse("VL$bare")
+            YTMusicParser.parseTracks(root).firstOrNull { it.id == videoId }?.setVideoId
+        }.getOrNull()
+        val ids = listOfNotNull(fresh, setVideoId)
+            .map { it.trim() }
+            .filter { it.isNotBlank() }
+            .distinct()
+        val reasons = mutableListOf<String>()
+        for (id in ids) {
+            val (ok, reason) = runCatching { innerTube.removeFromPlaylist(playlistId, videoId, id) }
+                .getOrDefault(false to "exception")
+            if (ok) {
+                pageCache.remove("playlist" to playlistId)
+                return true to (reason.ifBlank { "ok (setVideoId=$id)" })
+            }
+            reasons += "$id -> $reason"
+        }
+        val (ok, reason) = runCatching { innerTube.removeFromPlaylist(playlistId, videoId, null) }
+            .getOrDefault(false to "exception")
+        if (ok) {
+            pageCache.remove("playlist" to playlistId)
+            return true to (reason.ifBlank { "ok (no setVideoId)" })
+        }
+        reasons += "none -> $reason"
+        return false to reasons.joinToString(" ; ")
     }
 
     suspend fun renamePlaylist(playlistId: String, title: String): Boolean {
@@ -824,6 +903,8 @@ class MusicRepository(
 
     private companion object {
         const val HOME_TTL_MS = 5 * 60 * 1000L
+        const val SEARCH_TTL_MS = 2 * 60 * 1000L
+        const val PAGE_TTL_MS = 5 * 60 * 1000L
         val DEFAULT_MOODS = listOf("Chill", "Party", "Throwback", "Focus", "Romantic", "Workout")
         const val FILTER_SONGS = "EgWKAQIIAWoKEAkQBRAKEAMQBA%3D%3D"
         const val FILTER_ALBUMS = "EgWKAQIYAWoKEAkQChAFEAMQBA%3D%3D"
