@@ -57,11 +57,11 @@
     <td align="center"><sub>05</sub></td>
   </tr>
   <tr>
-    <td><img src="https://raw.githubusercontent.com/popeye0013/Dotfiles/main/Meoify/img1.png" width="260" alt="Meoify screenshot 1" /></td>
-    <td><img src="https://raw.githubusercontent.com/popeye0013/Dotfiles/main/Meoify/img2.png" width="260" alt="Meoify screenshot 2" /></td>
-    <td><img src="https://raw.githubusercontent.com/popeye0013/Dotfiles/main/Meoify/img3.png" width="260" alt="Meoify screenshot 3" /></td>
-    <td><img src="https://raw.githubusercontent.com/popeye0013/Dotfiles/main/Meoify/img4.png" width="260" alt="Meoify screenshot 4" /></td>
-    <td><img src="https://raw.githubusercontent.com/popeye0013/Dotfiles/main/Meoify/img5.png" width="260" alt="Meoify screenshot 5" /></td>
+    <td><img src="https://raw.githubusercontent.com/popeye0013/Dotfiles/main/Meoify/Screenshots/img1.png" width="260" alt="Meoify screenshot 1" /></td>
+    <td><img src="https://raw.githubusercontent.com/popeye0013/Dotfiles/main/Meoify/Screenshots/img2.png" width="260" alt="Meoify screenshot 2" /></td>
+    <td><img src="https://raw.githubusercontent.com/popeye0013/Dotfiles/main/Meoify/Screenshots/img3.png" width="260" alt="Meoify screenshot 3" /></td>
+    <td><img src="https://raw.githubusercontent.com/popeye0013/Dotfiles/main/Meoify/Screenshots/img4.png" width="260" alt="Meoify screenshot 4" /></td>
+    <td><img src="https://raw.githubusercontent.com/popeye0013/Dotfiles/main/Meoify/Screenshots/img5.png" width="260" alt="Meoify screenshot 5" /></td>
   </tr>
 </table>
 
