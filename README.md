@@ -157,7 +157,7 @@ The patched jar lives in `app/libs/` and can be regenerated offline:
 tools/patch-newpipe-extractor/patch.sh
 ```
 
-See [`tools/patch-newpipe-extractor/README.md`](tools/patch-newpipe-extractor/README.md) for the full list of rewrites.
+See [`tools/README.md`](tools/README.md) for the full list of rewrites.
 
 ### <img src="docs/icons/tests.svg" width="21" height="21" alt="" />&nbsp;Tests
 
