@@ -603,22 +603,21 @@ fun SettingsScreen(
                     }
                 }
             }
-            item {
-                SettingsCard {
-                    ToggleRow(
-                        icon = Icons.Filled.CloudSync,
-                        title = "Sync to YouTube Music history",
-                        subtitle = when {
-                            settings.ytCookies == null ->
-                                "Sign in to YouTube Music to mirror your listening"
-                            historyStatus != null -> historyStatus.orEmpty()
-                            else ->
-                                "Songs you listen to appear in your account history, whatever the source"
-                        },
-                        checked = settings.historySync,
-                        enabled = settings.ytCookies != null,
-                        onCheckedChange = { app.container.settings.setHistorySync(it) },
-                    )
+            if (settings.ytCookies != null) {
+                item { SectionLabel("Sync") }
+                item {
+                    SettingsCard {
+                        ToggleRow(
+                            icon = Icons.Filled.CloudSync,
+                            title = "YouTube Music history",
+                            subtitle = when {
+                                historyStatus != null -> historyStatus.orEmpty()
+                                else -> "Mirror your listening to YouTube Music history"
+                            },
+                            checked = settings.historySync,
+                            onCheckedChange = { app.container.settings.setHistorySync(it) },
+                        )
+                    }
                 }
             }
             item { SectionLabel("Scrobbling") }
@@ -1113,12 +1112,13 @@ fun SettingsScreen(
                             // Server-only tiers must not stay selected once the
                             // server is removed; fall back to the best stream.
                             if (value.isBlank() &&
-                                (current.quality == AudioQuality.HIFI ||
-                                    current.quality == AudioQuality.HI_RES)
+                                (current.quality == AudioQuality.HI_RES ||
+                                    current.quality == AudioQuality.CD_LOSSLESS ||
+                                    current.quality == AudioQuality.STANDARD_320)
                             ) {
-                                app.container.settings.setQuality(AudioQuality.HIGH_YOUTUBE).join()
+                                app.container.settings.setQuality(AudioQuality.YOUTUBE).join()
                                 app.container.settings.settings.first {
-                                    it.quality == AudioQuality.HIGH_YOUTUBE
+                                    it.quality == AudioQuality.YOUTUBE
                                 }
                             }
                             actions.reloadCurrent()

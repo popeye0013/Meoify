@@ -99,16 +99,27 @@ class StreamResolver(
             if (!force && again != null && System.currentTimeMillis() - again.createdAt < CACHE_TTL_MS) {
                 return@withLock again.audio
             }
-            val audio = if (server != null &&
-                (quality == AudioQuality.HI_RES || quality == AudioQuality.HIFI)
+            // On an unmetered connection Auto uses the server's Hi-Res stream,
+            // matching the "Wi-Fi uses Hi-Res" promise in Settings.
+            val effective = if (quality == AudioQuality.AUTO && server != null &&
+                !isMeteredConnection()
             ) {
-                runCatching { resolveFromServer(server, track, quality) }
+                AudioQuality.HI_RES
+            } else {
+                quality
+            }
+            val audio = if (server != null &&
+                (effective == AudioQuality.HI_RES ||
+                    effective == AudioQuality.CD_LOSSLESS ||
+                    effective == AudioQuality.STANDARD_320)
+            ) {
+                runCatching { resolveFromServer(server, track, effective) }
                     .getOrElse { e ->
                         if (e is kotlinx.coroutines.CancellationException) throw e
-                        extract(track.id, quality)
+                        extract(track.id, effective)
                     }
             } else {
-                extract(track.id, quality)
+                extract(track.id, effective)
             }
             cache[key] = CachedAudio(audio, System.currentTimeMillis())
             audio
@@ -198,9 +209,14 @@ class StreamResolver(
         val tidalId = match["id"]?.jsonPrimitive?.contentOrNull
             ?: throw StreamUnavailableException("The lossless server returned an invalid track.")
 
-        val preferred = if (quality == AudioQuality.HI_RES) "HI_RES_LOSSLESS" else "HIGH"
+        val flac = quality == AudioQuality.HI_RES || quality == AudioQuality.CD_LOSSLESS
+        val preferred = when (quality) {
+            AudioQuality.HI_RES -> "HI_RES_LOSSLESS"
+            AudioQuality.CD_LOSSLESS -> "LOSSLESS"
+            else -> "HIGH"
+        }
         var audio = streamFromTrackEndpoint(server, tidalId, preferred, quality)
-        if (audio == null && quality == AudioQuality.HI_RES) {
+        if (audio == null && flac) {
             // Some catalogues only have 16-bit CD lossless, which is still a
             // real FLAC stream and better than falling back to lossy AAC.
             audio = streamFromTrackEndpoint(server, tidalId, "LOSSLESS", quality)
@@ -259,10 +275,11 @@ class StreamResolver(
         tidalId: String,
         quality: AudioQuality,
     ): ResolvedAudio? {
-        val formats = if (quality == AudioQuality.HI_RES) {
-            "FLAC,FLAC_HIRES"
-        } else {
-            "AACLC"
+        val flac = quality == AudioQuality.HI_RES || quality == AudioQuality.CD_LOSSLESS
+        val formats = when (quality) {
+            AudioQuality.HI_RES -> "FLAC,FLAC_HIRES"
+            AudioQuality.CD_LOSSLESS -> "FLAC"
+            else -> "AACLC"
         }
         val data = runCatching {
             getJson(
@@ -280,8 +297,8 @@ class StreamResolver(
             ?: return null
         return ResolvedAudio(
             url = uri,
-            bitrate = if (quality == AudioQuality.HI_RES) 0 else 320,
-            format = if (quality == AudioQuality.HI_RES) "FLAC DASH" else "AAC DASH",
+            bitrate = if (flac) 0 else 320,
+            format = if (flac) "FLAC DASH" else "AAC DASH",
             mimeType = "application/dash+xml",
         )
     }
@@ -432,10 +449,10 @@ class StreamResolver(
             // YouTube Music has no true 320 kbps or lossless stream; when the
             // hifi server is unavailable these tiers use the best it offers.
             AudioQuality.HI_RES -> Int.MAX_VALUE
-            AudioQuality.HIFI -> 320_000
-            AudioQuality.HIGH_YOUTUBE -> 256_000
-            AudioQuality.LOW -> 48_000
-            AudioQuality.MEDIUM -> 128_000
+            AudioQuality.CD_LOSSLESS -> Int.MAX_VALUE
+            AudioQuality.STANDARD_320 -> 320_000
+            AudioQuality.YOUTUBE -> 256_000
+            AudioQuality.DATA_SAVER -> 96_000
         }
         return try {
             val info = try {

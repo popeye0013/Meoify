@@ -152,38 +152,45 @@ enum class ThemeMode { SYSTEM, DARK, LIGHT }
 
 enum class AudioQuality(
     val title: String,
+    val tag: String,
     val shortLabel: String,
     val description: String,
 ) {
+    HI_RES(
+        title = "Hi-Res Audio",
+        tag = "24-BIT /192k",
+        shortLabel = "Hi-Res",
+        description = "Up to 24-bit / 192 kHz. Studio Master FLAC",
+    ),
+    CD_LOSSLESS(
+        title = "CD Lossless",
+        tag = "16-BIT / 44.1k",
+        shortLabel = "CD FLAC",
+        description = "16-bit / 44.1 kHz Bit-Exact CD FLAC",
+    ),
+    STANDARD_320(
+        title = "Standard Quality",
+        tag = "320 kbps",
+        shortLabel = "320 kbps",
+        description = "320 kbps High-Bitrate MP3 / AAC",
+    ),
+    YOUTUBE(
+        title = "YouTube Music",
+        tag = "YOUTUBE",
+        shortLabel = "YT",
+        description = "128-256 kbps YouTube Music AAC / Opus stream",
+    ),
+    DATA_SAVER(
+        title = "Data Saver",
+        tag = "96 kbps",
+        shortLabel = "96 kbps",
+        description = "96 kbps High Efficiency AAC",
+    ),
     AUTO(
         title = "Auto",
+        tag = "WIFI/DATA",
         shortLabel = "Auto",
         description = "Adapts to your connection. Wi-Fi uses Hi-Res; mobile data stays balanced.",
-    ),
-    LOW(
-        title = "Low (48 kbps)",
-        shortLabel = "48 kbps",
-        description = "Uses the least data; suited for very slow connections.",
-    ),
-    MEDIUM(
-        title = "Normal (128 kbps)",
-        shortLabel = "128 kbps",
-        description = "The default setting for streaming and downloads.",
-    ),
-    HIGH_YOUTUBE(
-        title = "High (256 kbps)",
-        shortLabel = "256 kbps",
-        description = "256 kbps YouTube Music AAC/Opus stream.",
-    ),
-    HIFI(
-        title = "HiFi (320 kbps)",
-        shortLabel = "HiFi",
-        description = "Streams high-quality 320 kbps AAC from a HiFi or 320 server.",
-    ),
-    HI_RES(
-        title = "Lossless (Hi-Res)",
-        shortLabel = "Hi-Res",
-        description = "Up to 24-bit FLAC streaming from supported servers.",
     ),
 }
 

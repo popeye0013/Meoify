@@ -59,12 +59,11 @@ class SettingsStore(private val context: Context) {
                 dynamicColor = prefs[Keys.dynamic] ?: false,
                 pureBlack = prefs[Keys.pureBlack] ?: false,
                 quality = when (prefs[Keys.quality]) {
-                    // Legacy names from older pickers. New tiers use distinct
-                    // enum names so a saved "HIGH" still means the old Hi-Res.
+                    // Legacy names from older pickers, mapped to the nearest tier.
                     "HIGH" -> AudioQuality.HI_RES
-                    "NORMAL", "STANDARD" -> AudioQuality.HIFI
-                    "SAVER" -> AudioQuality.LOW
-                    "YOUTUBE_MUSIC" -> AudioQuality.HIGH_YOUTUBE
+                    "NORMAL", "STANDARD", "HIFI" -> AudioQuality.STANDARD_320
+                    "SAVER", "LOW" -> AudioQuality.DATA_SAVER
+                    "YOUTUBE_MUSIC", "HIGH_YOUTUBE", "MEDIUM" -> AudioQuality.YOUTUBE
                     else -> runCatching { AudioQuality.valueOf(prefs[Keys.quality] ?: "") }
                         .getOrDefault(AudioQuality.AUTO)
                 },

@@ -84,12 +84,15 @@ fun AudioQualitySheet(
 
             Spacer(Modifier.height(14.dp))
 
+            val serverTiers = setOf(
+                AudioQuality.HI_RES,
+                AudioQuality.CD_LOSSLESS,
+                AudioQuality.STANDARD_320,
+            )
             val options = if (serverConnected) {
                 AudioQuality.entries
             } else {
-                AudioQuality.entries.filterNot {
-                    it == AudioQuality.HIFI || it == AudioQuality.HI_RES
-                }
+                AudioQuality.entries.filterNot { it in serverTiers }
             }
             options.forEach { option ->
                 AudioQualityOptionRow(
@@ -102,9 +105,9 @@ fun AudioQualitySheet(
             Spacer(Modifier.height(10.dp))
             Text(
                 text = if (serverConnected) {
-                    "HiFi and Lossless use your connected server. Without it, those tiers fall back to YouTube Music's best stream."
+                    "Hi-Res, CD Lossless and Standard Quality use your connected server. Without one, those tiers fall back to YouTube Music's best stream."
                 } else {
-                    "Add a HiFi (320 kbps) or Tidal/hifi-api server in Settings → Playback → Lossless server to unlock HiFi and Lossless."
+                    "Add a hifi-api [Tidal] server for Hi-Res FLAC, or a 320 kbps server for AAC streaming, in Settings → Playback → Lossless server. Without one, those tiers fall back to YouTube Music's best stream."
                 },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -137,16 +140,31 @@ private fun AudioQualityOptionRow(
         RadioButton(selected = selected, onClick = null)
         Spacer(Modifier.width(8.dp))
         Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = quality.title,
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold,
-                color = if (selected) {
-                    MaterialTheme.colorScheme.primary
-                } else {
-                    MaterialTheme.colorScheme.onSurface
-                },
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = quality.title,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = if (selected) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.onSurface
+                    },
+                )
+                Spacer(Modifier.width(6.dp))
+                Surface(
+                    shape = RoundedCornerShape(50),
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                ) {
+                    Text(
+                        text = quality.tag,
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp),
+                    )
+                }
+            }
             Spacer(Modifier.height(2.dp))
             Text(
                 text = quality.description,
