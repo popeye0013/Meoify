@@ -1,14 +1,19 @@
 <a id="meoify"></a>
-<p
-<img src="https://readme-typing-svg.demolab.com?font=Google+Sans&weight=600&size=22&pause=1000&color=FF4D67&center=true&vCenter=true&width=520&lines=YouTube+Music%2C+the+way+you+want+it.;Material+3+Expressive+%C2%B7+Lossless+%C2%B7+Lyrics;Background+playback+%C2%B7+Real+artwork" alt="Typing animation" />
+
+<h1 align="center">
+  <img src="docs/header.svg" width="440" alt="Meoify" />
+</h1>
+
+<p align="center">
+  <img src="https://readme-typing-svg.demolab.com?font=Google+Sans&weight=600&size=22&pause=1000&color=FF4D67&center=true&vCenter=true&width=520&lines=YouTube+Music%2C+the+way+you+want+it.;Material+3+Expressive+%C2%B7+Lossless+%C2%B7+Lyrics;Background+playback+%C2%B7+Real+artwork" alt="Typing animation" />
 </p>
 
 <p align="center">
   <a href="https://github.com/popeye0013/Meoify/releases/latest">
-    <img src="https://img.shields.io/github/v/release/popeye0013/Meoify?style=for-the-badge&color=D62828&labelColor=0D0D0F" alt="Latest release" />
+    <img src="https://img.shields.io/github/v/release/popeye0013/Meoify?style=for-the-badge&color=FF4D67&labelColor=0D0D0F" alt="Latest release" />
   </a>
   <a href="https://github.com/popeye0013/Meoify/releases">
-    <img src="https://img.shields.io/github/downloads/popeye0013/Meoify/total?style=for-the-badge&color=D62828&labelColor=0D0D0F" alt="Total downloads" />
+    <img src="https://img.shields.io/github/downloads/popeye0013/Meoify/total?style=for-the-badge&color=FF4D67&labelColor=0D0D0F" alt="Total downloads" />
   </a>
   <a href="https://github.com/popeye0013/Meoify/stargazers">
     <img src="https://img.shields.io/github/stars/popeye0013/Meoify?style=for-the-badge&color=7C3AED&labelColor=0D0D0F" alt="Stars" />
@@ -21,7 +26,7 @@
 
 <p align="center">
   <a href="https://github.com/popeye0013/Meoify/releases/latest">
-    <img src="https://img.shields.io/badge/Download_the_latest_APK-D62828?style=for-the-badge&logo=android&logoColor=white&labelColor=0D0D0F" alt="Download the latest APK" />
+    <img src="https://img.shields.io/badge/Download_the_latest_APK-FF4D67?style=for-the-badge&logo=android&logoColor=white&labelColor=0D0D0F" alt="Download the latest APK" />
   </a>
 </p>
 

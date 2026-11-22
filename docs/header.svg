@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 424 140" width="424" height="140" role="img" aria-label="Meoify">
+  <defs>
+    <linearGradient id="logo-tile" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FF7A8F"/>
+      <stop offset="0.52" stop-color="#FF4D67"/>
+      <stop offset="1" stop-color="#BF1B3E"/>
+    </linearGradient>
+    <linearGradient id="logo-shine" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.24"/>
+      <stop offset="0.55" stop-color="#FFFFFF" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="logo-play" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#FFD2D9"/>
+    </linearGradient>
+    <filter id="logo-shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="14" stdDeviation="14" flood-color="#5A0A1B" flood-opacity="0.35"/>
+    </filter>
+
+    <linearGradient id="title-gradient" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#FF4D67"/>
+      <stop offset="55%" stop-color="#FF7A9C"/>
+      <stop offset="100%" stop-color="#A855F7"/>
+    </linearGradient>
+    <filter id="title-glow" x="-60%" y="-80%" width="220%" height="260%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="10" result="wideBlur"/>
+      <feFlood flood-color="#FF4D67" flood-opacity="0.75" result="pink"/>
+      <feComposite in="pink" in2="wideBlur" operator="in" result="outerGlow"/>
+      <feGaussianBlur in="SourceAlpha" stdDeviation="4" result="tightBlur"/>
+      <feFlood flood-color="#FFFFFF" flood-opacity="0.55" result="white"/>
+      <feComposite in="white" in2="tightBlur" operator="in" result="innerGlow"/>
+      <feMerge>
+        <feMergeNode in="outerGlow"/>
+        <feMergeNode in="innerGlow"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <g transform="translate(24 22) scale(0.1875)">
+    <rect width="512" height="512" rx="118" fill="url(#logo-tile)"/>
+    <rect width="512" height="512" rx="118" fill="url(#logo-shine)"/>
+    <g transform="translate(61.6 61.6) scale(3.6)" filter="url(#logo-shadow)">
+      <path
+        d="M30,50 L36,22 L58,38 Z M78,50 L72,22 L50,38 Z M54,58 m-25,0 a25,25 0 1,0 50,0 a25,25 0 1,0 -50,0 Z"
+        fill="#14060A"/>
+      <path d="M48,48 L68,58 L48,68 Z" fill="url(#logo-play)"/>
+    </g>
+  </g>
+
+  <text x="275" y="97" text-anchor="middle" font-family="'Google Sans','Product Sans',Arial,sans-serif" font-size="72" font-weight="800" letter-spacing="-1.5" fill="url(#title-gradient)" filter="url(#title-glow)">Meoify</text>
+</svg>
