@@ -1,8 +1,10 @@
 <a id="meoify"></a>
 
 <h1 align="center">
-  <img src="docs/header.svg" width="440" alt="Meoify" />
+  <img src="docs/meoify-animated.gif" width="160" alt="Meoify" style="border-radius: 50%;" />
 </h1>
+
+<h1 align="center">Meoify</h1>
 
 <p align="center">
   <img src="https://readme-typing-svg.demolab.com?font=Google+Sans&weight=600&size=22&pause=1000&color=D62828&center=true&vCenter=true&width=620&lines=Purr-fectly+tuned%3A+Spotify%E2%80%99s+flow%2C+YouTube%E2%80%99s+catalog%2C+and+Material+3+design." alt="Typing animation" />
