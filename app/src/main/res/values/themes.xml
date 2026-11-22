@@ -26,12 +26,4 @@
         <item name="postSplashScreenTheme">@style/Theme.Meoify</item>
     </style>
 
-    <!-- Fallback for devices without dynamic color (Android 11 and older). -->
-    <style name="Theme.App.Starting.Dynamic" parent="Theme.SplashScreen">
-        <item name="windowSplashScreenBackground">@color/splash_background</item>
-        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_splash_vector</item>
-        <item name="windowSplashScreenAnimationDuration">1000</item>
-        <item name="postSplashScreenTheme">@style/Theme.Meoify</item>
-    </style>
-
 </resources>

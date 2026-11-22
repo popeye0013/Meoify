@@ -20,7 +20,6 @@ import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
-import com.meoify.music.data.local.SplashPreferences
 import com.meoify.music.ui.MeoifyApp
 import com.meoify.music.ui.theme.MeoifyTheme
 
@@ -34,17 +33,9 @@ class MainActivity : ComponentActivity() {
     ) { }
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        // The system draws the splash before DataStore is ready, so pick the
-        // starting theme from the synchronous mirror of the dynamic-color flag.
-        val dynamicSplash = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
-            SplashPreferences.isDynamicColorEnabled(this)
-        setTheme(SplashPreferences.splashTheme(dynamicSplash))
         val splash = installSplashScreen()
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
-        // Android 12+ keeps the splash theme per app; persist it so the next
-        // launch uses the same (dynamic or brand) colors.
-        SplashPreferences.syncPlatformSplashTheme(this, dynamicSplash)
         // Prefer the highest refresh rate the display supports for smooth UI.
         // Setting both the preferred mode and refresh rate keeps 90/120 Hz
         // screens from falling back to 60 Hz.

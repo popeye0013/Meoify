@@ -14,7 +14,6 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
-import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
@@ -26,27 +25,6 @@ private val Context.settingsStore by preferencesDataStore(name = "meoify_setting
 class SettingsStore(private val context: Context) {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-
-    init {
-        // The splash screen is drawn before DataStore has been read, so keep
-        // its synchronous mirror up to date with the stored preference.
-        scope.launch {
-            context.settingsStore.data
-                .catch { error ->
-                    if (error is IOException) {
-                        emit(androidx.datastore.preferences.core.emptyPreferences())
-                    } else {
-                        throw error
-                    }
-                }
-                .collect { prefs ->
-                    val enabled = prefs[Keys.dynamic] ?: false
-                    if (SplashPreferences.isDynamicColorEnabled(context) != enabled) {
-                        SplashPreferences.setDynamicColorEnabled(context, enabled)
-                    }
-                }
-        }
-    }
 
     private object Keys {
         val theme = stringPreferencesKey("theme")
@@ -115,7 +93,6 @@ class SettingsStore(private val context: Context) {
     }
 
     fun setDynamicColor(enabled: Boolean) = scope.launch {
-        SplashPreferences.setDynamicColorEnabled(context, enabled)
         context.settingsStore.edit { it[Keys.dynamic] = enabled }
     }
 
