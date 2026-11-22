@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Monochrome play mark used when the splash follows the system's dynamic
+     (Material You) palette: white reads on the accent-colored background. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="240dp"
+    android:height="240dp"
+    android:viewportWidth="1024"
+    android:viewportHeight="1024">
+    <path
+        android:name="triangle"
+        android:fillColor="#FFFFFF"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="30"
+        android:strokeLineJoin="round"
+        android:pathData="M360,300 L360,724 L700,512 Z"/>
+</vector>

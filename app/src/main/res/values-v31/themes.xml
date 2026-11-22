@@ -6,4 +6,14 @@
         <item name="windowSplashScreenAnimationDuration">1000</item>
         <item name="postSplashScreenTheme">@style/Theme.Meoify</item>
     </style>
+
+    <!-- Android 12+ splash that follows the wallpaper-derived Material You
+         palette instead of the fixed brand red. The platform accent color is
+         the same source Material 3's dynamic schemes use. -->
+    <style name="Theme.App.Starting.Dynamic" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@android:color/system_accent1_600</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_splash_vector_dynamic</item>
+        <item name="windowSplashScreenAnimationDuration">1000</item>
+        <item name="postSplashScreenTheme">@style/Theme.Meoify</item>
+    </style>
 </resources>

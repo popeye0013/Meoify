@@ -112,6 +112,7 @@ import com.meoify.music.MeoifyApplication
 import com.meoify.music.R
 import com.meoify.music.data.UpdateChecker
 import com.meoify.music.data.backup.BackupManager
+import com.meoify.music.data.local.SplashPreferences
 import com.meoify.music.data.model.AudioQuality
 import com.meoify.music.data.model.DeveloperInfo
 import com.meoify.music.data.model.ThemeMode
@@ -508,7 +509,12 @@ fun SettingsScreen(
                         },
                         checked = settings.dynamicColor,
                         enabled = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S,
-                        onCheckedChange = { app.container.settings.setDynamicColor(it) },
+                        onCheckedChange = {
+                            app.container.settings.setDynamicColor(it)
+                            // Persist the splash theme now so the very next
+                            // launch already uses the matching colors.
+                            SplashPreferences.syncPlatformSplashTheme(context, it)
+                        },
                     )
                     ToggleRow(
                         icon = Icons.Filled.ColorLens,
