@@ -1,11 +1,6 @@
 <a id="meoify"></a>
-
-<h1 align="center">
-  <img src="docs/meoify-logo-new.png" width="96" alt="Meoify" style="vertical-align: middle;" />&nbsp;&nbsp;Meoify
-</h1>
-
-<p align="center">
-  <img src="https://readme-typing-svg.demolab.com?font=Google+Sans&weight=600&size=22&pause=1000&color=D62828&center=true&vCenter=true&width=620&lines=Purr-fectly+tuned%3A+Spotify%E2%80%99s+flow%2C+YouTube%E2%80%99s+catalog%2C+and+Material+3+design." alt="Typing animation" />
+<p
+<img src="https://readme-typing-svg.demolab.com?font=Google+Sans&weight=600&size=22&pause=1000&color=FF4D67&center=true&vCenter=true&width=520&lines=YouTube+Music%2C+the+way+you+want+it.;Material+3+Expressive+%C2%B7+Lossless+%C2%B7+Lyrics;Background+playback+%C2%B7+Real+artwork" alt="Typing animation" />
 </p>
 
 <p align="center">
