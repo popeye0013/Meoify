@@ -1,7 +1,7 @@
 <a id="meoify"></a>
 
 <h1 align="center">
-  <img src="docs/header.svg" width="440" alt="Meoify" />
+  <img src="docs/meoify-logo.png" width="96" alt="Meoify" style="vertical-align: middle;" />&nbsp;&nbsp;Meoify
 </h1>
 
 <p align="center">
