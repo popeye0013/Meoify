@@ -227,6 +227,7 @@ fun MeoifyApp(
             removeFromPlaylist = { id, track ->
                 if (id.startsWith("local_")) {
                     container.library.removeFromPlaylist(id, track.id)
+                    container.playlistChanges.value = id
                     scope.launch { snackbarHostState.showSnackbar("Removed from playlist") }
                 } else {
                     scope.launch {

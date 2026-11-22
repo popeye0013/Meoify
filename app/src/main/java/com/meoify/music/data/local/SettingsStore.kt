@@ -55,7 +55,7 @@ class SettingsStore(private val context: Context) {
         .map { prefs ->
             AppSettings(
                 themeMode = runCatching { ThemeMode.valueOf(prefs[Keys.theme] ?: "") }
-                    .getOrDefault(ThemeMode.DARK),
+                    .getOrDefault(ThemeMode.LIGHT),
                 dynamicColor = prefs[Keys.dynamic] ?: false,
                 pureBlack = prefs[Keys.pureBlack] ?: false,
                 quality = when (prefs[Keys.quality]) {

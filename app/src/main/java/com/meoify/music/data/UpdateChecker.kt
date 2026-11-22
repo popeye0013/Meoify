@@ -32,6 +32,15 @@ object UpdateChecker {
         val published: String? = null,
     )
 
+    private const val RELEASES_URL = "https://github.com/${DeveloperInfo.HANDLE}/Meoify/releases"
+
+    /**
+     * GitHub's release feed. Unlike the REST API it is not limited to 60
+     * anonymous requests per hour, so it is used whenever the API is rate
+     * limited, blocked by a network, or otherwise unavailable.
+     */
+    private const val ATOM_URL = "$RELEASES_URL.atom"
+
     private val client = OkHttpClient.Builder()
         .connectTimeout(12, TimeUnit.SECONDS)
         .readTimeout(12, TimeUnit.SECONDS)
@@ -40,7 +49,7 @@ object UpdateChecker {
     private val json = Json { ignoreUnknownKeys = true }
 
     suspend fun latest(): Release? = withContext(Dispatchers.IO) {
-        fromGitHubApi()
+        fromGitHubApi() ?: fromAtomFeed(limit = 1).firstOrNull()
     }
 
     private fun fromGitHubApi(): Release? = runCatching {
@@ -62,7 +71,7 @@ object UpdateChecker {
      * decide to download. The releases endpoint is public for this repository.
      */
     suspend fun history(limit: Int = 10): List<Release> = withContext(Dispatchers.IO) {
-        runCatching {
+        val fromApi = runCatching {
             val request = Request.Builder()
                 .url("https://api.github.com/repos/${DeveloperInfo.HANDLE}/Meoify/releases?per_page=$limit")
                 .header("Accept", "application/vnd.github+json")
@@ -75,7 +84,77 @@ object UpdateChecker {
                     .mapNotNull { (it as? JsonObject)?.let(::parseGithubRelease) }
             }
         }.getOrElse { emptyList() }
+        fromApi.ifEmpty { fromAtomFeed(limit) }
     }
+
+    private fun fromAtomFeed(limit: Int): List<Release> = runCatching {
+        val request = Request.Builder()
+            .url(ATOM_URL)
+            .header("User-Agent", "Meoify-Android")
+            .build()
+        client.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) return@runCatching emptyList()
+            parseAtomFeed(response.body?.string().orEmpty(), limit)
+        }
+    }.getOrElse { emptyList() }
+
+    /**
+     * Reads the public releases Atom feed. Each entry exposes the tag in its
+     * link, the version in its title, and the changelog as escaped HTML.
+     */
+    internal fun parseAtomFeed(xml: String, limit: Int = 10): List<Release> {
+        if (xml.isBlank()) return emptyList()
+        return xml.split("<entry>")
+            .drop(1)
+            .mapNotNull { chunk -> parseAtomEntry(chunk.substringBefore("</entry>")) }
+            .take(limit)
+    }
+
+    private fun parseAtomEntry(entry: String): Release? {
+        val title = entry.substringAfter("<title>", "").substringBefore("</title>").trim()
+        val link = entry.substringAfter("rel=\"alternate\"", "")
+            .substringAfter("href=\"", "")
+            .substringBefore("\"")
+            .trim()
+        val tag = link.substringAfterLast("/tag/", "")
+            .ifBlank { title.removePrefix("Meoify").trim() }
+        val version = tag.removePrefix("v").removePrefix("V").trim()
+        if (version.isBlank()) return null
+        val updated = entry.substringAfter("<updated>", "").substringBefore("</updated>").trim()
+        val content = entry.substringAfter("<content type=\"html\">", "")
+            .substringBefore("</content>")
+        return Release(
+            version = version,
+            url = link.ifBlank { "$RELEASES_URL/tag/v$version" },
+            notes = parseAtomNotes(content),
+            published = updated.ifBlank { null },
+        )
+    }
+
+    private fun parseAtomNotes(content: String): List<String> {
+        if (content.isBlank()) return emptyList()
+        // The feed escapes the HTML for XML, and the HTML escapes its own
+        // entities, so the text is unescaped once before and once after tags
+        // are stripped (e.g. "&amp;amp;" in the feed becomes "&" in the note).
+        val html = unescapeHtml(content)
+        val bullets = Regex("<li[^>]*>(.*?)</li>", RegexOption.DOT_MATCHES_ALL)
+            .findAll(html)
+            .map { match -> unescapeHtml(stripTags(match.groupValues[1])).trim() }
+            .filter { it.isNotEmpty() }
+            .take(8)
+            .toList()
+        return bullets.ifEmpty { parseNotes(unescapeHtml(stripTags(html))) }
+    }
+
+    private fun stripTags(value: String): String = value.replace(Regex("<[^>]+>"), "")
+
+    private fun unescapeHtml(value: String): String = value
+        .replace("&lt;", "<")
+        .replace("&gt;", ">")
+        .replace("&quot;", "\"")
+        .replace("&#39;", "'")
+        .replace("&#x27;", "'")
+        .replace("&amp;", "&")
 
     private fun parseGithubRelease(root: JsonObject): Release? {
         val tag = root["tag_name"]?.jsonPrimitive?.contentOrNull.orEmpty().trim()

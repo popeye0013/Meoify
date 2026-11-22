@@ -14,6 +14,7 @@ import com.meoify.music.data.local.PlaybackStore
 import com.meoify.music.data.local.SettingsStore
 import com.meoify.music.data.remote.StreamResolver
 import com.meoify.music.playback.HistorySync
+import com.meoify.music.playback.ListenTogetherManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import com.meoify.music.playback.ScrobbleSync
 import com.meoify.music.playback.PlayerConnection
@@ -44,6 +45,7 @@ class AppContainer(context: Context) {
     val playlistChanges = MutableStateFlow<String?>(null)
     val historySync = HistorySync(player, repository, settings) { ytLibrary.notePlayed() }
     val scrobbleSync = ScrobbleSync(player, repository, settings)
+    val listenTogether = ListenTogetherManager(player)
 }
 
 class MeoifyApplication : Application(), SingletonImageLoader.Factory {

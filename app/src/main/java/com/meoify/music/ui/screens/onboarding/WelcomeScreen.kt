@@ -115,7 +115,7 @@ fun WelcomeScreen(
             )
             Spacer(Modifier.height(6.dp))
             Text(
-                text = "Material Design YouTube Music client for Android.",
+                text = "Purr-fectly tuned: Spotify’s flow, YouTube’s catalog, and Material 3 design.",
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,

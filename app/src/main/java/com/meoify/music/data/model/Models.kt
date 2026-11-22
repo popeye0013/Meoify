@@ -146,6 +146,7 @@ data class LibraryData(
     val playlists: List<LocalPlaylist> = emptyList(),
     val recent: List<Track> = emptyList(),
     val recentSearches: List<String> = emptyList(),
+    val listeningHistory: List<ListeningEvent> = emptyList(),
 ) {
     fun isLiked(trackId: String): Boolean = liked.any { it.id == trackId }
 }
@@ -197,7 +198,7 @@ enum class AudioQuality(
 }
 
 data class AppSettings(
-    val themeMode: ThemeMode = ThemeMode.DARK,
+    val themeMode: ThemeMode = ThemeMode.LIGHT,
     val dynamicColor: Boolean = false,
     val pureBlack: Boolean = false,
     val quality: AudioQuality = AudioQuality.AUTO,

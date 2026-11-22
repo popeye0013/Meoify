@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.webkit.CookieManager
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -42,7 +43,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -50,7 +53,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.meoify.music.MeoifyApplication
-import com.meoify.music.ui.components.MeoifyLogo
+import com.meoify.music.R
+import androidx.compose.ui.platform.LocalContext
+import coil3.compose.AsyncImage
+import coil3.request.ImageRequest
 import com.meoify.music.ui.theme.Crimson
 import kotlinx.coroutines.launch
 
@@ -143,7 +149,13 @@ fun YouTubeLoginScreen(onBack: () -> Unit, onSignedIn: () -> Unit) {
                 .padding(top = 6.dp, bottom = 14.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            MeoifyLogo(size = 62.dp)
+            Image(
+                painter = painterResource(R.drawable.meoify_logo),
+                contentDescription = "Meoify",
+                modifier = Modifier
+                    .size(62.dp)
+                    .clip(CircleShape),
+            )
             Spacer(Modifier.height(10.dp))
             Text(
                 text = "Sign in to YouTube Music",

@@ -15,8 +15,8 @@ android {
         applicationId = "com.meoify.music"
         minSdk = 26
         targetSdk = 36
-        versionCode = 75
-        versionName = "3.5.1"
+        versionCode = 77
+        versionName = "3.6.0"
     }
 
     buildFeatures {
@@ -100,6 +100,7 @@ dependencies {
     implementation("androidx.compose.material:material-icons-extended:1.7.8")
 
     implementation("io.coil-kt.coil3:coil-compose:3.3.0")
+    implementation("io.coil-kt.coil3:coil-gif:3.3.0")
     implementation("io.coil-kt.coil3:coil-network-okhttp:3.3.0")
 
     implementation("androidx.media3:media3-exoplayer:1.8.0")

@@ -88,6 +88,7 @@
 - **Synced lyrics** — LRC from LRCLIB with auto-scroll and tap-to-seek, plus a plain-text fallback.
 - **Lyrics preview** — real-time synced lyrics under the album art on Now Playing.
 - **Volume & output** — media volume slider with a Bluetooth battery badge; switch outputs from the system.
+- **Listen Together (Live Sync)** — listen in real time with friends. Room codes sync track changes, play/pause, and seek position across devices via a low-latency relay.
 - **High refresh rate** — uses up to 120 Hz where the display supports it.
 - **Real album artwork** — covers are looked up in this order: Spotify, Apple iTunes, then YouTube Music. A video frame is never used as song artwork. Covers and decoded images are cached in memory and on disk, so they load instantly on mobile data and Wi-Fi.
 
@@ -98,6 +99,7 @@
 - **Optional sign-in** — web sign-in for a personalised feed and account library; likes and playlists sync back.
 - **Listening history sync** — real listens are reported with the same tracking ping YouTube's web player uses.
 - **Local profile** — use Meoify without an account and pick a name and avatar shown across the app.
+- **Meoify Wrapped & On-Device Stats** — monthly, yearly, and all-time listening insights (top tracks, top artists, total hours, and listening rhythm) computed 100% on-device with zero tracking.
 - **Backup & restore** — export playlists and your profile to a readable `.json` file.
 
 ### <img src="docs/icons/design-details.svg" width="21" height="21" alt="" />&nbsp;Design &amp; details

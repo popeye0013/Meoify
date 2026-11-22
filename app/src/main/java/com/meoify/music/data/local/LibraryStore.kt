@@ -5,6 +5,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.meoify.music.data.model.LibraryData
+import com.meoify.music.data.model.ListeningEvent
 import com.meoify.music.data.model.LocalPlaylist
 import com.meoify.music.data.model.Track
 import kotlinx.coroutines.CoroutineScope
@@ -34,6 +35,7 @@ class LibraryStore(private val context: Context) {
         val playlists = stringPreferencesKey("playlists")
         val recent = stringPreferencesKey("recent_tracks")
         val searches = stringPreferencesKey("recent_searches")
+        val historyEvents = stringPreferencesKey("listening_history_events")
     }
 
     val library: Flow<LibraryData> = context.libraryStore.data
@@ -44,6 +46,7 @@ class LibraryStore(private val context: Context) {
                 playlists = decodePlaylists(prefs[Keys.playlists]),
                 recent = decodeTracks(prefs[Keys.recent]),
                 recentSearches = decodeStrings(prefs[Keys.searches]),
+                listeningHistory = decodeListeningEvents(prefs[Keys.historyEvents]),
             )
         }
 
@@ -85,6 +88,19 @@ class LibraryStore(private val context: Context) {
             val updated = (listOf(track) + current.filterNot { it.id == track.id }).take(40)
             prefs[Keys.recent] = json.encodeToString(updated)
         }
+    }
+
+    /** Records a genuine listening session with verified listened time. */
+    fun recordListeningEvent(event: ListeningEvent) = scope.launch {
+        context.libraryStore.edit { prefs ->
+            val existing = decodeListeningEvents(prefs[Keys.historyEvents])
+            val updated = (listOf(event) + existing).take(5000)
+            prefs[Keys.historyEvents] = json.encodeToString(updated)
+        }
+    }
+
+    fun clearListeningHistory() = scope.launch {
+        context.libraryStore.edit { it[Keys.historyEvents] = "[]" }
     }
 
     fun clearRecent() = scope.launch {
@@ -191,5 +207,9 @@ class LibraryStore(private val context: Context) {
 
     private fun decodeStrings(raw: String?): List<String> =
         raw?.let { runCatching { json.decodeFromString<List<String>>(it) }.getOrDefault(emptyList()) }
+            ?: emptyList()
+
+    private fun decodeListeningEvents(raw: String?): List<ListeningEvent> =
+        raw?.let { runCatching { json.decodeFromString<List<ListeningEvent>>(it) }.getOrDefault(emptyList()) }
             ?: emptyList()
 }

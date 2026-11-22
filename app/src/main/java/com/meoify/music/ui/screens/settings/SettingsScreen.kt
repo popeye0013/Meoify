@@ -39,6 +39,8 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.ArrowOutward
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.BarChart
+import com.meoify.music.ui.screens.stats.WrappedSheet
 import androidx.compose.material.icons.filled.Badge
 import androidx.compose.material.icons.filled.Backup
 import androidx.compose.material.icons.filled.Close
@@ -200,6 +202,7 @@ fun SettingsScreen(
     var restoreUri by remember { mutableStateOf<Uri?>(null) }
     var checkingUpdate by remember { mutableStateOf(false) }
     var updateRelease by remember { mutableStateOf<UpdateChecker.Release?>(null) }
+    var showWrappedSheet by remember { mutableStateOf(false) }
     var showChangelog by remember { mutableStateOf(false) }
     val versionName = remember {
         runCatching {
@@ -447,6 +450,24 @@ fun SettingsScreen(
                     onSignOut = { showSignOutDialog = true },
                 )
             }
+            }
+
+            item { SectionLabel("Wrapped") }
+            item {
+                Surface(
+                    shape = RoundedCornerShape(28.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerLow,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        ActionRow(
+                            icon = Icons.Filled.BarChart,
+                            title = "Meoify Wrapped",
+                            subtitle = "View top songs, artists & on-device listening stats",
+                            onClick = { showWrappedSheet = true },
+                        )
+                    }
+                }
             }
 
             if (matches(*appearanceKeys)) {
@@ -881,7 +902,7 @@ fun SettingsScreen(
                     }
                     Spacer(Modifier.height(12.dp))
                     Text(
-                        text = "YouTube Music, the way you want it.",
+                        text = "Purr-fectly tuned: Spotify’s flow, YouTube’s catalog, and Material 3 design.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -1442,6 +1463,10 @@ fun SettingsScreen(
             },
         )
     }
+
+    if (showWrappedSheet) {
+        WrappedSheet(onDismiss = { showWrappedSheet = false })
+    }
 }
 
 @Composable
@@ -1532,24 +1557,8 @@ private fun ProfileCard(
                     Spacer(Modifier.height(9.dp))
                     if (loading) {
                         SyncChip("Syncing account…", active = true)
-                    } else {
-                        SyncChip(
-                            text = if (signedIn) "YouTube Music connected" else "Local profile",
-                            active = signedIn,
-                        )
                     }
-                    // Live result of the last listen synced to YouTube Music
-                    // history, shown directly under the account name.
-                    if (signedIn && !historyStatus.isNullOrBlank()) {
-                        Spacer(Modifier.height(5.dp))
-                        Text(
-                            text = historyStatus.orEmpty(),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.primary,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
+
                 }
             }
 
@@ -1932,7 +1941,9 @@ private fun BackupTile(
             )
         }
     }
+
 }
+
 
 @Composable
 private fun SectionLabel(text: String) {

@@ -21,7 +21,7 @@ fun MeoifyLogo(
     size: Dp = 96.dp,
 ) {
     Image(
-        painter = painterResource(R.drawable.ic_splash_logo),
+        painter = painterResource(R.drawable.meoify_logo),
         contentDescription = "Meoify",
         modifier = modifier.size(size),
     )
@@ -38,7 +38,7 @@ fun MeoifyMark(
     tint: Color = Color.Unspecified,
 ) {
     Icon(
-        painter = painterResource(R.drawable.ic_launcher_monochrome),
+        painter = painterResource(R.mipmap.ic_launcher_monochrome),
         contentDescription = null,
         tint = tint,
         modifier = modifier.size(size),

@@ -29,6 +29,7 @@ import androidx.media3.session.SessionToken
 import com.google.common.util.concurrent.ListenableFuture
 import com.meoify.music.data.CoverArtResolver
 import com.meoify.music.data.local.LibraryStore
+import com.meoify.music.data.model.ListeningEvent
 import com.meoify.music.data.local.PlaybackSnapshot
 import com.meoify.music.data.local.PlaybackStore
 import com.meoify.music.data.model.Track
@@ -256,6 +257,8 @@ class PlayerConnection(
     private var lastPersistAt = 0L
     private var persistedTrackId: String? = null
     private var persistedPlaying = false
+    private var trackSeeked = false
+    private var completionRecorded = false
     /**
      * Set when the activity detached from the service. A media controller keeps
      * the service bound, so it must be released before a paused service can be
@@ -265,12 +268,37 @@ class PlayerConnection(
 
     private val controllerListener = object : Player.Listener {
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+            val previousTrack = _state.value.track
+            val autoCompleted = reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO ||
+                reason == Player.MEDIA_ITEM_TRANSITION_REASON_REPEAT
             val id = mediaItem?.mediaId
             if (id != null) {
                 val forward = (queueIndex until queue.size).firstOrNull { queue[it].id == id }
                 val found = forward ?: queue.indexOfFirst { it.id == id }
                 if (found >= 0) queueIndex = found
                 queue.getOrNull(queueIndex)?.let { track ->
+                    // Record the previous track as a full listen only if it played
+                    // to completion without seeking/skipping.
+                    if (autoCompleted && previousTrack != null && previousTrack.id != track.id && !trackSeeked) {
+                        if (!completionRecorded) {
+                            completionRecorded = true
+                            library.recordListeningEvent(
+                                ListeningEvent(
+                                    trackId = previousTrack.id,
+                                    title = previousTrack.title,
+                                    artist = previousTrack.artist,
+                                    album = previousTrack.album,
+                                    albumId = previousTrack.albumId,
+                                    thumbnailUrl = previousTrack.thumbnailUrl,
+                                    durationMs = previousTrack.durationMs,
+                                    listenedMs = if (previousTrack.durationMs > 0) previousTrack.durationMs else 180_000L,
+                                    timestampMs = System.currentTimeMillis(),
+                                )
+                            )
+                        }
+                    }
+                    completionRecorded = false
+                    trackSeeked = false
                     _state.update { it.copy(track = track) }
                     library.addRecent(track)
                 }
@@ -289,7 +317,39 @@ class PlayerConnection(
                 consecutiveFailures = 0
                 _state.update { it.copy(isPreparing = false) }
             }
+            if (playbackState == Player.STATE_ENDED) {
+                val t = _state.value.track
+                if (t != null && !trackSeeked && !completionRecorded) {
+                    completionRecorded = true
+                    library.recordListeningEvent(
+                        ListeningEvent(
+                            trackId = t.id,
+                            title = t.title,
+                            artist = t.artist,
+                            album = t.album,
+                            albumId = t.albumId,
+                            thumbnailUrl = t.thumbnailUrl,
+                            durationMs = t.durationMs,
+                            listenedMs = if (t.durationMs > 0) t.durationMs else 180_000L,
+                            timestampMs = System.currentTimeMillis(),
+                        )
+                    )
+                }
+            }
             refresh()
+        }
+
+        override fun onPositionDiscontinuity(
+            oldPosition: Player.PositionInfo,
+            newPosition: Player.PositionInfo,
+            reason: Int,
+        ) {
+            if (reason == Player.DISCONTINUITY_REASON_SEEK ||
+                reason == Player.DISCONTINUITY_REASON_SEEK_ADJUSTMENT
+            ) {
+                trackSeeked = true
+            }
+            super.onPositionDiscontinuity(oldPosition, newPosition, reason)
         }
 
         override fun onShuffleModeEnabledChanged(shuffleModeEnabled: Boolean) {

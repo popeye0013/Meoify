@@ -71,6 +71,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -91,6 +92,8 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.meoify.music.BuildConfig
 import com.meoify.music.data.UpdateChecker
@@ -177,20 +180,33 @@ fun MeoifyScaffold(
     val showNavBar = chromeAllowed && !settingsOpen && detailStack.isEmpty()
     val showBottomBar = showMiniPlayer || showNavBar
 
-    // Check once per launch; the popup itself only appears after the person has
-    // stayed on the home screen for a few seconds, so it never interrupts the
-    // first tap after opening the app.
+    // Check on launch and again whenever the app comes back to the foreground,
+    // so a release published while Meoify is still in memory is not missed.
+    // Resumes are throttled to one check a minute to stay well inside GitHub's
+    // anonymous API quota.
     var latestRelease by remember { mutableStateOf<UpdateChecker.Release?>(null) }
     var pendingUpdate by remember { mutableStateOf<UpdateChecker.Release?>(null) }
     var promptShown by remember { mutableStateOf(false) }
     var showChangelog by remember { mutableStateOf(false) }
+    var updateCheckTick by remember { mutableIntStateOf(0) }
+    var lastUpdateCheckAt by remember { mutableLongStateOf(0L) }
 
-    LaunchedEffect(settings.onboardingCompleted) {
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
+        updateCheckTick++
+    }
+
+    LaunchedEffect(settings.onboardingCompleted, updateCheckTick) {
         if (!settings.onboardingCompleted) return@LaunchedEffect
+        val now = System.currentTimeMillis()
+        if (lastUpdateCheckAt != 0L && now - lastUpdateCheckAt < 60_000L) {
+            return@LaunchedEffect
+        }
+        lastUpdateCheckAt = now
         val latest = UpdateChecker.latest() ?: return@LaunchedEffect
         if (UpdateChecker.isNewer(latest.version, BuildConfig.VERSION_NAME) &&
             latest.version != settings.skippedUpdateVersion
         ) {
+            if (latestRelease?.version != latest.version) promptShown = false
             latestRelease = latest
         }
     }
