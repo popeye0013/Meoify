@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 128" width="420" height="128" role="img" aria-label="Meoify">
+  <defs>
+    <linearGradient id="wordmark-gradient" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#FF4D67"/>
+      <stop offset="52%" stop-color="#FF7A9C"/>
+      <stop offset="100%" stop-color="#A855F7"/>
+    </linearGradient>
+    <linearGradient id="wordmark-sheen" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.22"/>
+      <stop offset="60%" stop-color="#FFFFFF" stop-opacity="0"/>
+    </linearGradient>
+    <filter id="wordmark-glow" x="-15%" y="-40%" width="130%" height="180%">
+      <feDropShadow dx="0" dy="6" stdDeviation="7" flood-color="#FF4D67" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+  <text x="210" y="88" text-anchor="middle"
+        font-family="'Google Sans','Product Sans',Inter,'Segoe UI',Arial,sans-serif"
+        font-size="92" font-weight="800" letter-spacing="-2.5"
+        fill="url(#wordmark-gradient)" filter="url(#wordmark-glow)">Meoify</text>
+  <text x="210" y="88" text-anchor="middle"
+        font-family="'Google Sans','Product Sans',Inter,'Segoe UI',Arial,sans-serif"
+        font-size="92" font-weight="800" letter-spacing="-2.5"
+        fill="url(#wordmark-sheen)">Meoify</text>
+</svg>
