@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Dynamic-color version of the splash mark: the white play triangle keeps
+     the three equalizer bars as cut-outs filled with the wallpaper-derived
+     accent, matching the fixed-red logo's look while following Material You. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="240dp"
+    android:height="240dp"
+    android:viewportWidth="1024"
+    android:viewportHeight="1024">
+    <group android:name="icon" android:pivotX="512" android:pivotY="512">
+        <path android:name="triangle"
+            android:fillColor="#FFFFFF"
+            android:strokeColor="#FFFFFF"
+            android:strokeWidth="30"
+            android:strokeLineJoin="round"
+            android:pathData="M360,300 L360,724 L700,512 Z"/>
+        <path android:name="bar1" android:fillColor="@android:color/system_accent1_600" android:pathData="M470,392 L470,392 Q488,392 488,410 L488,614 Q488,632 470,632 L470,632 Q452,632 452,614 L452,410 Q452,392 470,392 Z"/>
+        <path android:name="bar2" android:fillColor="@android:color/system_accent1_600" android:pathData="M540,432 L540,432 Q558,432 558,450 L558,574 Q558,592 540,592 L540,592 Q522,592 522,574 L522,450 Q522,432 540,432 Z"/>
+        <path android:name="bar3" android:fillColor="@android:color/system_accent1_600" android:pathData="M610,472 L610,472 Q628,472 628,490 L628,534 Q628,552 610,552 L610,552 Q592,552 592,534 L592,490 Q592,472 610,472 Z"/>
+    </group>
+</vector>

@@ -112,6 +112,7 @@ import com.meoify.music.MeoifyApplication
 import com.meoify.music.R
 import com.meoify.music.data.UpdateChecker
 import com.meoify.music.data.backup.BackupManager
+import com.meoify.music.data.local.SplashPreferences
 import com.meoify.music.data.model.AudioQuality
 import com.meoify.music.data.model.DeveloperInfo
 import com.meoify.music.data.model.ThemeMode
@@ -454,19 +455,16 @@ fun SettingsScreen(
 
             item { SectionLabel("Wrapped") }
             item {
-                Surface(
-                    shape = RoundedCornerShape(28.dp),
-                    color = MaterialTheme.colorScheme.surfaceContainerLow,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Column(modifier = Modifier.fillMaxWidth()) {
-                        ActionRow(
-                            icon = Icons.Filled.BarChart,
-                            title = "Meoify Wrapped",
-                            subtitle = "View top songs, artists & on-device listening stats",
-                            onClick = { showWrappedSheet = true },
-                        )
-                    }
+                // Use the same padded card as every other section. A bare
+                // Surface let the icon tile touch the rounded corner, which
+                // clipped the tile and left the row misaligned with the rest.
+                SettingsCard {
+                    ActionRow(
+                        icon = Icons.Filled.BarChart,
+                        title = "Meoify Wrapped",
+                        subtitle = "View top songs, artists & on-device listening stats",
+                        onClick = { showWrappedSheet = true },
+                    )
                 }
             }
 
@@ -508,7 +506,12 @@ fun SettingsScreen(
                         },
                         checked = settings.dynamicColor,
                         enabled = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S,
-                        onCheckedChange = { app.container.settings.setDynamicColor(it) },
+                        onCheckedChange = {
+                            app.container.settings.setDynamicColor(it)
+                            // Persist the splash theme now so the very next
+                            // launch already uses the matching colors.
+                            SplashPreferences.syncPlatformSplashTheme(context, it)
+                        },
                     )
                     ToggleRow(
                         icon = Icons.Filled.ColorLens,

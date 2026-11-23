@@ -440,7 +440,7 @@ class InnerTube(private val client: OkHttpClient) {
         } catch (e: MusicApiException) {
             throw e
         } catch (e: IOException) {
-            throw MusicApiException("Couldn't reach YouTube Music. Check your connection.", e)
+            throw MusicApiException("No connection right now. Reconnect to get back to your music.", e)
         }
     }
 

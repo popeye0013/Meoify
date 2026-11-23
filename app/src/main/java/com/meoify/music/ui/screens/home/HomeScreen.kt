@@ -146,7 +146,7 @@ fun HomeScreen() {
                             )
                             Spacer(Modifier.height(12.dp))
                             Text(
-                                text = "Couldn't reach YouTube Music",
+                                text = "You're Offline",
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold,
                             )

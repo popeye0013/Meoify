@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="utf-8"?>
+<animated-vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:drawable="@drawable/ic_splash_vector_dynamic">
+
+    <target android:name="icon">
+        <aapt:attr name="android:animation">
+            <set android:ordering="together">
+                <objectAnimator
+                    android:propertyName="scaleX"
+                    android:valueFrom="0.8"
+                    android:valueTo="1"
+                    android:duration="400"
+                    android:interpolator="@android:interpolator/overshoot"/>
+                <objectAnimator
+                    android:propertyName="scaleY"
+                    android:valueFrom="0.8"
+                    android:valueTo="1"
+                    android:duration="400"
+                    android:interpolator="@android:interpolator/overshoot"/>
+            </set>
+        </aapt:attr>
+    </target>
+
+        <target android:name="bar1">
+            <aapt:attr name="android:animation">
+                <objectAnimator
+                    android:propertyName="pathData"
+                    android:valueType="pathType"
+                    android:valueFrom="M470,392 L470,392 Q488,392 488,410 L488,614 Q488,632 470,632 L470,632 Q452,632 452,614 L452,410 Q452,392 470,392 Z"
+                    android:valueTo="M470,446.0 L470,446.0 Q488,446.0 488,464.0 L488,560.0 Q488,578.0 470,578.0 L470,578.0 Q452,578.0 452,560.0 L452,464.0 Q452,446.0 470,446.0 Z"
+                    android:startOffset="300"
+                    android:duration="150"
+                    android:repeatCount="3"
+                    android:repeatMode="reverse"
+                    android:interpolator="@android:interpolator/fast_out_slow_in"/>
+            </aapt:attr>
+        </target>
+
+        <target android:name="bar2">
+            <aapt:attr name="android:animation">
+                <objectAnimator
+                    android:propertyName="pathData"
+                    android:valueType="pathType"
+                    android:valueFrom="M540,432 L540,432 Q558,432 558,450 L558,574 Q558,592 540,592 L540,592 Q522,592 522,574 L522,450 Q522,432 540,432 Z"
+                    android:valueTo="M540,468.0 L540,468.0 Q558,468.0 558,486.0 L558,538.0 Q558,556.0 540,556.0 L540,556.0 Q522,556.0 522,538.0 L522,486.0 Q522,468.0 540,468.0 Z"
+                    android:startOffset="340"
+                    android:duration="150"
+                    android:repeatCount="3"
+                    android:repeatMode="reverse"
+                    android:interpolator="@android:interpolator/fast_out_slow_in"/>
+            </aapt:attr>
+        </target>
+
+        <target android:name="bar3">
+            <aapt:attr name="android:animation">
+                <objectAnimator
+                    android:propertyName="pathData"
+                    android:valueType="pathType"
+                    android:valueFrom="M610,472 L610,472 Q628,472 628,490 L628,534 Q628,552 610,552 L610,552 Q592,552 592,534 L592,490 Q592,472 610,472 Z"
+                    android:valueTo="M610,490.0 L610,490.0 Q628,490.0 628,508.0 L628,516.0 Q628,534.0 610,534.0 L610,534.0 Q592,534.0 592,516.0 L592,508.0 Q592,490.0 610,490.0 Z"
+                    android:startOffset="380"
+                    android:duration="150"
+                    android:repeatCount="3"
+                    android:repeatMode="reverse"
+                    android:interpolator="@android:interpolator/fast_out_slow_in"/>
+            </aapt:attr>
+        </target>
+</animated-vector>
