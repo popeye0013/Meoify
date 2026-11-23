@@ -83,7 +83,7 @@
 - **Now Playing sheet** — the three-dot menu opens a modal sheet with queue, share, video and sleep actions plus full song details.
 - **Swipe to queue** — swipe a song right in any playlist or Liked Songs to add it to the queue without leaving the list.
 - **Background playback** — Media3 / ExoPlayer with lockscreen and notification controls.
-- **Five audio modes** — Auto, Lossless (Hi-Res), Standard (320 kbps), Balanced (256 kbps) and Data Saver. See [Audio quality](#audio-quality).
+- **Six audio modes** — Auto, Hi-Res Audio, CD Lossless, Standard (320 kbps), YouTube Music and Data Saver. See [Audio quality](#audio-quality).
 - **Sleep timer** — stop playback after 5, 10, 15, 30, 45 or 60 minutes.
 - **Synced lyrics** — LRC from LRCLIB with auto-scroll and tap-to-seek, plus a plain-text fallback.
 - **Lyrics preview** — real-time synced lyrics under the album art on Now Playing.
@@ -104,7 +104,7 @@
 
 ### <img src="docs/icons/design-details.svg" width="21" height="21" alt="" />&nbsp;Design &amp; details
 
-- **Material 3 Expressive** — light, dark and pure-black themes, dynamic colour on Android 12+, rounded surfaces and Google Sans Flex.
+- **Material 3 Expressive** — light, dark and pure-black themes, dynamic colour on Android 12+ (including the splash screen and its equalizer bars), rounded surfaces and Google Sans Flex.
 - **Volume & output popup** — the speaker button on Now Playing opens a media volume slider with a Bluetooth battery badge. Output switching happens via the system. The button shows a speaker or Bluetooth icon to match the active output.
 - **Sharing** — share songs or jump to album and artist pages from the track menu.
 - **In-app updates** — release notes in Settings and an optional home-screen prompt.
@@ -118,10 +118,11 @@ Pick a mode in **Settings → Playback**, or tap the quality pill on the Now Pla
 | Mode | What it does |
 |---|---|
 | **Auto** | Adapts to your connection — Wi-Fi keeps the best stream, mobile data stays balanced. |
-| **Lossless (Hi-Res)** | Up to 24-bit FLAC from a hifi-api / Tidal-compatible server. |
+| **Hi-Res Audio** | Up to 24-bit / 192 kHz FLAC from a hifi-api / Tidal-compatible server. |
+| **CD Lossless** | 16-bit / 44.1 kHz bit-exact FLAC from the same server. |
 | **Standard (320 kbps)** | 320 kbps AAC from the same lossless server. |
-| **Balanced (256 kbps)** | 256 kbps AAC / Opus, the native YouTube Music stream. |
-| **Data Saver** | Low-bitrate audio to reduce mobile data use. |
+| **YouTube Music** | 128–256 kbps AAC / Opus, the native YouTube Music stream. |
+| **Data Saver** | 96 kbps AAC to reduce mobile data use. |
 
 > YouTube Music itself tops out at 256 kbps AAC/Opus. To go higher, add a server under **Settings → Playback → Lossless server**. Meoify supports two formats in the same field and detects which one you pasted: a [hifi-api](https://github.com/binimum/hifi-api) / Tidal server for Hi-Res FLAC, or a 320 kbps Cloudflare Worker (JioSaavn) for AAC up to 320 kbps. Meoify searches the server for a matching track and streams the real URL it returns. When no server is set or it fails, those tiers fall back to the best YouTube Music stream. You can give the server a custom name and test it before saving; Settings shows whether the saved server is responding. Meoify never upsamples or fakes lossless audio. The 320 kbps Worker is based on [EchoMusicApp/320kbs-extension](https://github.com/EchoMusicApp/320kbs-extension) (MIT). A new mode applies from the next track.
 
