@@ -30,20 +30,32 @@ object YTMusicParser {
      * both the per-item renderer (new) and the header renderer (old).
      */
     fun parseAccount(root: JsonObject): com.meoify.music.data.model.AccountInfo? {
+        // YouTube has shipped several account menu shapes. Collect any object
+        // that owns one of the known identity fields instead of relying on a
+        // single renderer name, so a layout change cannot leave us with a
+        // generic placeholder in Listen Together.
         val candidates = buildList {
             addAll(root.findAll("accountItem").mapNotNull { it.asObjectOrNull() })
             addAll(root.findAll("activeAccountHeaderRenderer").mapNotNull { it.asObjectOrNull() })
-        }
-        val holder = candidates.firstOrNull { it["accountName"]?.readText() != null }
-            ?: return null
+            addAll(findObjectsWithKey(root, "accountName"))
+            addAll(findObjectsWithKey(root, "email"))
+        }.distinctBy { it.toString() }
 
-        val email = holder["email"]?.readText()
-        val name = holder["accountName"]?.readText()
+        val holder = candidates.firstOrNull { candidate ->
+            listOf("accountName", "name", "title", "email", "emailAddress", "channelHandle")
+                .any { key -> candidate[key]?.readText() != null }
+        } ?: return null
+
+        val name = listOf("accountName", "name", "title")
+            .firstNotNullOfOrNull { holder[it]?.readText() }
+        val email = listOf("email", "emailAddress")
+            .firstNotNullOfOrNull { holder[it]?.readText() }
         val handle = holder["channelHandle"]?.readText()
         val avatar = holder["accountPhoto"]?.asObjectOrNull()?.findThumbnail()
             ?: holder["avatar"]?.asObjectOrNull()?.findThumbnail()
+            ?: holder.findThumbnail()
 
-        if (name.isNullOrBlank() && email.isNullOrBlank() && avatar.isNullOrBlank()) return null
+        if (listOf(name, email, handle, avatar).all { it.isNullOrBlank() }) return null
         return com.meoify.music.data.model.AccountInfo(
             name = name,
             email = email,
@@ -827,6 +839,18 @@ object YTMusicParser {
         return url
             .replace(Regex("=w\\d+-h\\d+"), "=w900-h900")
             .replace(Regex("=s\\d+"), "=s900")
+    }
+
+    private fun findObjectsWithKey(element: JsonElement?, key: String): Sequence<JsonObject> = sequence {
+        when (element) {
+            is JsonObject -> {
+                if (element[key] != null) yield(element)
+                element.values.forEach { value -> yieldAll(findObjectsWithKey(value, key)) }
+            }
+
+            is JsonArray -> element.forEach { value -> yieldAll(findObjectsWithKey(value, key)) }
+            else -> Unit
+        }
     }
 
     private fun findKey(element: JsonElement?, key: String): Sequence<JsonElement> = sequence {

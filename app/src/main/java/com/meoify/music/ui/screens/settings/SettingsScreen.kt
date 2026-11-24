@@ -118,6 +118,7 @@ import com.meoify.music.R
 import com.meoify.music.data.UpdateChecker
 import com.meoify.music.data.backup.BackupManager
 import com.meoify.music.data.local.SplashPreferences
+import com.meoify.music.data.model.AccountInfo
 import com.meoify.music.data.model.AudioQuality
 import com.meoify.music.data.model.DeveloperInfo
 import com.meoify.music.data.model.DownloadState
@@ -442,17 +443,34 @@ fun SettingsScreen(
             item {
                 val displayName = account?.displayName
                     ?: settings.localProfileName
-                    ?: settings.accountName
+                    ?: AccountInfo.realName(settings.accountName)
                     ?: "Your profile"
+                val signedIn = settings.ytCookies != null
+                val accountDetails = buildList {
+                    if (signedIn) {
+                        account?.handle
+                            ?.removePrefix("@")
+                            ?.trim()
+                            ?.takeIf { it.isNotBlank() }
+                            ?.let { add("@$it") }
+                        account?.email
+                            ?.trim()
+                            ?.takeIf { it.isNotBlank() }
+                            ?.let { add(it) }
+                        if (isEmpty()) add("Signed in to YouTube Music")
+                    } else {
+                        add(
+                            if (settings.localProfileName != null) {
+                                "Local profile · not signed in"
+                            } else {
+                                "No account connected"
+                            },
+                        )
+                    }
+                }
                 ProfileCard(
                     name = displayName,
-                    subtitle = account?.email
-                        ?: account?.handle
-                        ?: when {
-                            settings.ytCookies != null -> "Signed in to YouTube Music"
-                            settings.localProfileName != null -> "Local profile · not signed in"
-                            else -> "No account connected"
-                        },
+                    details = accountDetails,
                     avatarUrl = account?.avatarUrl
                         ?: settings.localAvatarPath?.let { File(it) },
                     initials = account?.initials
@@ -1548,7 +1566,7 @@ fun SettingsScreen(
 @Composable
 private fun ProfileCard(
     name: String,
-    subtitle: String,
+    details: List<String>,
     avatarUrl: Any?,
     initials: String?,
     signedIn: Boolean,
@@ -1623,13 +1641,15 @@ private fun ProfileCard(
                         overflow = TextOverflow.Ellipsis,
                     )
                     Spacer(Modifier.height(3.dp))
-                    Text(
-                        text = subtitle,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
+                    details.take(3).forEach { line ->
+                        Text(
+                            text = line,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
                     Spacer(Modifier.height(9.dp))
                     if (loading) {
                         SyncChip("Syncing account…", active = true)

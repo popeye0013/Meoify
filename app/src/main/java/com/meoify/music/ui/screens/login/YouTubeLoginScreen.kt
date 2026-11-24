@@ -54,6 +54,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.meoify.music.MeoifyApplication
 import com.meoify.music.R
+import com.meoify.music.data.model.AccountInfo
 import androidx.compose.ui.platform.LocalContext
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
@@ -82,11 +83,13 @@ fun YouTubeLoginScreen(onBack: () -> Unit, onSignedIn: () -> Unit) {
         val container = app.container
         container.repository.applyCookies(cookies)
         container.settings.setYtCookies(cookies)
-        container.settings.setAccountName("YouTube Music account")
+        // Do not persist a generic label as the account name. Listen Together
+        // falls back to the local profile until the real name is available.
+        container.settings.setAccountName(null)
         scope.launch {
             val account = container.repository.account()
             if (account != null) {
-                container.settings.setAccountName(account.displayName)
+                container.settings.setAccountName(AccountInfo.realName(account))
                 container.settings.setAccountAvatarUrl(account.avatarUrl)
             }
         }

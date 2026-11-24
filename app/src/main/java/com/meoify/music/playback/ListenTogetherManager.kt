@@ -1,6 +1,7 @@
 package com.meoify.music.playback
 
 import com.meoify.music.data.local.SettingsStore
+import com.meoify.music.data.model.AccountInfo
 import com.meoify.music.data.model.Track
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -98,7 +99,7 @@ class ListenTogetherManager(
      */
     private fun currentProfile(): SessionProfile {
         val current = settings.settings.value
-        val ytName = current.accountName?.takeIf { it.isNotBlank() }
+        val ytName = AccountInfo.realName(current.accountName)
         return if (current.ytCookies != null && ytName != null) {
             SessionProfile(
                 name = ytName,

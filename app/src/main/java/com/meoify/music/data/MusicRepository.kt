@@ -640,9 +640,17 @@ class MusicRepository(
      */
     suspend fun account(): com.meoify.music.data.model.AccountInfo? {
         if (!cookiesPresent) return null
-        return runCatching {
+        val info = runCatching {
             com.meoify.music.data.remote.YTMusicParser.parseAccount(innerTube.accountMenu())
         }.getOrNull()
+        if (info != null && settings != null) {
+            // Replace the placeholder written during sign-in with the real
+            // account name once YouTube Music exposes it. Existing installs get
+            // repaired the next time the profile is loaded.
+            settings.setAccountName(com.meoify.music.data.model.AccountInfo.realName(info))
+            settings.setAccountAvatarUrl(info.avatarUrl)
+        }
+        return info
     }
 
     /** True when the app currently holds YouTube Music cookies. */

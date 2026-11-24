@@ -49,9 +49,7 @@ data class AccountInfo(
     val avatarUrl: String? = null,
 ) {
     val displayName: String
-        get() = name?.takeIf { it.isNotBlank() }
-            ?: email?.substringBefore('@')?.takeIf { it.isNotBlank() }
-            ?: "You"
+        get() = realName(this) ?: "You"
 
     val initials: String
         get() = displayName
@@ -61,6 +59,20 @@ data class AccountInfo(
             .map { it.first().uppercaseChar() }
             .joinToString("")
             .ifBlank { "M" }
+
+    companion object {
+        private const val GENERIC_NAME = "YouTube Music account"
+
+        /** Rejects the placeholder written before the account lookup finishes. */
+        fun realName(value: String?): String? = value?.trim()
+            ?.takeIf { it.isNotBlank() && !it.equals(GENERIC_NAME, ignoreCase = true) }
+
+        /** Best human-readable name from an account response, or null if absent. */
+        fun realName(info: AccountInfo): String? =
+            realName(info.name)
+                ?: realName(info.email?.substringBefore('@'))
+                ?: realName(info.handle?.removePrefix("@"))
+    }
 }
 
 /** A titled row on Home, kept exactly as YouTube Music or Meoify named it. */
