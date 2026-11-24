@@ -1,8 +1,8 @@
 <a id="meoify"></a>
 
-<h1 align="center">
-  <img src="docs/meoify-logo.png" width="96" alt="Meoify logo" align="absmiddle" />&nbsp;&nbsp;<img src="docs/meoify-title.svg" width="320" alt="Meoify" align="absmiddle" />
-</h1>
+<p align="center">
+  <img src="docs/meoify-banner.svg" alt="Meoify" width="100%" />
+</p>
 
 <p align="center">
   <img src="https://readme-typing-svg.demolab.com?font=Google+Sans&weight=600&size=22&pause=1000&color=FF4D67&center=true&vCenter=true&width=520&lines=YouTube+Music%2C+the+way+you+want+it.;Material+3+Expressive+%C2%B7+Lossless+%C2%B7+Lyrics;Background+playback+%C2%B7+Real+artwork" alt="Typing animation" />
@@ -10,23 +10,23 @@
 
 <p align="center">
   <a href="https://github.com/popeye0013/Meoify/releases/latest">
-    <img src="https://img.shields.io/github/v/release/popeye0013/Meoify?style=for-the-badge&color=FF4D67&labelColor=0D0D0F" alt="Latest release" />
+    <img src="https://img.shields.io/github/v/release/popeye0013/Meoify?style=flat&color=FF4D67&labelColor=2A2A32" alt="Latest release" />
   </a>
   <a href="https://github.com/popeye0013/Meoify/releases">
-    <img src="https://img.shields.io/github/downloads/popeye0013/Meoify/total?style=for-the-badge&color=FF4D67&labelColor=0D0D0F" alt="Total downloads" />
+    <img src="https://img.shields.io/github/downloads/popeye0013/Meoify/total?style=flat&color=FF4D67&labelColor=2A2A32" alt="Total downloads" />
   </a>
   <a href="https://github.com/popeye0013/Meoify/stargazers">
-    <img src="https://img.shields.io/github/stars/popeye0013/Meoify?style=for-the-badge&color=7C3AED&labelColor=0D0D0F" alt="Stars" />
+    <img src="https://img.shields.io/github/stars/popeye0013/Meoify?style=flat&color=7C3AED&labelColor=2A2A32" alt="Stars" />
   </a>
   <a href="LICENSE">
-    <img src="https://img.shields.io/github/license/popeye0013/Meoify?style=for-the-badge&color=7C3AED&labelColor=0D0D0F" alt="GPL-3.0 license" />
+    <img src="https://img.shields.io/github/license/popeye0013/Meoify?style=flat&color=7C3AED&labelColor=2A2A32" alt="GPL-3.0 license" />
   </a>
-  <img src="https://img.shields.io/badge/Android-8.0%2B-3DDC84?style=for-the-badge&logo=android&logoColor=white&labelColor=0D0D0F" alt="Android 8.0+" />
+  <img src="https://img.shields.io/badge/Android-8.0%2B-3DDC84?style=flat&logo=android&logoColor=white&labelColor=2A2A32" alt="Android 8.0+" />
 </p>
 
 <p align="center">
   <a href="https://github.com/popeye0013/Meoify/releases/latest">
-    <img src="https://img.shields.io/badge/Download_the_latest_APK-FF4D67?style=for-the-badge&logo=android&logoColor=white&labelColor=0D0D0F" alt="Download the latest APK" />
+    <img src="https://img.shields.io/badge/Download_the_latest_APK-FF4D67?style=flat&logo=android&logoColor=white&labelColor=2A2A32" alt="Download the latest APK" />
   </a>
 </p>
 
