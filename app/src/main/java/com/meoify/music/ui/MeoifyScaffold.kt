@@ -115,7 +115,9 @@ import com.meoify.music.ui.screens.search.SearchScreen
 import com.meoify.music.ui.screens.settings.SettingsScreen
 import com.meoify.music.util.openUrl
 import kotlin.math.roundToInt
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 
 private sealed interface ShellScreen {
     data object Login : ShellScreen
@@ -204,8 +206,16 @@ fun MeoifyScaffold(
         if (lastUpdateCheckAt != 0L && now - lastUpdateCheckAt < 60_000L) {
             return@LaunchedEffect
         }
-        lastUpdateCheckAt = now
-        val latest = UpdateChecker.latest() ?: return@LaunchedEffect
+        // Record the attempt only after it finishes. If an ON_RESUME tick cancels
+        // this effect mid-check, the restarted effect must still be allowed to
+        // run; otherwise the auto popup is silently skipped on cold start.
+        val latest = try {
+            UpdateChecker.latest()
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } finally {
+            if (isActive) lastUpdateCheckAt = System.currentTimeMillis()
+        } ?: return@LaunchedEffect
         if (UpdateChecker.isNewer(latest.version, BuildConfig.VERSION_NAME) &&
             latest.version != settings.skippedUpdateVersion
         ) {
