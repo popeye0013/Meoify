@@ -56,6 +56,8 @@ class DetailViewModel(
             title = "Playlist",
             tracks = emptyList(),
         )
+        // Downloads and DownloadQueue are rendered directly by DetailScreen.
+        else -> error("Unsupported detail destination: ${destination.key}")
     }
 }
 

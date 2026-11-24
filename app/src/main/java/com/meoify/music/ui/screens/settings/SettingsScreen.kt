@@ -37,6 +37,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.Logout
+import androidx.compose.material.icons.automirrored.filled.QueueMusic
 import androidx.compose.material.icons.filled.ArrowOutward
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.BarChart
@@ -52,7 +53,9 @@ import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.CurrencyRupee
 import androidx.compose.material.icons.filled.DeleteSweep
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.HighQuality
 import androidx.compose.material.icons.filled.Login
 import androidx.compose.material.icons.filled.Person
@@ -75,6 +78,7 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.Slider
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
@@ -85,6 +89,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -115,7 +120,9 @@ import com.meoify.music.data.backup.BackupManager
 import com.meoify.music.data.local.SplashPreferences
 import com.meoify.music.data.model.AudioQuality
 import com.meoify.music.data.model.DeveloperInfo
+import com.meoify.music.data.model.DownloadState
 import com.meoify.music.data.model.ThemeMode
+import com.meoify.music.data.model.formatDownloadBytes
 import com.meoify.music.ui.components.AudioQualitySheet
 import com.meoify.music.ui.components.ChangelogSheet
 import com.meoify.music.ui.components.ProfileAvatar
@@ -154,6 +161,16 @@ fun SettingsScreen(
     val profileLoading by profileViewModel.loading.collectAsStateWithLifecycle()
     val historyStatus by app.container.historySync.status.collectAsStateWithLifecycle()
     val scrobbleStatus by app.container.scrobbleSync.status.collectAsStateWithLifecycle()
+    val downloads by app.container.downloadManager.downloads.collectAsStateWithLifecycle()
+    val downloadQueue by app.container.downloadManager.queue.collectAsStateWithLifecycle()
+    val downloadPrefs by app.container.downloadManager.preferences.collectAsStateWithLifecycle()
+    val offlineBytes = downloads.sumOf { it.fileSize }
+    val activeDownloadCount = downloadQueue.count {
+        it.state == DownloadState.QUEUED || it.state == DownloadState.RUNNING
+    }
+    var offlineLimitDraft by remember(downloadPrefs.maxOfflineMiB) {
+        mutableFloatStateOf(downloadPrefs.maxOfflineMiB.toFloat())
+    }
 
     // The Played count only changes when the account history does, so read it
     // again when Settings opens instead of showing the number from startup.
@@ -291,6 +308,7 @@ fun SettingsScreen(
         "kbps", "history", "sync", "scrobbl", "last.fm", "lastfm", "mixes",
     )
     val libraryKeys = arrayOf("Library", "clear", "recent", "searches", "listening", "history")
+    val offlineKeys = arrayOf("Offline", "download", "downloads", "storage", "queue", "like")
     val backupKeys = arrayOf("Backup", "restore", "export", "import", "json", "file")
     val supportKeys = arrayOf("Support", "donate", "UPI", "Google Pay", "contribution", "money")
     val developerKeys = arrayOf("Developer", "telegram", "contact", "github", "source")
@@ -628,6 +646,61 @@ fun SettingsScreen(
                     }
                 }
             }
+            if (matches(*offlineKeys)) {
+                item { SectionLabel("Offline") }
+                item {
+                    SettingsCard {
+                        ToggleRow(
+                            icon = Icons.Filled.Favorite,
+                            title = "Download liked songs",
+                            subtitle = "Save a song automatically when you like it",
+                            checked = downloadPrefs.autoDownloadOnLike,
+                            onCheckedChange = { app.container.downloadManager.setAutoDownloadOnLike(it) },
+                        )
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            "Offline storage limit",
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                        Text(
+                            if (downloadPrefs.maxOfflineMiB == 0) {
+                                "Unlimited • ${formatDownloadBytes(downloads.sumOf { it.fileSize })} saved"
+                            } else {
+                                "${downloadPrefs.maxOfflineMiB} MiB • ${formatDownloadBytes(downloads.sumOf { it.fileSize })} saved"
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Slider(
+                            value = offlineLimitDraft,
+                            onValueChange = { offlineLimitDraft = it },
+                            onValueChangeFinished = {
+                                app.container.downloadManager.setMaxOfflineMiB(offlineLimitDraft.toInt())
+                            },
+                            valueRange = 0f..4096f,
+                            steps = 15,
+                        )
+                        ActionRow(
+                            icon = Icons.Filled.Download,
+                            title = "Manage downloads",
+                            subtitle = "${downloads.size} saved ${formatDownloadBytes(offlineBytes)}",
+                            onClick = actions.openDownloads,
+                        )
+                        ActionRow(
+                            icon = Icons.AutoMirrored.Filled.QueueMusic,
+                            title = "Download queue",
+                            subtitle = if (activeDownloadCount > 0) {
+                                "$activeDownloadCount in progress"
+                            } else {
+                                "No downloads in progress"
+                            },
+                            onClick = actions.openDownloadQueue,
+                        )
+                    }
+                }
+            }
+
             if (settings.ytCookies != null) {
                 item { SectionLabel("Sync") }
                 item {

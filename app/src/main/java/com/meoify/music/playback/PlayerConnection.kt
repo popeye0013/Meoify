@@ -36,6 +36,7 @@ import com.meoify.music.data.model.Track
 import com.meoify.music.data.remote.Artwork
 import com.meoify.music.data.remote.ResolvedAudio
 import com.meoify.music.data.remote.StreamResolver
+import com.meoify.music.download.DownloadManager
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -164,6 +165,7 @@ class PlayerConnection(
     private val library: LibraryStore,
     private val coverArt: CoverArtResolver? = null,
     private val playbackStore: PlaybackStore,
+    private val downloads: DownloadManager? = null,
 ) {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -300,6 +302,7 @@ class PlayerConnection(
                     completionRecorded = false
                     trackSeeked = false
                     _state.update { it.copy(track = track) }
+                    downloads?.setPlayingTrack(track.id)
                     library.addRecent(track)
                 }
             }
@@ -708,7 +711,7 @@ class PlayerConnection(
                 if (generation != myGeneration) return@launch
                 val track = queue.getOrNull(attempt) ?: break
                 try {
-                    audio = resolver.resolve(track)
+                    audio = resolveAudio(track)
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
@@ -778,7 +781,7 @@ class PlayerConnection(
                 upcoming.take(PARALLEL_PREFETCH).map { index ->
                     async(Dispatchers.IO) {
                         val next = queue[index]
-                        runCatching { resolver.resolve(next) }
+                        runCatching { resolveAudio(next) }
                             .getOrNull()
                             ?.let { next to it }
                     }
@@ -793,7 +796,7 @@ class PlayerConnection(
                 if (generation != myGeneration) break
                 val track = queue.getOrNull(index) ?: break
                 try {
-                    val nextAudio = resolver.resolve(track)
+                    val nextAudio = resolveAudio(track)
                     if (generation == myGeneration) {
                         c.addMediaItem(track.toMediaItem(nextAudio))
                     }
@@ -825,7 +828,7 @@ class PlayerConnection(
             val position = c.currentPosition
             val wasPlaying = c.isPlaying
             val audio = try {
-                resolver.resolve(track, force = true)
+                resolveAudio(track, force = true)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -1051,7 +1054,7 @@ class PlayerConnection(
         }
         scope.launch {
             try {
-                val audio = resolver.resolve(track)
+                val audio = resolveAudio(track)
                 val item = track.toMediaItem(audio)
                 if (playNext) {
                     c.addMediaItem(c.currentMediaItemIndex + 1, item)
@@ -1111,7 +1114,7 @@ class PlayerConnection(
                 }
                 if (queue.any { it.id == track.id }) continue
                 try {
-                    val audio = resolver.resolve(track)
+                    val audio = resolveAudio(track)
                     if (generation != myGeneration) return@launch
                     if (expectedTrackId != null && _state.value.track?.id != expectedTrackId) {
                         return@launch
@@ -1356,9 +1359,19 @@ class PlayerConnection(
         }
     }
 
+    /** Offline files take priority; network resolution is the fallback. */
+    private suspend fun resolveAudio(track: Track, force: Boolean = false): ResolvedAudio {
+        val local = downloads?.localAudio(track)
+        if (local != null) return local
+        return resolver.resolve(track, force = force)
+    }
+
     private suspend fun Track.toMediaItem(audio: ResolvedAudio): MediaItem {
-        // Spotify -> Apple iTunes -> YouTube Music, never a video frame.
-        val artwork = coverArt?.cover(this) ?: Artwork.songArt(thumbnailUrl)
+        // A retained cover keeps offline songs recognizable; otherwise use the
+        // Spotify -> Apple iTunes -> YouTube Music lookup, never a video frame.
+        val artwork = downloads?.coverUri(this)
+            ?: coverArt?.cover(this)
+            ?: Artwork.songArt(thumbnailUrl)
         val metadata = MediaMetadata.Builder()
             .setTitle(title)
             .setArtist(artist)

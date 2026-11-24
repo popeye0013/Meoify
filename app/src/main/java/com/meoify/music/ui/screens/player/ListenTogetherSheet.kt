@@ -61,6 +61,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.meoify.music.MeoifyApplication
 import com.meoify.music.playback.ListenTogetherManager
+import com.meoify.music.ui.components.ProfileAvatar
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -71,6 +72,12 @@ fun ListenTogetherSheet(
     val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
     val sessionState by manager.session.collectAsStateWithLifecycle()
+    val selfAvatar: Any? = when {
+        !sessionState.selfAvatarUrl.isNullOrBlank() -> sessionState.selfAvatarUrl
+        !sessionState.selfLocalAvatarPath.isNullOrBlank() ->
+            java.io.File(sessionState.selfLocalAvatarPath.orEmpty())
+        else -> null
+    }
 
     val suggestedCode = remember { (100000..999999).random().toString() }
     var joinCode by remember { mutableStateOf("") }
@@ -135,6 +142,10 @@ fun ListenTogetherSheet(
                         roomCode = sessionState.roomCode.orEmpty(),
                         isHost = sessionState.isHost,
                         statusMessage = sessionState.statusMessage,
+                        selfName = sessionState.selfName,
+                        selfAvatar = selfAvatar,
+                        peerName = sessionState.peerName,
+                        peerAvatar = sessionState.peerAvatarUrl,
                         onCopy = { clipboard.setText(AnnotatedString(sessionState.roomCode.orEmpty())) },
                         onShare = {
                             val shareText = "Join my Meoify Listen Together session!\nRoom Code: ${sessionState.roomCode}"
@@ -178,6 +189,10 @@ private fun ConnectedSessionView(
     roomCode: String,
     isHost: Boolean,
     statusMessage: String?,
+    selfName: String?,
+    selfAvatar: Any?,
+    peerName: String?,
+    peerAvatar: Any?,
     onCopy: () -> Unit,
     onShare: () -> Unit,
     onSyncNow: () -> Unit,
@@ -210,7 +225,17 @@ private fun ConnectedSessionView(
             }
         }
 
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(14.dp))
+
+        ParticipantsCard(
+            isHost = isHost,
+            selfName = selfName,
+            selfAvatar = selfAvatar,
+            peerName = peerName,
+            peerAvatar = peerAvatar,
+        )
+
+        Spacer(Modifier.height(14.dp))
 
         // Large Room Code Card
         Surface(
@@ -296,6 +321,86 @@ private fun ConnectedSessionView(
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+    }
+}
+
+@Composable
+private fun ParticipantsCard(
+    isHost: Boolean,
+    selfName: String?,
+    selfAvatar: Any?,
+    peerName: String?,
+    peerAvatar: Any?,
+) {
+    Surface(
+        shape = RoundedCornerShape(20.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(modifier = Modifier.padding(14.dp)) {
+            Text(
+                text = "IN THIS SESSION",
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                letterSpacing = 1.2.sp,
+            )
+            Spacer(Modifier.height(12.dp))
+            ParticipantRow(
+                name = when {
+                    isHost -> selfName?.takeIf { it.isNotBlank() } ?: "You"
+                    else -> peerName?.takeIf { it.isNotBlank() } ?: "Waiting for host…"
+                },
+                avatar = if (isHost) selfAvatar else peerAvatar,
+                role = "Host",
+                highlighted = true,
+            )
+            Spacer(Modifier.height(12.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+            Spacer(Modifier.height(12.dp))
+            ParticipantRow(
+                name = when {
+                    isHost -> peerName?.takeIf { it.isNotBlank() } ?: "Waiting for friends…"
+                    else -> selfName?.takeIf { it.isNotBlank() } ?: "You"
+                },
+                avatar = if (isHost) peerAvatar else selfAvatar,
+                role = if (isHost) "Joined" else "You",
+            )
+        }
+    }
+}
+
+@Composable
+private fun ParticipantRow(
+    name: String,
+    avatar: Any?,
+    role: String,
+    highlighted: Boolean = false,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        ProfileAvatar(
+            name = name,
+            url = avatar,
+            size = 38.dp,
+            ring = highlighted,
+        )
+        Spacer(Modifier.width(12.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = name,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+            )
+            Text(
+                text = role,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }
 

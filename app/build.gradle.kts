@@ -15,8 +15,8 @@ android {
         applicationId = "com.meoify.music"
         minSdk = 26
         targetSdk = 36
-        versionCode = 78
-        versionName = "3.6.1"
+        versionCode = 79
+        versionName = "3.7.0"
     }
 
     buildFeatures {
@@ -105,6 +105,8 @@ dependencies {
 
     implementation("androidx.media3:media3-exoplayer:1.8.0")
     implementation("androidx.media3:media3-exoplayer-dash:1.8.0")
+    // Needed by PlaybackService so local file:// URIs play alongside HTTP streams.
+    implementation("androidx.media3:media3-datasource:1.8.0")
     implementation("androidx.media3:media3-session:1.8.0")
 
     implementation("androidx.datastore:datastore-preferences:1.1.7")

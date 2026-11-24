@@ -158,7 +158,10 @@ import kotlin.math.PI
 import kotlin.math.sin
 
 @Composable
-fun PlayerScreen(onClose: () -> Unit) {
+fun PlayerScreen(
+    onClose: () -> Unit,
+    onAddToPlaylist: (Track) -> Unit,
+) {
     val state = LocalPlayerState.current
     val activity = LocalContext.current as? Activity
     val app = (LocalContext.current.applicationContext as com.meoify.music.MeoifyApplication)
@@ -432,7 +435,7 @@ fun PlayerScreen(onClose: () -> Unit) {
             sleepLeftMinutes = sleepLeftMinutes,
             onDismiss = { menuOpen = false },
             onShare = ::shareTrack,
-            onShowQueue = { showQueue = true },
+            onAddToPlaylist = { onAddToPlaylist(track) },
             lyricsPreviewEnabled = lyricsPreview,
             onToggleLyricsPreview = {
                 swipeScope.launch {

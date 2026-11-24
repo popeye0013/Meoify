@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.LibraryAdd
 import androidx.compose.material.icons.filled.PlaylistPlay
@@ -52,6 +53,7 @@ fun PlaylistActionSheet(
     canEdit: Boolean,
     canSave: Boolean,
     canDelete: Boolean,
+    canDownload: Boolean,
     hasTracks: Boolean,
     onDismiss: () -> Unit,
     onPlayNext: () -> Unit,
@@ -60,6 +62,7 @@ fun PlaylistActionSheet(
     onStartMix: () -> Unit,
     onEdit: () -> Unit,
     onAddToQueue: () -> Unit,
+    onDownloads: () -> Unit,
     onSave: () -> Unit,
     onDelete: () -> Unit,
 ) {
@@ -121,6 +124,9 @@ fun PlaylistActionSheet(
                 SheetAction(Icons.Filled.Edit, "Edit playlist", onClick = onEdit)
             }
             SheetAction(Icons.Filled.QueueMusic, "Add to queue", enabled = hasTracks, onClick = onAddToQueue)
+            if (canDownload) {
+                SheetAction(Icons.Filled.Download, "Offline options", onClick = onDownloads)
+            }
             if (canSave) {
                 SheetAction(Icons.Filled.LibraryAdd, "Save to playlist", onClick = onSave)
             }

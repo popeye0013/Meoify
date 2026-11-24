@@ -147,13 +147,16 @@ fun MeoifyScaffold(
     onNewPlaylistNameChange: (String) -> Unit,
     settingsOpen: Boolean,
     onSettingsOpenChange: (Boolean) -> Unit,
+    onDetailDismissed: (Destination) -> Unit,
     snackbarHostState: SnackbarHostState,
 ) {
     val actions = LocalAppActions.current
     var loginOpen by remember { mutableStateOf(false) }
 
     fun closeDetail() {
-        if (detailStack.isNotEmpty()) detailStack.removeAt(detailStack.lastIndex)
+        if (detailStack.isNotEmpty()) {
+            onDetailDismissed(detailStack.removeAt(detailStack.lastIndex))
+        }
     }
     val app = androidx.compose.ui.platform.LocalContext.current.applicationContext as com.meoify.music.MeoifyApplication
     val settings by app.container.settings.settings.collectAsStateWithLifecycle()
@@ -466,7 +469,10 @@ fun MeoifyScaffold(
             modifier = Modifier.fillMaxSize(),
             color = Color.Black,
         ) {
-            PlayerScreen(onClose = { onShowPlayerChange(false) })
+            PlayerScreen(
+                onClose = { onShowPlayerChange(false) },
+                onAddToPlaylist = onAddToPlaylist,
+            )
         }
     }
 

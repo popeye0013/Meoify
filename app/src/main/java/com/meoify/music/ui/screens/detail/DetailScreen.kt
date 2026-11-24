@@ -89,6 +89,7 @@ import com.meoify.music.playback.PlayerUiState
 import com.meoify.music.ui.components.ArtistCard
 import com.meoify.music.ui.components.MediaCard
 import com.meoify.music.ui.components.ArtworkImage
+import com.meoify.music.ui.components.DownloadOptionsSheet
 import com.meoify.music.ui.components.PlaylistActionSheet
 import com.meoify.music.ui.components.PlaylistEditorSheet
 import com.meoify.music.ui.components.SectionHeader
@@ -96,8 +97,11 @@ import com.meoify.music.ui.components.TrackCard
 import com.meoify.music.ui.navigation.Destination
 import com.meoify.music.ui.navigation.LocalAppActions
 import com.meoify.music.ui.navigation.LocalBottomContentInset
+import com.meoify.music.ui.navigation.LocalDownloads
 import com.meoify.music.ui.navigation.LocalLibrary
 import com.meoify.music.ui.navigation.LocalPlayerState
+import com.meoify.music.ui.screens.downloads.DownloadQueueScreen
+import com.meoify.music.ui.screens.downloads.DownloadsScreen
 import com.meoify.music.ui.theme.ArtworkColorCache
 import com.meoify.music.ui.viewmodel.DetailViewModel
 import com.meoify.music.ui.viewmodel.DetailViewModelFactory
@@ -108,6 +112,18 @@ fun DetailScreen(destination: Destination, onBack: () -> Unit) {
     val library = LocalLibrary.current
     val actions = LocalAppActions.current
     val playerState = LocalPlayerState.current
+
+    when (destination) {
+        is Destination.Downloads -> {
+            DownloadsScreen(onBack = onBack)
+            return
+        }
+        is Destination.DownloadQueue -> {
+            DownloadQueueScreen(onBack = onBack)
+            return
+        }
+        else -> Unit
+    }
 
     val page: DetailPage? = when (destination) {
         is Destination.Liked -> DetailPage(
@@ -207,6 +223,12 @@ private fun DetailContent(
     var page by remember(loadedPage.id) { mutableStateOf(loadedPage) }
     LaunchedEffect(loadedPage) { page = loadedPage }
     val context = LocalContext.current
+    val downloads by LocalDownloads.current.collectAsStateWithLifecycle()
+    val downloadedIds = remember(downloads) { downloads.map { it.track.id }.toSet() }
+    val allDownloaded = page.tracks.isNotEmpty() && page.tracks.all { it.id in downloadedIds }
+    val downloadManager = (context.applicationContext as MeoifyApplication).container.downloadManager
+    val trackedPlaylists by downloadManager.trackedPlaylists.collectAsStateWithLifecycle()
+    val isTracked = trackedPlaylists.any { it.id == page.id }
 
     val fallbackAccent = remember(page.id) { ArtworkColorCache.fallbackColor(page.id) }
     var accent by remember(page.id) { mutableStateOf(fallbackAccent) }
@@ -230,6 +252,7 @@ private fun DetailContent(
     val isPlayingPage = isCurrentPage && playerState.isPlaying
 
     var showMenu by remember { mutableStateOf(false) }
+    var showDownloadSheet by remember { mutableStateOf(false) }
     var showEdit by remember { mutableStateOf(false) }
     var showDelete by remember { mutableStateOf(false) }
     var showSave by remember { mutableStateOf(false) }
@@ -240,6 +263,10 @@ private fun DetailContent(
     // makes sense there, while album and artist pages are browsed in order.
     val swipeRightToQueue = page.kind == MediaKind.PLAYLIST || page.kind == MediaKind.MIX
     val isLikedPage = destination is Destination.Liked || page.id == "liked"
+    // Downloading a playlist tracks its future additions; liked songs and albums
+    // stay one-off bulk downloads.
+    val downloadPlaylistId = localPlaylistId
+        ?: if (!isLikedPage && page.kind == MediaKind.PLAYLIST) page.id else null
     // YouTube Music returns the editable header only for playlists the signed-in
     // account owns; local playlists are always editable.
     val canEdit = !isLikedPage && (localPlaylistId != null || page.owned)
@@ -424,6 +451,33 @@ private fun DetailContent(
         item { Spacer(Modifier.height(28.dp)) }
     }
 
+    if (showDownloadSheet) {
+        DownloadOptionsSheet(
+            title = page.title,
+            trackCount = page.tracks.size,
+            allDownloaded = allDownloaded,
+            canTrack = downloadPlaylistId != null,
+            isTracked = isTracked,
+            onDismiss = { showDownloadSheet = false },
+            onDownloadAll = {
+                actions.downloadTracks(page.tracks, page.title, downloadPlaylistId)
+                showDownloadSheet = false
+            },
+            onRemoveAll = {
+                page.tracks.forEach { actions.removeDownloaded(it.id) }
+                showDownloadSheet = false
+            },
+            onTrack = {
+                actions.trackPlaylistDownloads(page.id, page.title, page.tracks)
+                showDownloadSheet = false
+            },
+            onUntrack = {
+                actions.untrackPlaylistDownloads(page.id)
+                showDownloadSheet = false
+            },
+        )
+    }
+
     if (showMenu) {
         val playlistLink = if (localPlaylistId == null && !isLikedPage) {
             "https://music.youtube.com/playlist?list=${page.id.removePrefix("VL")}"
@@ -437,6 +491,7 @@ private fun DetailContent(
             canEdit = canEdit,
             canSave = canSave,
             canDelete = canDelete,
+            canDownload = page.tracks.isNotEmpty() && page.kind != MediaKind.ARTIST,
             hasTracks = page.tracks.isNotEmpty(),
             onDismiss = { showMenu = false },
             onPlayNext = {
@@ -476,6 +531,10 @@ private fun DetailContent(
             onAddToQueue = {
                 showMenu = false
                 actions.addTracksToQueue(page.tracks)
+            },
+            onDownloads = {
+                showMenu = false
+                showDownloadSheet = true
             },
             onSave = {
                 showMenu = false

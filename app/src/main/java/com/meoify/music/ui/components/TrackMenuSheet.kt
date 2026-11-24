@@ -14,10 +14,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.MoreHoriz
+import androidx.compose.material.icons.filled.OfflinePin
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.QueueMusic
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -27,6 +29,7 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import android.content.Intent
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -34,9 +37,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.meoify.music.data.remote.Artwork
 import com.meoify.music.data.model.Track
 import com.meoify.music.ui.navigation.LocalAppActions
+import com.meoify.music.ui.navigation.LocalDownloads
 import com.meoify.music.ui.navigation.LocalLibrary
 import com.meoify.music.ui.theme.ArtworkColorCache
 
@@ -50,6 +55,8 @@ fun TrackMenuSheet(
 ) {
     val actions = LocalAppActions.current
     val library = LocalLibrary.current
+    val downloads by LocalDownloads.current.collectAsStateWithLifecycle()
+    val isDownloaded = downloads.any { it.track.id == track.id }
     val context = LocalContext.current
     val sheetState = rememberModalBottomSheetState()
     val cover = rememberTrackCover(track)
@@ -85,6 +92,13 @@ fun TrackMenuSheet(
             }
             MenuItem(Icons.Filled.Favorite, if (library.isLiked(track.id)) "Remove from Liked Songs" else "Add to Liked Songs") {
                 actions.toggleLike(track); onDismiss()
+            }
+            MenuItem(
+                if (isDownloaded) Icons.Filled.OfflinePin else Icons.Filled.Download,
+                if (isDownloaded) "Remove download" else "Download song",
+            ) {
+                actions.toggleDownload(track)
+                onDismiss()
             }
             MenuItem(Icons.Filled.QueueMusic, "Play next") { actions.playNext(track); onDismiss() }
             MenuItem(Icons.Filled.Add, "Add to queue") { actions.addToQueue(track); onDismiss() }

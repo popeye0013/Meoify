@@ -9,10 +9,13 @@ import coil3.request.crossfade
 import com.meoify.music.data.CoverArtResolver
 import com.meoify.music.data.MusicRepository
 import com.meoify.music.data.YtLibrarySync
+import com.meoify.music.data.local.DownloadStore
 import com.meoify.music.data.local.LibraryStore
 import com.meoify.music.data.local.PlaybackStore
 import com.meoify.music.data.local.SettingsStore
 import com.meoify.music.data.remote.StreamResolver
+import com.meoify.music.download.DownloadManager
+import com.meoify.music.download.DownloadNotifications
 import com.meoify.music.playback.HistorySync
 import com.meoify.music.playback.ListenTogetherManager
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -39,13 +42,22 @@ class AppContainer(context: Context) {
     val coverArt = CoverArtResolver(repository, appContext)
     val ytLibrary = YtLibrarySync(repository, library)
     val streamResolver = StreamResolver(appContext, settings)
-    val player = PlayerConnection(appContext, streamResolver, library, coverArt, playback)
+    val downloadStore = DownloadStore(appContext)
+    val downloadManager = DownloadManager(appContext, downloadStore, streamResolver)
+    val player = PlayerConnection(
+        appContext,
+        streamResolver,
+        library,
+        coverArt,
+        playback,
+        downloadManager,
+    )
     // Broadcasts playlist ids whose contents changed, so open detail screens
     // can refresh instead of showing stale rows after an add/remove.
     val playlistChanges = MutableStateFlow<String?>(null)
     val historySync = HistorySync(player, repository, settings) { ytLibrary.notePlayed() }
     val scrobbleSync = ScrobbleSync(player, repository, settings)
-    val listenTogether = ListenTogetherManager(player)
+    val listenTogether = ListenTogetherManager(player, settings)
 }
 
 class MeoifyApplication : Application(), SingletonImageLoader.Factory {
@@ -55,6 +67,7 @@ class MeoifyApplication : Application(), SingletonImageLoader.Factory {
 
     override fun onCreate() {
         super.onCreate()
+        DownloadNotifications.createChannels(this)
         container = AppContainer(this)
     }
 

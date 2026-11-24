@@ -122,7 +122,37 @@ fun MeoifyTheme(
     val context = LocalContext.current
     val colorScheme = when {
         settings.dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+            if (!darkTheme) {
+                dynamicLightColorScheme(context)
+            } else {
+                val dynamic = dynamicDarkColorScheme(context)
+                if (!settings.pureBlack) {
+                    dynamic
+                } else {
+                    // Dynamic palettes ignore the pure-black surfaces. Keep the
+                    // wallpaper-derived accents but swap in the true-black
+                    // backgrounds/containers so the preference still applies.
+                    val pure = meoifyDarkScheme(pureBlack = true)
+                    dynamic.copy(
+                        background = pure.background,
+                        onBackground = pure.onBackground,
+                        surface = pure.surface,
+                        onSurface = pure.onSurface,
+                        surfaceVariant = pure.surfaceVariant,
+                        onSurfaceVariant = pure.onSurfaceVariant,
+                        surfaceDim = pure.surfaceDim,
+                        surfaceBright = pure.surfaceBright,
+                        surfaceContainerLowest = pure.surfaceContainerLowest,
+                        surfaceContainerLow = pure.surfaceContainerLow,
+                        surfaceContainer = pure.surfaceContainer,
+                        surfaceContainerHigh = pure.surfaceContainerHigh,
+                        surfaceContainerHighest = pure.surfaceContainerHighest,
+                        inverseSurface = pure.inverseSurface,
+                        inverseOnSurface = pure.inverseOnSurface,
+                        scrim = pure.scrim,
+                    )
+                }
+            }
         }
 
         darkTheme -> meoifyDarkScheme(settings.pureBlack)

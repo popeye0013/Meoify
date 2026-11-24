@@ -17,6 +17,7 @@ import com.meoify.music.data.remote.MusicArtworkMatch
 import com.meoify.music.data.remote.MusicApiException
 import com.meoify.music.data.remote.SpotifyPlaylistClient
 import com.meoify.music.data.remote.SpotifyTrack
+import java.net.URLDecoder
 import com.meoify.music.data.remote.YTMusicParser
 import com.meoify.music.data.remote.YTMusicParser.SearchFilter
 import com.meoify.music.data.remote.YTMusicParser.findAll
@@ -418,16 +419,7 @@ class MusicRepository(
     }
 
     /** Reads a playlist id from a YouTube link, or accepts a bare id. */
-    private fun youtubePlaylistId(raw: String): String? {
-        if (raw.isBlank()) return null
-        Regex("[?&]list=([^&]+)").find(raw)?.let { return it.groupValues[1] }
-        val trimmed = raw.trim()
-        return trimmed.takeIf {
-            it.startsWith("PL") || it.startsWith("VL") ||
-                it.startsWith("UU") || it.startsWith("FL") ||
-                it.startsWith("LL") || it.startsWith("RD")
-        }
-    }
+    internal fun youtubePlaylistId(raw: String): String? = playlistIdFromLink(raw)
 
     /** Appends every continuation row to [initial], up to a sane cap. */
     private suspend fun withContinuations(
@@ -912,3 +904,30 @@ class MusicRepository(
         const val FILTER_PLAYLISTS = "EgWKAQIoAWoKEAkQChAFEAMQBA%3D%3D"
     }
 }
+
+/**
+ * Accepts the links YouTube Music actually shares: query links, browse links
+ * (`/browse/VLPL...` and mix ids) and bare playlist ids. The old parser only
+ * understood `?list=` and a short prefix allow-list, which rejected browse
+ * links and newer id types.
+ */
+internal fun playlistIdFromLink(raw: String): String? {
+    val value = raw.trim()
+    if (value.isBlank()) return null
+
+    Regex("[?#&]list=([^&#]+)").find(value)?.let { match ->
+        return decodePlaylistId(match.groupValues[1]).takeIf { it.isNotBlank() }
+    }
+    Regex("/browse/([^/?#]+)").find(value)?.let { match ->
+        return decodePlaylistId(match.groupValues[1]).takeIf { it.isNotBlank() }
+    }
+
+    val bare = value.substringAfterLast('/').substringBefore('?').substringBefore('#')
+    return decodePlaylistId(bare).takeIf(::isYouTubePlaylistId)
+}
+
+private fun decodePlaylistId(value: String): String =
+    runCatching { URLDecoder.decode(value, "UTF-8") }.getOrDefault(value).trim()
+
+private fun isYouTubePlaylistId(id: String): Boolean =
+    listOf("PL", "VL", "UU", "FL", "LL", "RD", "OLAK", "MPREb").any(id::startsWith)

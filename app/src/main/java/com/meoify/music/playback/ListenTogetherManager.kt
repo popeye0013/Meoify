@@ -1,5 +1,6 @@
 package com.meoify.music.playback
 
+import com.meoify.music.data.local.SettingsStore
 import com.meoify.music.data.model.Track
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -47,7 +48,19 @@ data class SyncPayload(
     val track: Track? = null,
     val positionMs: Long = 0L,
     val isPlaying: Boolean = false,
+    /** Display name of the listener who sent this message. */
+    val senderName: String? = null,
+    /** Public avatar URL from YouTube Music; local pictures are not uploaded. */
+    val senderAvatarUrl: String? = null,
     val timestampMs: Long = System.currentTimeMillis(),
+)
+
+/** The identity shown to other listeners in a session. */
+data class SessionProfile(
+    val name: String,
+    val avatarUrl: String? = null,
+    /** Local file path for the signed-in device's own avatar. */
+    val localAvatarPath: String? = null,
 )
 
 data class SessionState(
@@ -57,10 +70,16 @@ data class SessionState(
     val isHost: Boolean = false,
     val statusMessage: String? = null,
     val error: String? = null,
+    val selfName: String? = null,
+    val selfAvatarUrl: String? = null,
+    val selfLocalAvatarPath: String? = null,
+    val peerName: String? = null,
+    val peerAvatarUrl: String? = null,
 )
 
 class ListenTogetherManager(
     private val player: PlayerConnection,
+    private val settings: SettingsStore,
     private val http: OkHttpClient = OkHttpClient(),
     private val relayServerBase: String = "https://ntfy.sh",
 ) {
@@ -71,6 +90,27 @@ class ListenTogetherManager(
     }
 
     val clientId: String = UUID.randomUUID().toString()
+
+    /**
+     * YouTube Music account identity when signed in, otherwise the Meoify local
+     * profile. Local avatar images stay on this device; only a public URL can be
+     * shared with peers over the relay.
+     */
+    private fun currentProfile(): SessionProfile {
+        val current = settings.settings.value
+        val ytName = current.accountName?.takeIf { it.isNotBlank() }
+        return if (current.ytCookies != null && ytName != null) {
+            SessionProfile(
+                name = ytName,
+                avatarUrl = current.accountAvatarUrl?.takeIf { it.startsWith("http") },
+            )
+        } else {
+            SessionProfile(
+                name = current.localProfileName?.takeIf { it.isNotBlank() } ?: "Listener",
+                localAvatarPath = current.localAvatarPath,
+            )
+        }
+    }
 
     private val _session = MutableStateFlow(SessionState())
     val session: StateFlow<SessionState> = _session.asStateFlow()
@@ -108,6 +148,7 @@ class ListenTogetherManager(
     private fun connectToRoom(code: String, isHost: Boolean) {
         disconnect()
 
+        val profile = currentProfile()
         _session.update {
             it.copy(
                 isConnecting = true,
@@ -115,6 +156,11 @@ class ListenTogetherManager(
                 isHost = isHost,
                 statusMessage = "Connecting to session $code…",
                 error = null,
+                selfName = profile.name,
+                selfAvatarUrl = profile.avatarUrl,
+                selfLocalAvatarPath = profile.localAvatarPath,
+                peerName = null,
+                peerAvatarUrl = null,
             )
         }
 
@@ -214,7 +260,14 @@ class ListenTogetherManager(
         val topic = topicForRoom(code)
         val url = "${relayServerBase.trimEnd('/')}/$topic"
 
-        val body = json.encodeToString(payload).toRequestBody("application/json".toMediaType())
+        // Stamp every outgoing message with the current identity so peers can
+        // show who is hosting and who joined without a separate handshake.
+        val profile = currentProfile()
+        val outgoing = payload.copy(
+            senderName = payload.senderName ?: profile.name,
+            senderAvatarUrl = payload.senderAvatarUrl ?: profile.avatarUrl,
+        )
+        val body = json.encodeToString(outgoing).toRequestBody("application/json".toMediaType())
         val req = Request.Builder()
             .url(url)
             .post(body)
@@ -269,6 +322,14 @@ class ListenTogetherManager(
     }
 
     private fun applyRemotePayload(payload: SyncPayload) {
+        if (!payload.senderName.isNullOrBlank()) {
+            _session.update {
+                it.copy(
+                    peerName = payload.senderName,
+                    peerAvatarUrl = payload.senderAvatarUrl,
+                )
+            }
+        }
         isApplyingRemoteUpdate = true
         scope.launch {
             try {

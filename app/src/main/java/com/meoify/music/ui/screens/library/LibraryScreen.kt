@@ -83,6 +83,7 @@ import com.meoify.music.ui.components.TrackCard
 import com.meoify.music.ui.components.TrackRow
 import com.meoify.music.ui.navigation.LocalAppActions
 import com.meoify.music.ui.navigation.LocalBottomContentInset
+import com.meoify.music.ui.navigation.LocalDownloads
 import com.meoify.music.ui.navigation.LocalLibrary
 import com.meoify.music.ui.navigation.LocalPlayerState
 import com.meoify.music.ui.navigation.LocalSignedIn
@@ -97,6 +98,7 @@ fun LibraryScreen(
     onAddToPlaylist: (Track) -> Unit,
 ) {
     val library = LocalLibrary.current
+    val downloads by LocalDownloads.current.collectAsStateWithLifecycle()
     val actions = LocalAppActions.current
     val context = LocalContext.current
     val app = context.applicationContext as MeoifyApplication
@@ -143,6 +145,13 @@ fun LibraryScreen(
         else library.recent.filter {
             it.title.contains(query, ignoreCase = true) ||
                 it.artist.contains(query, ignoreCase = true)
+        }
+    }
+    val filteredDownloads = remember(downloads, query) {
+        downloads.filter { entry ->
+            query.isBlank() ||
+                entry.track.title.contains(query, ignoreCase = true) ||
+                entry.track.artist.contains(query, ignoreCase = true)
         }
     }
 
@@ -256,6 +265,7 @@ fun LibraryScreen(
                                         LibraryFilter.Playlists -> "Playlists"
                                         LibraryFilter.Songs -> "Songs"
                                         LibraryFilter.Albums -> "Albums"
+                                        LibraryFilter.Downloads -> "Downloads"
                                     },
                                 )
                             },
@@ -476,6 +486,54 @@ fun LibraryScreen(
                             }
                             if (row.size == 1) Spacer(Modifier.weight(1f))
                         }
+                    }
+                }
+            }
+
+            LibraryFilter.Downloads -> {
+                if (filteredDownloads.isEmpty()) {
+                    item {
+                        EmptyLibrary(
+                            title = if (query.isBlank()) "No downloads yet" else "No downloads match “$query”",
+                            message = if (query.isBlank()) {
+                                "Download a song from its menu to play it without a connection."
+                            } else {
+                                "Try a different title or artist."
+                            },
+                            action = "View download queue",
+                            onAction = { actions.openDownloadQueue() },
+                        )
+                    }
+                } else {
+                    item {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                "${filteredDownloads.size} offline song${if (filteredDownloads.size == 1) "" else "s"}",
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.ExtraBold,
+                                modifier = Modifier.weight(1f),
+                            )
+                            TextButton(onClick = { actions.openDownloadQueue() }) { Text("Queue") }
+                        }
+                    }
+                    items(filteredDownloads, key = { "download_${it.track.id}" }) { entry ->
+                        TrackRow(
+                            track = entry.track,
+                            isCurrent = currentTrackId == entry.track.id,
+                            onClick = {
+                                actions.playTracks(
+                                    filteredDownloads.map { it.track },
+                                    filteredDownloads.indexOf(entry),
+                                    "Downloads",
+                                )
+                            },
+                            onMoreClick = { actions.openTrackMenu(entry.track, null) },
+                        )
                     }
                 }
             }
@@ -1015,7 +1073,7 @@ private data class PlaylistTarget(
     val fromYouTube: Boolean,
 )
 
-enum class LibraryFilter { Playlists, Songs, Albums }
+enum class LibraryFilter { Playlists, Songs, Albums, Downloads }
 
 enum class LibrarySort(
     val label: String,

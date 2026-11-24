@@ -1,5 +1,10 @@
 package com.meoify.music.ui
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -11,6 +16,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.meoify.music.AppContainer
 import com.meoify.music.data.model.AppSettings
@@ -18,10 +24,12 @@ import com.meoify.music.data.model.LibraryData
 import com.meoify.music.data.model.PlaylistEdit
 import com.meoify.music.data.model.Track
 import com.meoify.music.data.model.UiState
+import com.meoify.music.download.DownloadService
 import com.meoify.music.playback.PlayerUiState
 import com.meoify.music.ui.navigation.AppActions
 import com.meoify.music.ui.navigation.Destination
 import com.meoify.music.ui.navigation.LocalAppActions
+import com.meoify.music.ui.navigation.LocalDownloads
 import com.meoify.music.ui.navigation.LocalLibrary
 import com.meoify.music.ui.navigation.LocalPlayerState
 import com.meoify.music.ui.navigation.LocalSignedIn
@@ -47,6 +55,26 @@ fun MeoifyApp(
     val appContext = LocalContext.current.applicationContext
 
     val snackbarHostState = androidx.compose.material3.SnackbarHostState()
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { /* Downloads still work if the person declines; progress stays in-app. */ }
+
+    fun askForDownloadNotifications() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(
+                appContext,
+                Manifest.permission.POST_NOTIFICATIONS,
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        container.downloadManager.events.collect { message ->
+            snackbarHostState.showSnackbar(message)
+        }
+    }
 
     LaunchedEffect(settings.ytCookies) {
         container.repository.applyCookies(settings.ytCookies)
@@ -78,6 +106,20 @@ fun MeoifyApp(
     var showCreatePlaylist by remember { mutableStateOf(false) }
     var newPlaylistName by remember { mutableStateOf("") }
     var settingsOpen by remember { mutableStateOf(false) }
+    // Download screens opened from Settings should return there on back.
+    var returnToSettingsFromDownloads by remember { mutableStateOf(false) }
+
+    fun openDetail(destination: Destination) {
+        returnToSettingsFromDownloads = false
+        detailStack.add(destination)
+    }
+
+    fun openDownloadDestination(destination: Destination) {
+        // Keep the return flag when navigating Downloads -> Download queue.
+        if (settingsOpen) returnToSettingsFromDownloads = true
+        settingsOpen = false
+        detailStack.add(destination)
+    }
 
     // Open music.youtube.com links that Android hands to Meoify. Playlists go
     // straight to their page, ?q= links start a search, and plain song links
@@ -175,10 +217,14 @@ fun MeoifyApp(
                             snackbarHostState.showSnackbar(
                                 "Couldn't update Liked Music on YouTube Music",
                             )
+                        } else {
+                            container.downloadManager.onLikeChanged(track, !wasLiked)
                         }
                     }
                 } else {
+                    val wasLiked = library.liked.any { it.id == track.id }
                     container.library.toggleLike(track)
+                    container.downloadManager.onLikeChanged(track, !wasLiked)
                 }
             },
             togglePlayPause = { container.player.togglePlayPause() },
@@ -194,18 +240,26 @@ fun MeoifyApp(
                 trackMenuTrack = track
                 trackMenuPlaylistId = playlistId
             },
-            openAlbum = { id -> if (id != null) detailStack.add(Destination.Album(id)) },
-            openArtist = { id -> if (id != null) detailStack.add(Destination.Artist(id)) },
-            openPlaylist = { id -> detailStack.add(Destination.Playlist(id)) },
-            openLiked = { detailStack.add(Destination.Liked) },
-            openLocalPlaylist = { id -> detailStack.add(Destination.LocalPlaylist(id)) },
-            openProfile = { settingsOpen = true },
+            openAlbum = { id -> if (id != null) openDetail(Destination.Album(id)) },
+            openArtist = { id -> if (id != null) openDetail(Destination.Artist(id)) },
+            openPlaylist = { id -> openDetail(Destination.Playlist(id)) },
+            openLiked = { openDetail(Destination.Liked) },
+            openLocalPlaylist = { id -> openDetail(Destination.LocalPlaylist(id)) },
+            openProfile = {
+                returnToSettingsFromDownloads = false
+                settingsOpen = true
+            },
             openLibrary = {
+                returnToSettingsFromDownloads = false
                 detailStack.clear()
                 tab = Tab.Library
             },
-            openSettings = { settingsOpen = true },
+            openSettings = {
+                returnToSettingsFromDownloads = false
+                settingsOpen = true
+            },
             search = { query ->
+                returnToSettingsFromDownloads = false
                 settingsOpen = false
                 detailStack.clear()
                 tab = Tab.Search
@@ -336,12 +390,33 @@ fun MeoifyApp(
             },
             clearRecentSearches = { container.library.clearRecentSearches() },
             clearRecent = { container.library.clearRecent() },
+            toggleDownload = { track ->
+                askForDownloadNotifications()
+                DownloadService.start(appContext)
+                container.downloadManager.toggle(track)
+            },
+            downloadTracks = { tracks, source, playlistId ->
+                askForDownloadNotifications()
+                DownloadService.start(appContext)
+                container.downloadManager.downloadAll(tracks, source, playlistId)
+            },
+            isDownloaded = { id -> container.downloadManager.downloads.value.any { it.track.id == id } },
+            removeDownloaded = { id -> container.downloadManager.removeById(id) },
+            clearDownloads = { container.downloadManager.clearAll() },
+            openDownloads = { openDownloadDestination(Destination.Downloads) },
+            openDownloadQueue = { openDownloadDestination(Destination.DownloadQueue) },
+            trackPlaylistDownloads = { id, name, tracks ->
+                askForDownloadNotifications()
+                container.downloadManager.trackPlaylist(id, name, tracks)
+            },
+            untrackPlaylistDownloads = { id -> container.downloadManager.untrackPlaylist(id) },
         )
     }
 
     CompositionLocalProvider(
         LocalAppActions provides actions,
         LocalLibrary provides library,
+        LocalDownloads provides container.downloadManager.downloads,
         LocalPlayerState provides playerState,
         LocalYtPlaylists provides ytState.playlists,
         LocalYtLoading provides ytState.loading,
@@ -370,7 +445,16 @@ fun MeoifyApp(
             newPlaylistName = newPlaylistName,
             onNewPlaylistNameChange = { newPlaylistName = it },
             settingsOpen = settingsOpen,
-            onSettingsOpenChange = { settingsOpen = it },
+            onSettingsOpenChange = { open ->
+                settingsOpen = open
+                if (!open) returnToSettingsFromDownloads = false
+            },
+            onDetailDismissed = { destination ->
+                if (destination is Destination.Downloads || destination is Destination.DownloadQueue) {
+                    if (returnToSettingsFromDownloads) settingsOpen = true
+                    returnToSettingsFromDownloads = false
+                }
+            },
             snackbarHostState = snackbarHostState,
         )
     }

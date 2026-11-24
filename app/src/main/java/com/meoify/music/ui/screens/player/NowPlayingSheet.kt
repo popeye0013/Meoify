@@ -19,10 +19,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.QueueMusic
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Group
+import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.Lyrics
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
@@ -68,8 +68,8 @@ import com.meoify.music.util.formatDuration
 
 /**
  * The now-playing three-dot menu, presented as a modal sheet instead of a small
- * dropdown. It keeps the player actions (queue, share, video, sleep timer) and
- * adds like/queue shortcuts plus a readable song-details section.
+ * dropdown. It keeps the player actions (share, video, sleep timer) and adds
+ * like/playlist shortcuts plus a readable song-details section.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -80,7 +80,7 @@ internal fun NowPlayingSheet(
     lyricsPreviewEnabled: Boolean,
     onDismiss: () -> Unit,
     onShare: () -> Unit,
-    onShowQueue: () -> Unit,
+    onAddToPlaylist: () -> Unit,
     onToggleLyricsPreview: () -> Unit,
     onListenTogether: () -> Unit,
     onOpenVideo: () -> Unit,
@@ -175,11 +175,11 @@ internal fun NowPlayingSheet(
                     actions.toggleLike(track)
                 }
                 QuickAction(
-                    icon = Icons.AutoMirrored.Filled.QueueMusic,
-                    label = "Queue",
+                    icon = Icons.Filled.LibraryMusic,
+                    label = "Add to playlist",
                     modifier = Modifier.weight(1f),
                 ) {
-                    closeThen(onShowQueue)
+                    closeThen(onAddToPlaylist)
                 }
                 QuickAction(
                     icon = Icons.Filled.Share,
@@ -361,6 +361,7 @@ private fun QuickAction(
             fontWeight = if (active) FontWeight.Bold else FontWeight.Medium,
             color = if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
             maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
         )
     }
 }

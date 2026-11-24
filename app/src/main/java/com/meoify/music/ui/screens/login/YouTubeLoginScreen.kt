@@ -85,7 +85,10 @@ fun YouTubeLoginScreen(onBack: () -> Unit, onSignedIn: () -> Unit) {
         container.settings.setAccountName("YouTube Music account")
         scope.launch {
             val account = container.repository.account()
-            if (account != null) container.settings.setAccountName(account.displayName)
+            if (account != null) {
+                container.settings.setAccountName(account.displayName)
+                container.settings.setAccountAvatarUrl(account.avatarUrl)
+            }
         }
     }
 

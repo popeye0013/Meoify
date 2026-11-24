@@ -64,6 +64,7 @@ class SettingsStore(private val context: Context) {
         val onboarding = booleanPreferencesKey("onboarding_completed")
         val ytCookies = stringPreferencesKey("yt_cookies")
         val accountName = stringPreferencesKey("yt_account")
+        val accountAvatarUrl = stringPreferencesKey("yt_account_avatar")
         val localProfileName = stringPreferencesKey("local_profile_name")
         val localAvatarPath = stringPreferencesKey("local_avatar_path")
         val libraryGrid = booleanPreferencesKey("library_grid")
@@ -100,6 +101,7 @@ class SettingsStore(private val context: Context) {
                 onboardingCompleted = prefs[Keys.onboarding] ?: false,
                 ytCookies = prefs[Keys.ytCookies],
                 accountName = prefs[Keys.accountName],
+                accountAvatarUrl = prefs[Keys.accountAvatarUrl],
                 localProfileName = prefs[Keys.localProfileName],
                 localAvatarPath = prefs[Keys.localAvatarPath],
                 libraryGridView = prefs[Keys.libraryGrid] ?: false,
@@ -185,10 +187,17 @@ class SettingsStore(private val context: Context) {
         }
     }
 
+    fun setAccountAvatarUrl(url: String?) = scope.launch {
+        context.settingsStore.edit {
+            if (url == null) it.remove(Keys.accountAvatarUrl) else it[Keys.accountAvatarUrl] = url
+        }
+    }
+
     fun logoutYouTube() = scope.launch {
         context.settingsStore.edit {
             it.remove(Keys.ytCookies)
             it.remove(Keys.accountName)
+            it.remove(Keys.accountAvatarUrl)
         }
     }
 

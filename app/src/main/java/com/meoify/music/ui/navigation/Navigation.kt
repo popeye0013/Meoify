@@ -3,11 +3,13 @@ package com.meoify.music.ui.navigation
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.unit.dp
+import com.meoify.music.data.model.DownloadedTrack
 import com.meoify.music.data.model.LibraryData
 import com.meoify.music.data.model.MediaCard
 import com.meoify.music.data.model.PlaylistEdit
 import com.meoify.music.data.model.Track
 import com.meoify.music.playback.PlayerUiState
+import kotlinx.coroutines.flow.StateFlow
 
 sealed class Destination(val key: String) {
     data class Album(val id: String) : Destination("album:$id")
@@ -15,6 +17,8 @@ sealed class Destination(val key: String) {
     data class Artist(val id: String) : Destination("artist:$id")
     data object Liked : Destination("liked")
     data class LocalPlaylist(val id: String) : Destination("local:$id")
+    data object Downloads : Destination("downloads")
+    data object DownloadQueue : Destination("download_queue")
 }
 
 data class AppActions(
@@ -68,12 +72,26 @@ data class AppActions(
     val editPlaylist: (String, PlaylistEdit) -> Unit,
     val clearRecentSearches: () -> Unit,
     val clearRecent: () -> Unit,
+    /** Adds or removes one song from offline storage. */
+    val toggleDownload: (Track) -> Unit,
+    val downloadTracks: (List<Track>, String, String?) -> Unit,
+    val isDownloaded: (String) -> Boolean,
+    val removeDownloaded: (String) -> Unit,
+    val clearDownloads: () -> Unit,
+    val openDownloads: () -> Unit,
+    val openDownloadQueue: () -> Unit,
+    /** Downloads future additions to this playlist and prunes removed songs. */
+    val trackPlaylistDownloads: (String, String, List<Track>) -> Unit,
+    val untrackPlaylistDownloads: (String) -> Unit,
 )
 
 val LocalAppActions = compositionLocalOf<AppActions> { error("AppActions not provided") }
 val LocalLibrary = compositionLocalOf<LibraryData> { LibraryData() }
 val LocalPlayerState = compositionLocalOf<PlayerUiState> { PlayerUiState() }
 val LocalLikedIds = compositionLocalOf<Set<String>> { emptySet() }
+val LocalDownloads = compositionLocalOf<StateFlow<List<DownloadedTrack>>> {
+    error("Download state not provided")
+}
 
 /**
  * Extra bottom padding scrollable screens should add to their content, so the

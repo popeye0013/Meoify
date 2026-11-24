@@ -11,6 +11,7 @@ import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
@@ -96,7 +97,12 @@ class PlaybackService : MediaSessionService() {
             .build()
 
         val player = ExoPlayer.Builder(this)
-            .setMediaSourceFactory(DefaultMediaSourceFactory(dataSourceFactory))
+            // DefaultDataSource delegates file:// to FileDataSource and http(s)
+            // to the configured YouTube-aware factory, so offline tracks and
+            // network streams share one media source chain.
+            .setMediaSourceFactory(
+                DefaultMediaSourceFactory(DefaultDataSource.Factory(this, dataSourceFactory)),
+            )
             .setLoadControl(loadControl)
             // handleAudioFocus = true: Media3 ducks on transient focus loss
             // (calls, notifications) and pauses on permanent loss.

@@ -179,6 +179,10 @@ private fun TrackCardBody(
                             )
                         }
                     }
+                    DownloadedBadge(
+                        trackId = track.id,
+                        modifier = Modifier.align(Alignment.BottomEnd).padding(2.dp),
+                    )
                 }
                 Spacer(Modifier.width(12.dp))
             }

@@ -215,6 +215,7 @@ data class AppSettings(
     val lastfmUsername: String? = null,
     val ytCookies: String? = null,
     val accountName: String? = null,
+    val accountAvatarUrl: String? = null,
     val localProfileName: String? = null,
     val localAvatarPath: String? = null,
     val libraryGridView: Boolean = false,
