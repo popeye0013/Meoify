@@ -80,22 +80,26 @@
 
 - **Full player** — square artwork, wavy seek bar, shuffle, repeat, mute, queue management and a floating mini player.
 - **Queue gestures** — hold a song to reorder the queue, or swipe it right to remove it.
-- **Now Playing sheet** — the three-dot menu opens a modal sheet with queue, share, video and sleep actions plus full song details.
+- **Now Playing sheet** — the three-dot menu opens a modal sheet with quick Like, Add to playlist, Share and Sleep actions, plus Play next, Add to queue, video, Listen Together, lyrics and sleep-timer options and full song details.
 - **Swipe to queue** — swipe a song right in any playlist or Liked Songs to add it to the queue without leaving the list.
 - **Background playback** — Media3 / ExoPlayer with lockscreen and notification controls.
+- **Offline downloads** — save songs, albums and playlists for local playback, with a pause/resume queue, retry and artwork kept on device. Tracked playlists pick up newly added songs automatically.
+- **Download settings** — optional auto-download on Like, a configurable offline storage limit, and live saved and in-progress counts in Settings. A single song saves silently; a batch chimes once when it finishes.
 - **Six audio modes** — Auto, Hi-Res Audio, CD Lossless, Standard (320 kbps), YouTube Music and Data Saver. See [Audio quality](#audio-quality).
 - **Sleep timer** — stop playback after 5, 10, 15, 30, 45 or 60 minutes.
 - **Synced lyrics** — LRC from LRCLIB with auto-scroll and tap-to-seek, plus a plain-text fallback.
 - **Lyrics preview** — real-time synced lyrics under the album art on Now Playing.
 - **Volume & output** — media volume slider with a Bluetooth battery badge; switch outputs from the system.
-- **Listen Together (Live Sync)** — listen in real time with friends. Room codes sync track changes, play/pause, and seek position across devices via a low-latency relay.
+- **Listen Together (Live Sync)** — listen in real time with friends. Room codes sync track changes, play/pause, and seek position across devices via a low-latency relay, and the session shows host and friend names and avatars from YouTube Music or the local profile.
 - **High refresh rate** — uses up to 120 Hz where the display supports it.
 - **Real album artwork** — covers are looked up in this order: Spotify, Apple iTunes, then YouTube Music. A video frame is never used as song artwork. Covers and decoded images are cached in memory and on disk, so they load instantly on mobile data and Wi-Fi.
 
 ### <img src="docs/icons/library-accounts.svg" width="21" height="21" alt="" />&nbsp;Library &amp; accounts
 
 - **Liked songs, playlists, saved albums and history** — with list and grid layouts.
-- **YouTube Music playlists** — your account playlists appear in Library and open straight in the player.
+- **Downloads screen** — browse saved songs, see how much storage they use, manage the download queue and remove downloads individually or all at once.
+- **Add to playlist sheet** — a card-style sheet with real playlist covers and a keyboard-friendly New playlist field.
+- **YouTube Music playlists** — your account playlists appear in Library and open straight in the player. Import links accept browse URLs, mixes and bare playlist IDs as well as standard playlist links.
 - **Optional sign-in** — web sign-in for a personalised feed and account library; likes and playlists sync back.
 - **Listening history sync** — real listens are reported with the same tracking ping YouTube's web player uses.
 - **Local profile** — use Meoify without an account and pick a name and avatar shown across the app.
@@ -104,7 +108,7 @@
 
 ### <img src="docs/icons/design-details.svg" width="21" height="21" alt="" />&nbsp;Design &amp; details
 
-- **Material 3 Expressive** — light, dark and pure-black themes, dynamic colour on Android 12+ (including the splash screen and its equalizer bars), rounded surfaces and Google Sans Flex.
+- **Material 3 Expressive** — light, dark and pure-black themes (pure black also works with dynamic colour), dynamic colour on Android 12+ (including the splash screen and its equalizer bars), rounded surfaces and Google Sans Flex.
 - **Volume & output popup** — the speaker button on Now Playing opens a media volume slider with a Bluetooth battery badge. Output switching happens via the system. The button shows a speaker or Bluetooth icon to match the active output.
 - **Sharing** — share songs or jump to album and artist pages from the track menu.
 - **In-app updates** — release notes in Settings and an optional home-screen prompt.
